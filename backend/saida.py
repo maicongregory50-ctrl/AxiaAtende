@@ -50,6 +50,16 @@ class Saida:
         raise NotImplementedError
 
 
+def wa_id_do_whatsapp(numero: str) -> str:
+    """O id do WhatsApp de um celular brasileiro e o numero ANTIGO, sem o 9 (o seu chega assim nos
+    avisos da Meta: 554991505565). O cartao de contato com o id errado nao mostra "Conversar", so
+    "Convidar" (ensaio de 09/10/2026, cartao do Benedito)."""
+    n = "".join(c for c in (numero or "") if c.isdigit())
+    if len(n) == 13 and n.startswith("55") and n[4] == "9":
+        return n[:4] + n[5:]
+    return n
+
+
 def conferir_botoes(opcoes: list[Opcao]) -> None:
     if not 1 <= len(opcoes) <= MAX_BOTOES:
         raise ValueError("botoes: de 1 a %d, vieram %d" % (MAX_BOTOES, len(opcoes)))
@@ -102,7 +112,7 @@ class SaidaMeta(Saida):
         partes = nome.split()
         cartao = Contact(name=Contact.Name(formatted_name=nome, first_name=partes[0],
                                            last_name=" ".join(partes[1:]) or None),
-                         phones=[Contact.Phone(phone="+" + whatsapp, wa_id=whatsapp, type="WORK")],
+                         phones=[Contact.Phone(phone="+" + whatsapp, wa_id=wa_id_do_whatsapp(whatsapp), type="WORK")],
                          org=Contact.Org(company=empresa))
         return self._wa.send_contact(to=para, contact=cartao).id
 

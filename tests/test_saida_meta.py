@@ -48,7 +48,9 @@ def test_contato_vai_como_cartao_com_o_whatsapp_de_quem_atende(meta):
     assert c["type"] == "contacts"
     cartao = c["contacts"][0]
     assert cartao["name"]["formatted_name"] == "Willian Souza" and cartao["name"]["first_name"] == "Willian"
-    assert cartao["phones"][0]["wa_id"] == "5546999784298" and cartao["org"]["company"] == "Sementes Renascer"
+    assert cartao["phones"][0]["phone"] == "+5546999784298"
+    assert cartao["phones"][0]["wa_id"] == "554699784298"          # o id do WhatsApp: sem o 9
+    assert cartao["org"]["company"] == "Sementes Renascer"
 
 
 def test_lista_vai_como_interactive_list(meta):
