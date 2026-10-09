@@ -190,17 +190,17 @@ try {
 }
 Ok "banco $BANCO, dono $APP"
 
-# A chave do pedido de envio vai tambem para o publicador do AxiaMarketing (o unico que pede).
+# A chave do pedido de envio vai tambem para o AxiaMarketing (o servico confere a lista; o publicador pede).
 # Instalacao antiga sem a chave: ela nasce agora, nos dois lados.
 if (-not (Ler-Segredo 'AXIAATENDE_CHAVE_PEDIDO')) {
     [IO.File]::AppendAllText($SEGREDOS, "AXIAATENDE_CHAVE_PEDIDO=$(Nova-Senha)`r`n", $SEM_BOM)
 }
 $chave = Ler-Segredo 'AXIAATENDE_CHAVE_PEDIDO'
-$ENVPUB = 'C:\AxiaMarketing\.env.publicador'
+$ENVPUB = 'C:\AxiaMarketing\.env.secrets'   # o config do marketing le a chave daqui (#950)
 if (Test-Path $ENVPUB) {
     $linhas = [IO.File]::ReadAllLines($ENVPUB) | Where-Object { -not $_.StartsWith('AXIAATENDE_CHAVE_PEDIDO=') }
     [IO.File]::WriteAllText($ENVPUB, (($linhas + "AXIAATENDE_CHAVE_PEDIDO=$chave") -join "`r`n") + "`r`n", $SEM_BOM)
-    Ok 'chave do pedido de envio escrita tambem no .env.publicador do AxiaMarketing'
+    Ok 'chave do pedido de envio escrita tambem no .env.secrets do AxiaMarketing'
 } else {
     Write-Host "   ??  $ENVPUB nao existe: o Marketing ainda nao consegue pedir envio" -ForegroundColor Yellow
 }
