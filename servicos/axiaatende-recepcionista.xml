@@ -3,7 +3,9 @@
   <name>AxiaAtende - Recepcionista</name>
   <description>AxiaAtende - o recepcionista do WhatsApp 49 3664 0121 (127.0.0.1:8008, publicado pelo Funnel na 443). O unico processo que fala com a Meta. #950</description>
   <executable>C:\AxiaAtende\.venv\Scripts\python.exe</executable>
-  <arguments>-m uvicorn backend.recepcionista:app --host 127.0.0.1 --port 8008 --proxy-headers --forwarded-allow-ips 127.0.0.1</arguments>
+  <arguments>-m uvicorn backend.recepcionista:app --host 127.0.0.1 --port 8008 --no-access-log --proxy-headers --forwarded-allow-ips 127.0.0.1</arguments>
+  <!-- Sem log de acesso: o aperto de mao da Meta traz o token de verificacao no endereco, e ele
+       iria parar no arquivo. O que chega fica no banco (eventos_meta), e a saude diz o ultimo. -->
   <workingdirectory>C:\AxiaAtende</workingdirectory>
   <startmode>Automatic</startmode>
   <depend>axiaatende-postgres</depend>
