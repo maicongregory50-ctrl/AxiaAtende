@@ -12,8 +12,9 @@ Ver, cliente por cliente, o que aconteceu com um envio aprovado. Há dois tipos:
 - **Material para cliente** — a peça da esteira, com a versão de cada revenda. Vai um **convite** com
   a capa e os botões "Quero receber" / "Não quero receber"; quem toca "Quero receber" recebe as
   imagens na conversa, sem custo, e o aceite fica gravado.
-- **Comunicação direta** — uma arte com o texto e o botão "Falar com o meu atendimento", que abre o
-  WhatsApp do responsável daquele cliente. **Só vai a quem já aceitou.**
+- **Comunicação direta** — uma arte com o texto e o botão "Falar com meu atendimento": um toque e
+  o cliente já está no WhatsApp do responsável dele, e o toque fica anotado. **Só vai a quem já
+  aceitou.**
 
 ## 2. Quem usa e quando
 
@@ -37,6 +38,7 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **Entregues** e **Lidos** | a confirmação que a Meta devolve |
 | **Quero receber** | tocou o botão: recebeu as imagens e o aceite ficou gravado |
 | **Não quero** | tocou o botão: saiu da lista para sempre, e o responsável dele recebeu um aviso no WhatsApp para um contato direto |
+| **Tocou em falar** (só na comunicação direta) | tocou "Falar com meu atendimento" e foi levado ao WhatsApp do responsável. Se ele mandou mensagem, isso acontece no WhatsApp do responsável: esta tela não vê |
 | **Não entregues** | a Meta recusou, em geral porque o número não é WhatsApp; o cadastro do cliente precisa de correção no ERP |
 | **Sem responsável** | o canal comercial do cadastro do cliente no ERP está vazio: ele **não recebe** até alguém preencher. A linha mostra o vendedor do último pedido como sugestão |
 | **Sem aceite** (só na comunicação direta) | o cliente nunca aceitou: precisa tocar "Quero receber" num material antes |
