@@ -99,6 +99,30 @@ def rotas(cfg) -> APIRouter:
                     WHERE envio_id = %s GROUP BY situacao""", (envio_id,))}
         return {"envio_id": envio_id, "situacoes": contagem}
 
+    @r.get("/pedido/modelos")
+    def modelos(x_axiaatende_chave: str | None = Header(default=None)):
+        """Os modelos ativos do cadastro, para a ficha do marketing oferecer so os que existem."""
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            return {"modelos": [dict(m) for m in con.execute(
+                """SELECT nome, categoria, uso, cabecalho_imagem, variaveis, botao, texto
+                     FROM atendimento.modelos WHERE ativo ORDER BY uso, nome""")]}
+
+    class Numeros(BaseModel):
+        numeros: list[str] = Field(max_length=5000)
+
+    @r.post("/pedido/aceites")
+    def aceites(pedido: Numeros, x_axiaatende_chave: str | None = Header(default=None)):
+        """O ultimo toque de cada numero ("aceite" ou "recusa"); quem nunca tocou nao aparece.
+        A conferencia da comunicacao direta usa isto junto com o aceite do cadastro."""
+        conferir(x_axiaatende_chave)
+        numeros = sorted({E.so_digitos(n) for n in pedido.numeros if n})
+        with conexao(cfg) as con:
+            linhas = con.execute(
+                """SELECT DISTINCT ON (whatsapp) whatsapp, tipo FROM atendimento.consentimentos
+                    WHERE whatsapp = ANY(%s) ORDER BY whatsapp, em DESC, id DESC""", (numeros,)).fetchall()
+        return {"aceites": {l["whatsapp"]: l["tipo"] for l in linhas}}
+
     @r.get("/pedido/resumo")
     def resumo(desde: datetime, ate: datetime, x_axiaatende_chave: str | None = Header(default=None)):
         """O KR2: no periodo, quantos clientes receberam convite, quantos responderam (tocaram ou

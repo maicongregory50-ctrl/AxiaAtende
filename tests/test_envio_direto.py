@@ -106,3 +106,17 @@ def test_quem_recusou_no_cadastro_nao_recebe_nem_convite(ligado, imagens):
     pedir(ligado, pedido(imagens, [dict(cliente(1, 10), aceite_cadastro=False), cliente(2, 5)]))
     d = destinatarios(ligado)
     assert d[1]["situacao"] == "recusou_antes" and d[2]["situacao"] == "aguardando"
+
+
+def test_modelos_e_aceites_para_a_ficha_do_marketing(ligado, imagens):
+    with conexao(ligado) as con:
+        con.execute("""INSERT INTO atendimento.consentimentos (whatsapp, tipo, wamid) VALUES
+                       ('5547999990001', 'aceite', 'w1'), ('5547999990002', 'aceite', 'w2'),
+                       ('5547999990002', 'recusa', 'w3')""")
+    with TestClient(criar_app(ligado)) as c:
+        m = c.get("/pedido/modelos", headers=CHAVE).json()["modelos"]
+        a = c.post("/pedido/aceites", json={"numeros": ["47 99999-0001", "5547999990002", "5547999990003"]},
+                   headers=CHAVE).json()["aceites"]
+        assert c.get("/pedido/modelos").status_code == 403
+    assert {x["nome"] for x in m} >= {"pecas_da_revenda", "epoca_de_plantio"}
+    assert a == {"5547999990001": "aceite", "5547999990002": "recusa"}
