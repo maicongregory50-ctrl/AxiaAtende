@@ -82,6 +82,17 @@ def test_em_escuta_grava_e_nao_responde_ninguem(ligado):
         assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 0
 
 
+def test_no_ensaio_responde_so_aos_numeros_do_ensaio(ligado):
+    ensaio = replace(ligado, responde_so_para=("5549991505565",))
+    s = SaidaFalsa()
+    with TestClient(R.criar_app(ensaio, saida=s, trabalhador=False)) as c:
+        _postar(c, aviso([texto("wamid.1", "oi")]))                                    # um cliente
+        _postar(c, aviso([texto("wamid.2", "oi", numero="5549991505565")], numero="5549991505565"))
+    R.processar_pendentes(ensaio, s, None, agora=QUINTA_14H)
+    assert [e["erro"] for e in _eventos(ensaio)] == ["escuta (ensaio)", ""]
+    assert len(s.enviadas) == 1 and "5549991505565" in str(s.enviadas[0])
+
+
 def test_status_da_meta_avanca_e_nao_volta(ligado):
     s = SaidaFalsa()
     with conexao(ligado) as con:

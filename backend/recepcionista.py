@@ -110,7 +110,10 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
                     elif ev["tipo"] == "mensagem":
                         corpo = ev["corpo"]
                         entrada = motor.ler_mensagem({"contacts": corpo["contacts"]}, corpo["msg"])
-                        motor.tratar(con, saida, ia, entrada, momento, envio)
+                        if cfg.responde_so_para and entrada.pessoa.wa_id not in cfg.responde_so_para:
+                            erro = "escuta (ensaio)"   # o Opa responde a quem nao esta no ensaio
+                        else:
+                            motor.tratar(con, saida, ia, entrada, momento, envio)
             except Exception as falha:  # noqa: BLE001 -- um evento ruim nao trava a fila
                 erro = "%s: %s" % (type(falha).__name__, str(falha)[:300])
             con.execute("UPDATE atendimento.eventos_meta SET processado_em = %s, erro = %s WHERE id = %s",
@@ -179,6 +182,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
         return {"de_pe": True, "ambiente": cfg.ambiente, "responde": cfg.responde,
+                "so_para": len(cfg.responde_so_para),
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None}
 

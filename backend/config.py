@@ -76,6 +76,10 @@ class Config:
     anthropic_url: str = ANTHROPIC_URL
     anthropic_chave: str = field(default="", repr=False)
     responde: bool = False
+    # O ENSAIO (#950, H1): o Opa so desliga pelo suporte dele, entao no ensaio o recepcionista
+    # responde SO a estes numeros (`ATENDE_SO_PARA=5549...,5549...`) e grava os outros em escuta.
+    # Vazio = responde a todos (a troca de verdade).
+    responde_so_para: tuple = ()
 
     def dsn(self) -> str:
         partes = ["host=%s" % self.banco_host, "port=%d" % self.banco_porta,
@@ -133,6 +137,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             anthropic_chave=segredos.get("ANTHROPIC_API_KEY", ""),
             chave_pedido=segredos.get("AXIAATENDE_CHAVE_PEDIDO", ""),
             responde=segredos.get("ATENDE_RESPONDE", "false").lower() == "true",
+            responde_so_para=tuple(n.strip() for n in segredos.get("ATENDE_SO_PARA", "").split(",") if n.strip()),
             # `AXIAATENDE_SAIDA`: `local` (o padrao: as telas so em http://127.0.0.1:8009).
             cookie_seguro=os.environ.get("AXIAATENDE_SAIDA", "local") == "vpn",
         )
