@@ -1,0 +1,20 @@
+#!/bin/sh
+# pre-commit -- invólucro do portão do commit pelo índice compartilhado (#539). Instalado pelo #841.
+#
+# A REGRA MORA NUM LUGAR SÓ: C:/SuporteAxia/scripts/githooks/pre-commit-indice.sh -- que é a fonte
+# declarada na tabela de `C:\AxiaSecurity\scripts\conferir_portoes_git.py` (PORTOES_COMUNS). Copiar
+# a regra para cá faria TRÊS cópias de uma coisa que a tabela chama de única, e a terceira
+# divergiria em silêncio. Por isso este arquivo aponta, e não duplica.
+#
+# O invólucro do próprio SuporteAxia resolve a fonte por `dirname $0`, porque lá ela está ao lado.
+# Aqui não está, então o caminho é absoluto -- e é justamente o que faz uma edição na regra valer
+# nos três repositórios no mesmo instante.
+#
+# Sem a fonte, avisa e deixa passar: falha ABERTA (D9 da spec). Quem cobra a ausência é o
+# conferidor, não o silêncio.
+fonte="C:/SuporteAxia/scripts/githooks/pre-commit-indice.sh"
+if [ ! -f "$fonte" ]; then
+    echo "aviso: portao do commit desligado -- fonte ausente: $fonte" >&2
+    exit 0
+fi
+exec sh "$fonte" "$@"
