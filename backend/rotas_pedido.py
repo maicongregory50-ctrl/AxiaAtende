@@ -35,7 +35,7 @@ class Cliente(BaseModel):
     responsavel_nome: str = ""
     responsavel_whatsapp: str = ""
     sugestao_vendedor: str = ""
-    aceite_cadastro: bool = False          # o aceite de marketing do cadastro (#952)
+    aceite_cadastro: bool | None = None    # o aceite do cadastro (#952): True, False (recusou) ou None
     capa: str | None = None                # a versao deste cliente (a peca da revenda com a logo dela)
     imagens: list[str] | None = None
 

@@ -100,3 +100,9 @@ def test_aviso_de_recusa_sai_pelo_modelo_do_cadastro(ligado, imagens):
     Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_9H)
     assert s.modelos[-1]["nome"] == "aviso_recusa"
     assert s.modelos[-1]["corpo"] == ["Cliente X", "10 · Rio do Sul", "https://wa.me/554799"]
+
+
+def test_quem_recusou_no_cadastro_nao_recebe_nem_convite(ligado, imagens):
+    pedir(ligado, pedido(imagens, [dict(cliente(1, 10), aceite_cadastro=False), cliente(2, 5)]))
+    d = destinatarios(ligado)
+    assert d[1]["situacao"] == "recusou_antes" and d[2]["situacao"] == "aguardando"

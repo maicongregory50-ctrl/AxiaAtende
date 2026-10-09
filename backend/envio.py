@@ -98,12 +98,13 @@ def receber_pedido(con, pedido: dict) -> int:
     for pos, c in enumerate(ordenados, start=1):
         numero = so_digitos(c.get("whatsapp", ""))
         resp = so_digitos(c.get("responsavel_whatsapp", ""))
-        aceite_cadastro = bool(c.get("aceite_cadastro"))
+        # o aceite do cadastro (#952): True aceitou, False RECUSOU, None nao perguntado
+        aceite_cadastro = c.get("aceite_cadastro") is True
         if not CELULAR.match(numero):
             situacao = "sem_whatsapp"
         elif not c.get("responsavel_nome") or not CELULAR.match(resp):
             situacao = "sem_responsavel"
-        elif _ultimo_consentimento(con, numero) == "recusa":
+        elif c.get("aceite_cadastro") is False or _ultimo_consentimento(con, numero) == "recusa":
             situacao = "recusou_antes"
         elif tipo == "direta" and not (aceite_cadastro or _ultimo_consentimento(con, numero) == "aceite"):
             situacao = "sem_aceite"
