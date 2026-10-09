@@ -77,10 +77,23 @@ Ao encerrar ou fazer pausa longa:
 
 ## Segurança e Backup (Axia Security)
 
-- Segredos só em `C:\AxiaAtende\.env.secrets`, fechado a administrador: o token da Meta **só de
-  WhatsApp** (app `axiaatende`, não o do AxiaMarketing), o segredo do app (assinatura dos avisos) e a
-  chave da Anthropic **própria, com teto de gasto**. Nunca em código, commit, log ou tela.
-- O único processo exposto é o recepcionista (`127.0.0.1:8008`, LocalService), publicado pelo Funnel do
-  Tailscale em `:443`. Ele confere a assinatura `X-Hub-Signature-256` de todo aviso. As telas ficam em
-  `127.0.0.1:8009`, sem saída externa.
-- Logs em `C:\Logs\AxiaAtende`, backup do banco e do código pelo `/security` (passo G6 do plano).
+- Segredos em dois arquivos fechados a administrador, nunca em código, commit, log ou tela:
+  - `C:\AxiaAtende\.env.secrets` (as telas, LocalSystem): a senha do banco e a chave do pedido do
+    Marketing;
+  - `C:\AxiaAtende\.env.recepcionista` (o recepcionista, LocalService também lê): a senha do banco, o
+    token da Meta **só de WhatsApp** (app `axiaatende`, não o do AxiaMarketing), o segredo do app
+    (assinatura dos avisos), o token de verificação, a chave da Anthropic **própria, com teto de
+    gasto** (workspace `axiaatende`) e `ATENDE_RESPONDE`.
+- O único processo exposto é o recepcionista (`127.0.0.1:8008`, LocalService, sem log de acesso),
+  publicado pelo Funnel do Tailscale em `:443`. Ele confere a assinatura `X-Hub-Signature-256` de todo
+  aviso. As telas ficam em `127.0.0.1:8009`, sem saída externa.
+- **Logs:** `C:\Logs\AxiaAtende` (telas) e `C:\Logs\AxiaAtende\recepcionista` (o recepcionista, que só
+  escreve ali).
+- **Backup do banco** (G6, 09/10/2026): `C:\AxiaSecurity\backups\backup_axiaatende_banco.ps1` (02:20,
+  `D:\Backup\AxiaAtende-Banco`, 30 dias, marcador `C:\Logs\Seguranca\BackupDisco\axiaatende-banco.ok`) e
+  `backup_cloud_axiaatende_banco.ps1` (02:45, cifrado em `cryptsecrets:AxiaAtende-Banco`, 90 dias,
+  `C:\Logs\Seguranca\BackupNuvem\axiaatende-banco.ok`). O código está no GitHub
+  (`maicongregory50-ctrl/AxiaAtende`), e o painel confere o push.
+- **Monitoramento:** grupo *AxiaAtende - WhatsApp* do `C:\AxiaSecurity\dashboard_live.html` —
+  recepcionista, avisos da Meta (amarelo com mais de 24 h de dia útil sem aviso), Funnel 443, telas e
+  banco. Catálogo: `rotinas.json` (`axiaatende-recepcionista`, `axiaatende-backend` e os dois backups).
