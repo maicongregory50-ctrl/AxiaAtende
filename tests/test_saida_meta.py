@@ -14,6 +14,8 @@ def meta():
 
     def responder(req: httpx.Request):
         pedidos.append(req)
+        if req.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "midia.%d" % len(pedidos)})
         return httpx.Response(200, json={"messaging_product": "whatsapp",
                                          "contacts": [{"input": "5549999990000", "wa_id": "5549999990000"}],
                                          "messages": [{"id": "wamid.meta.%d" % len(pedidos)}]})
@@ -65,3 +67,32 @@ def test_mais_de_tres_botoes_e_recusado_antes_de_sair(meta):
     with pytest.raises(ValueError):
         s.botoes("5549999990000", "x", [Opcao("a", "1"), Opcao("b", "2"), Opcao("c", "3"), Opcao("d", "4")])
     assert pedidos == []
+
+
+def test_modelo_do_convite_sobe_a_capa_e_vai_com_corpo_e_botoes(meta, tmp_path):
+    s, pedidos = meta
+    capa = tmp_path / "capa.jpg"
+    capa.write_bytes(b"\xff\xd8\xff falsa")
+    s.modelo("5549999990000", "pecas_da_revenda", "pt_BR", ["Agro", "3"], imagem=str(capa),
+             botoes=["envio:1:quero", "envio:1:nao_quero"])
+    assert pedidos[0].url.path.endswith("/media")
+    t = _corpo(pedidos[-1])
+    assert t["type"] == "template" and t["template"]["name"] == "pecas_da_revenda"
+    assert t["template"]["language"]["code"] == "pt_BR"
+    comps = t["template"]["components"]
+    assert comps[0]["type"] == "header" and comps[0]["parameters"][0]["type"] == "image"
+    assert [p["text"] for p in comps[1]["parameters"]] == ["Agro", "3"]
+    assert [c["parameters"][0]["payload"] for c in comps[2:]] == ["envio:1:quero", "envio:1:nao_quero"]
+
+
+def test_nota_do_numero_e_so_leitura():
+    pedidos = []
+
+    def responder(req):
+        pedidos.append(req)
+        return httpx.Response(200, json={"id": "725888737278277", "display_phone_number": "+55 49 3664-0121",
+                                         "verified_name": "Sementes Renascer", "quality_rating": "GREEN"})
+
+    s = SaidaMeta("725888737278277", "token-falso", sessao=httpx.Client(transport=httpx.MockTransport(responder)))
+    assert s.nota() == "GREEN"
+    assert all(p.method == "GET" for p in pedidos)

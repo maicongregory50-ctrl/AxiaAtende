@@ -250,6 +250,9 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None) -> No
         con.execute("UPDATE atendimento.conversas SET ia_confirmou = false WHERE id = %s", (conversa["id"],))
         mostrar_menu(con, saida, p, conversa, False)
     else:
+        # Quem foi convidado e escreveu: o texto fica tambem na linha dele na tela Envios.
+        if envio is not None and e.texto:
+            envio.tratar_texto_de_convidado(con, e, agora)
         # Texto, audio, foto, toque antigo: a IA le o que der; o resto vai para o menu.
         propor(con, saida, ia, p, conversa, e.texto or "", nova)
 

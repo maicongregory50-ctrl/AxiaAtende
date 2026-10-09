@@ -90,6 +90,11 @@ class SaidaMeta(Saida):
             to=para, text=texto,
             buttons=SectionList(button_title=botao, sections=[Section(title="Opções", rows=linhas)])).id
 
+    def nota(self) -> str:
+        """A nota de qualidade do numero na Meta (GREEN/YELLOW/RED), so leitura."""
+        q = self._wa.get_business_phone_number().quality_rating
+        return str(getattr(q, "value", q) or "UNKNOWN").upper()   # o PyWa pode devolver enum
+
     def imagem(self, para, arquivo, legenda=""):
         return self._wa.send_image(to=para, image=arquivo, caption=legenda or None).id
 
@@ -107,4 +112,6 @@ class SaidaMeta(Saida):
         for i, carga in enumerate(botoes or []):
             componentes.append({"type": "button", "sub_type": "quick_reply", "index": str(i),
                                 "parameters": [{"type": "payload", "payload": carga}]})
-        return self._wa.send_template(to=para, name=nome, language=idioma, params=componentes).id
+        from pywa.types.templates import TemplateLanguage   # o PyWa pede o idioma no tipo dele
+        return self._wa.send_template(to=para, name=nome, language=TemplateLanguage(idioma),
+                                      params=componentes).id

@@ -139,6 +139,9 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
     if ia is None and cfg.anthropic_chave:
         from .ia import IA
         ia = IA(cfg)
+    if envio is None and saida is not None:
+        from .envio import Envio
+        envio = Envio(ler_nota=getattr(saida, "nota", None))
     parar = threading.Event()
 
     def laco():

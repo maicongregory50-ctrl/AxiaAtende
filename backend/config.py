@@ -55,6 +55,11 @@ class Config:
     banco_usuario: str
     banco_senha: str = field(repr=False)
     processo: str = "telas"
+    # A chave do pedido de envio: so o publicador do AxiaMarketing a tem (o instalador a escreve
+    # nos dois lados). Sem ela, a API de pedido recusa: convite e mensagem paga.
+    chave_pedido: str = field(default="", repr=False)
+    # As imagens de cada envio, copiadas do Marketing para ca, onde o recepcionista (LocalService) le.
+    envios_pasta: Path = Path(r"C:\Dados\AxiaAtende\envios")
     logs: Path = Path(r"C:\Logs\AxiaAtende")
     tela: Path = RAIZ / "frontend" / "dist"
     cookie_seguro: bool = False
@@ -117,7 +122,8 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             raise RuntimeError("producao sem AXIAATENDE_BANCO_SENHA em %s" % arquivo)
         if processo == "telas":
             # As telas nunca carregam chave de fora, mesmo que alguem as escreva no arquivo.
-            segredos = {"AXIAATENDE_BANCO_SENHA": senha}
+            segredos = {"AXIAATENDE_BANCO_SENHA": senha,
+                        "AXIAATENDE_CHAVE_PEDIDO": segredos.get("AXIAATENDE_CHAVE_PEDIDO", "")}
         base = dict(
             banco_porta=5436, banco_nome="axiaatende", banco_usuario="axiaatende_app",
             banco_senha=senha,
@@ -125,6 +131,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             meta_app_secret=segredos.get("META_APP_SECRET", ""),
             meta_verify_token=segredos.get("META_VERIFY_TOKEN", ""),
             anthropic_chave=segredos.get("ANTHROPIC_API_KEY", ""),
+            chave_pedido=segredos.get("AXIAATENDE_CHAVE_PEDIDO", ""),
             responde=segredos.get("ATENDE_RESPONDE", "false").lower() == "true",
             # `AXIAATENDE_SAIDA`: `local` (o padrao: as telas so em http://127.0.0.1:8009).
             cookie_seguro=os.environ.get("AXIAATENDE_SAIDA", "local") == "vpn",
@@ -139,6 +146,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             banco_usuario="axiaatende_su", banco_senha="",
             logs=Path(os.environ.get("AXIAATENDE_LOGS",
                                      r"C:\Dados\AxiaAtende\%s\logs" % ambiente)),
+            envios_pasta=Path(r"C:\Dados\AxiaAtende\%s\envios" % ambiente),
         )
     if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
         base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele

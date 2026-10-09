@@ -116,7 +116,8 @@ if (-not $existeBanco) {
     # O segredo nasce ANTES do banco: se algo falhar no meio, a senha nao se perde.
     $conteudo = "# Segredos do AxiaAtende (#950), so das TELAS. Fechado a administrador. Nao copie, nao mostre.`r`n" +
                 "AXIAATENDE_BANCO_SENHA=$senhaApp`r`n" +
-                "AXIAATENDE_SU_SENHA=$senhaSuper`r`n"
+                "AXIAATENDE_SU_SENHA=$senhaSuper`r`n" +
+                "AXIAATENDE_CHAVE_PEDIDO=$(Nova-Senha)`r`n"
     [IO.File]::WriteAllText($SEGREDOS, $conteudo, $SEM_BOM)
     Fechar $SEGREDOS @()
     Ok "segredo das telas em $SEGREDOS (so administrador e sistema leem)"
@@ -189,8 +190,30 @@ try {
 }
 Ok "banco $BANCO, dono $APP"
 
+# A chave do pedido de envio vai tambem para o publicador do AxiaMarketing (o unico que pede).
+# Instalacao antiga sem a chave: ela nasce agora, nos dois lados.
+if (-not (Ler-Segredo 'AXIAATENDE_CHAVE_PEDIDO')) {
+    [IO.File]::AppendAllText($SEGREDOS, "AXIAATENDE_CHAVE_PEDIDO=$(Nova-Senha)`r`n", $SEM_BOM)
+}
+$chave = Ler-Segredo 'AXIAATENDE_CHAVE_PEDIDO'
+$ENVPUB = 'C:\AxiaMarketing\.env.publicador'
+if (Test-Path $ENVPUB) {
+    $linhas = [IO.File]::ReadAllLines($ENVPUB) | Where-Object { -not $_.StartsWith('AXIAATENDE_CHAVE_PEDIDO=') }
+    [IO.File]::WriteAllText($ENVPUB, (($linhas + "AXIAATENDE_CHAVE_PEDIDO=$chave") -join "`r`n") + "`r`n", $SEM_BOM)
+    Ok 'chave do pedido de envio escrita tambem no .env.publicador do AxiaMarketing'
+} else {
+    Write-Host "   ??  $ENVPUB nao existe: o Marketing ainda nao consegue pedir envio" -ForegroundColor Yellow
+}
+$chave = $null
+
 # ── 3. logs ──────────────────────────────────────────────────────────────────
-Passo '3. Pastas de log'
+Passo '3. Pastas de log e das imagens dos envios'
+$ENVIOS = Join-Path $DADOS 'envios'
+New-Item -ItemType Directory -Force $ENVIOS | Out-Null
+# As telas (LocalSystem) copiam as imagens do pedido para ca; o recepcionista (LocalService) le.
+& icacls $ENVIOS /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' "${LOCALSERV}:(OI)(CI)RX" | Out-Null
+if ($LASTEXITCODE -ne 0) { Falha "nao consegui fechar $ENVIOS" }
+Ok "$ENVIOS (sistema escreve, LocalService le)"
 New-Item -ItemType Directory -Force $LOGS, $LOGRECEP | Out-Null
 & icacls $LOGRECEP /grant "${LOCALSERV}:(OI)(CI)M" | Out-Null
 if ($LASTEXITCODE -ne 0) { Falha 'nao consegui dar o log do recepcionista a LocalService' }
