@@ -1,0 +1,32 @@
+/* As telas do AxiaAtende (#950), por cima do estilo da casa (estilo.css, copia do AxiaMarketing). */
+/* o estilo da casa ja da a margem do menu (.casa) e centra o main; aqui ele usa a largura toda */
+.casa main { max-width: none; padding: 22px 28px; }
+.atende h1 { font-size: 22px; color: var(--verde-escuro); margin: 0 0 4px; }
+.atende h2 { font-size: 16px; color: var(--verde-escuro); margin: 22px 0 8px; }
+.atende .sub { color: var(--texto-leve); font-size: 14px; margin: 0 0 14px; max-width: 980px; }
+.atende .filtros { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.atende .grupo { background: #e6f2d8; color: var(--verde-escuro); font-weight: 600; font-size: 13px; padding: 5px 10px;
+  border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 8px; }
+.atende .religar { margin-left: auto; }
+.atende .cartoes { display: flex; gap: 8px; margin-bottom: 18px; }
+.atende .cartao { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--borda); border-radius: 8px;
+  padding: 10px 12px; display: flex; flex-direction: column; }
+.atende .cartao span { font-size: 12.5px; color: var(--texto-leve); }
+.atende .cartao b { font-size: 24px; color: var(--verde-escuro); }
+.atende .cartao.alerta b { color: var(--aviso); }
+.atende .tabela { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--borda); font-size: 14px; }
+.atende .tabela.estreita { width: auto; min-width: 520px; }
+.atende .tabela th { text-align: left; font-size: 12.5px; color: var(--texto-leve); font-weight: 600; background: #fafbf9;
+  padding: 8px 10px; border-bottom: 1px solid var(--borda); }
+.atende .tabela td { padding: 7px 10px; border-bottom: 1px solid #eef1ec; vertical-align: top; }
+.atende .tabela td.ok { color: #2f7d1e; font-weight: 600; }
+.atende .leve { color: var(--texto-leve); font-size: 13px; }
+.atende .vazio { color: var(--texto-leve); }
+.atende .selo { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; background: #eef1ec; color: var(--texto-leve); }
+.atende .selo.v { background: #e3f2d3; color: #2f6a15; }
+.atende .selo.a { background: #fdf0d6; color: var(--aviso); }
+.atende .selo.r { background: #f8e0de; color: var(--perigo); }
+.atende .secundario { background: #fff; color: var(--verde-escuro); border: 1px solid var(--borda); border-radius: 6px; padding: 6px 12px; }
+.atende input[type=time] { border: 1px solid var(--borda); border-radius: 6px; padding: 5px; }
+.atende .num { white-space: nowrap; }
+.atende .filtros label.caixa { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; width: auto; flex: none; }
