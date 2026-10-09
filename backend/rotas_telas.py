@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from . import agenda
 from .banco import conexao
 
 PRECO_CONVITE = 0.07   # US$ por mensagem paga, por cima (A2 do plano)
@@ -48,15 +49,13 @@ def rotas(cfg, usuario) -> APIRouter:
     # ── Recepcao ─────────────────────────────────────────────────────────────
 
     @r.get("/recepcao")
-    def recepcao(dias: int = 7, motivo: str = "", situacao: str = ""):
+    def recepcao(dias: int = 7, motivo: str = "", situacao: str = "", quem: str = ""):
         desde = datetime.now(timezone.utc) - timedelta(days=max(1, min(dias, 365)))
         with conexao(cfg) as con:
             linhas = con.execute(
                 """SELECT c.*, d.nome AS destino_nome,
                           (SELECT m.chave FROM atendimento.menu m WHERE m.rotulo = c.caminho[1]
-                              AND m.pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') LIMIT 1) AS motivo,
-                          (SELECT ed.erp_codigo || ' · ' || ed.nome FROM atendimento.envio_destinatarios ed
-                            WHERE ed.whatsapp = c.wa_id ORDER BY ed.id DESC LIMIT 1) AS cliente
+                              AND m.pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') LIMIT 1) AS motivo
                      FROM atendimento.conversas c
                      LEFT JOIN atendimento.destinos d ON d.id = c.destino_id
                     WHERE c.iniciada_em >= %s ORDER BY c.iniciada_em DESC LIMIT 500""", (desde,)).fetchall()
@@ -64,10 +63,17 @@ def rotas(cfg, usuario) -> APIRouter:
                 """SELECT chave, rotulo FROM atendimento.menu
                     WHERE pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') AND ativo
                       AND acao <> 'encerrar' ORDER BY ordem""")]
+            leitura = agenda.ultima_leitura(con)
         if motivo:
             linhas = [l for l in linhas if l["motivo"] == motivo]
+        # #969: so do cadastro / so fora dele (quem nao foi conferido -- agenda vazia -- fica nos dois de fora)
+        if quem == "cadastro":
+            linhas = [l for l in linhas if l["erp_cadastros"] == 1]
+        elif quem == "fora":
+            linhas = [l for l in linhas if l["erp_cadastros"] != 1]
         cartoes = {
             "chegaram": len(linhas),
+            "do_cadastro": sum(1 for l in linhas if l["erp_cadastros"] == 1),
             "receberam_link": sum(1 for l in linhas if l["link_em"]),
             "pararam_no_meio": sum(1 for l in linhas if l["situacao"] == "parou_no_meio"),
             "disseram_sim": sum(1 for l in linhas if l["recebeu"] is True),
@@ -84,13 +90,17 @@ def rotas(cfg, usuario) -> APIRouter:
                 estado = {"parou_no_meio": "parou", "encerrada": "encerrou"}.get(l["situacao"], "em_curso")
             if situacao and estado != situacao:
                 continue
-            saida.append({"quando": l["iniciada_em"].isoformat(), "cliente": l["cliente"],
+            saida.append({"quando": l["iniciada_em"].isoformat(),
+                          "cadastro": ({"codigo": l["erp_codigo"], "nome": l["erp_nome"], "papeis": l["erp_papeis"] or [],
+                                        "contato_setor": l["erp_contato_setor"], "contato_nome": l["erp_contato_nome"]}
+                                       if l["erp_cadastros"] == 1 else None),
+                          "cadastros": l["erp_cadastros"],
                           "numero": mascarar(l["wa_id"]), "perfil": l["nome_perfil"],
                           "caminho": l["caminho"], "destino": l["destino_nome"], "estado": estado,
                           "pergunta_em": l["pergunta_em"].isoformat() if l["pergunta_em"] else None,
                           "aviso_nao_em": l["aviso_nao_em"].isoformat() if l["aviso_nao_em"] else None,
                           "satisfacao": l["satisfacao"], "ia": l["ia_confirmou"]})
-        return {"cartoes": cartoes, "motivos": motivos, "linhas": saida}
+        return {"cartoes": cartoes, "motivos": motivos, "linhas": saida, "leitura": leitura}
 
     # ── Envios ───────────────────────────────────────────────────────────────
 

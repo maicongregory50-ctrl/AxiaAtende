@@ -50,4 +50,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
     assert s["de_pe"] is True and s["responde"] is False
     assert s["mudancas"] == ["001_casa_e_atendimento.sql", "002_menu_da_olivia.sql",
                             "003_modelos_e_comunicacao_direta.sql",
-                            "004_modelo_nao_comeca_por_variavel.sql", "005_direta_por_toque.sql"]
+                            "004_modelo_nao_comeca_por_variavel.sql", "005_direta_por_toque.sql",
+                            "006_agenda_do_cadastro.sql"]

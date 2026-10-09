@@ -13,13 +13,15 @@ Rodar em desenvolvimento, contra o banco da 5437:
 
     python -m uvicorn backend.main:app --host 127.0.0.1 --port 8009
 """
+import threading
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import config, migracoes, seguranca
+from . import agenda, config, migracoes, seguranca
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -37,10 +39,26 @@ class Entrada(BaseModel):
 def criar_app(cfg: config.Config | None = None) -> FastAPI:
     cfg = cfg or config.carregar()
 
+    parar = threading.Event()
+
+    def ler_o_cadastro():
+        """#969: a agenda do cadastro ao subir e todo dia as 06:00. Sem o segredo, nem nasce."""
+        while True:
+            try:
+                agenda.atualizar(cfg)
+            except Exception as falha:  # noqa: BLE001 -- a leitura nunca derruba as telas
+                print("agenda: %s" % type(falha).__name__, flush=True)
+            agora = datetime.now(timezone.utc)
+            if parar.wait((agenda.proxima_leitura(agora) - agora).total_seconds()):
+                return
+
     @asynccontextmanager
     async def vida(app: FastAPI):
         migracoes.aplicar(cfg)
+        if cfg.erp_segredo:
+            threading.Thread(target=ler_o_cadastro, name="agenda", daemon=True).start()
         yield
+        parar.set()
 
     app = FastAPI(title="AxiaAtende", lifespan=vida, docs_url=None, redoc_url=None,
                   openapi_url=None)

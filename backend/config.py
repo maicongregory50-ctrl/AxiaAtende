@@ -80,6 +80,10 @@ class Config:
     # responde SO a estes numeros (`ATENDE_SO_PARA=5549...,5549...`) e grava os outros em escuta.
     # Vazio = responde a todos (a troca de verdade).
     responde_so_para: tuple = ()
+    # A leitura do cadastro no ERP (#969): SO o processo das telas tem o segredo.
+    erp_url: str = "http://127.0.0.1:8001"
+    erp_agente: str = "ATENDIMENTO"
+    erp_segredo: str = field(default="", repr=False)
 
     def dsn(self) -> str:
         partes = ["host=%s" % self.banco_host, "port=%d" % self.banco_porta,
@@ -127,7 +131,10 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
         if processo == "telas":
             # As telas nunca carregam chave de fora, mesmo que alguem as escreva no arquivo.
             segredos = {"AXIAATENDE_BANCO_SENHA": senha,
-                        "AXIAATENDE_CHAVE_PEDIDO": segredos.get("AXIAATENDE_CHAVE_PEDIDO", "")}
+                        "AXIAATENDE_CHAVE_PEDIDO": segredos.get("AXIAATENDE_CHAVE_PEDIDO", ""),
+                        "AXIAATENDE_ERP_SEGREDO": segredos.get("AXIAATENDE_ERP_SEGREDO", "")}
+        else:
+            segredos.pop("AXIAATENDE_ERP_SEGREDO", None)   # o recepcionista nunca le o ERP
         base = dict(
             banco_porta=5436, banco_nome="axiaatende", banco_usuario="axiaatende_app",
             banco_senha=senha,
@@ -136,6 +143,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             meta_verify_token=segredos.get("META_VERIFY_TOKEN", ""),
             anthropic_chave=segredos.get("ANTHROPIC_API_KEY", ""),
             chave_pedido=segredos.get("AXIAATENDE_CHAVE_PEDIDO", ""),
+            erp_segredo=segredos.get("AXIAATENDE_ERP_SEGREDO", ""),
             responde=segredos.get("ATENDE_RESPONDE", "false").lower() == "true",
             responde_so_para=tuple(n.strip() for n in segredos.get("ATENDE_SO_PARA", "").split(",") if n.strip()),
             # `AXIAATENDE_SAIDA`: `local` (o padrao: as telas so em http://127.0.0.1:8009).

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from . import agenda
 from .saida import MAX_BOTOES, Opcao, Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
@@ -161,9 +162,18 @@ def _nova_conversa(con, pessoa: Pessoa, agora: datetime):
     # Uma conversa que ficou em curso sem link e a pessoa voltou: a antiga parou no meio.
     con.execute("""UPDATE atendimento.conversas SET situacao = 'parou_no_meio'
                     WHERE bsuid = %s AND situacao = 'em_curso'""", (pessoa.bsuid,))
-    return con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, nome_perfil, iniciada_em, ultimo_toque_em)
+    c = con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, nome_perfil, iniciada_em, ultimo_toque_em)
                           VALUES (%s, %s, %s, %s, %s) RETURNING *""",
-                       (pessoa.bsuid, pessoa.wa_id, pessoa.nome, agora, agora)).fetchone()
+                    (pessoa.bsuid, pessoa.wa_id, pessoa.nome, agora, agora)).fetchone()
+    # #969: quem e, pelo cadastro do ERP. So o retrato na conversa: o caminho nao muda por isso.
+    quem = agenda.reconhecer(con, pessoa.wa_id)
+    if quem:
+        c = con.execute("""UPDATE atendimento.conversas
+                              SET erp_cadastros = %(erp_cadastros)s, erp_codigo = %(erp_codigo)s,
+                                  erp_nome = %(erp_nome)s, erp_papeis = %(erp_papeis)s,
+                                  erp_contato_setor = %(erp_contato_setor)s, erp_contato_nome = %(erp_contato_nome)s
+                            WHERE id = %(id)s RETURNING *""", dict(quem, id=c["id"])).fetchone()
+    return c
 
 
 def _registrar(con, conversa_id, para, tipo, resumo, wamid):
