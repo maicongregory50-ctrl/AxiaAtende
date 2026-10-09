@@ -5,8 +5,10 @@
 
 ## 1. Para que serve
 
-O menu da OlivIA termina sempre no link do WhatsApp de uma pessoa: o representante da região, o
-financeiro, o frete. Esta tela diz quem é essa pessoa em cada caso. Trocar aqui vale para a próxima
+O menu da OlivIA termina sempre no WhatsApp de uma pessoa: o representante da região, o
+financeiro, o frete. Quem chamou recebe uma mensagem curta e, logo abaixo, o **cartão de contato**
+dessa pessoa (nome, número e "Sementes Renascer"): toca em Conversar e já está falando com ela, ou
+salva o contato. Esta tela diz quem é essa pessoa em cada caso. Trocar aqui vale para a próxima
 pessoa que chamar, sem precisar de ninguém.
 
 ## 2. Quem usa e quando

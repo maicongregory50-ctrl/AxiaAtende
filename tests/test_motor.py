@@ -25,6 +25,13 @@ def passo(cfg, s, mensagem, agora=QUINTA_14H, ia=None):
     return s.ultima
 
 
+def _link(s):
+    """O fim de um caminho: o texto e, logo depois, o cartao de contato de quem atende."""
+    (t1, _, corpo, _), (t2, _, nome, numero) = s.enviadas[-2:]
+    assert t1 == "texto" and t2 == "contato"
+    return corpo, nome, numero[0]
+
+
 def _conversa(cfg):
     with conexao(cfg) as con:
         return con.execute("SELECT * FROM atendimento.conversas ORDER BY id DESC LIMIT 1").fetchone()
@@ -48,8 +55,10 @@ def test_comercial_pr_cascavel_chega_no_willian_so_com_toques(ligado):
     assert tipo == "lista" and len(opcoes) == 5          # 5 estados: mais de 3, lista
     tipo, _, _, opcoes = passo(ligado, s, toque("wamid.4", "menu:comercial.produtor.pr", lista=True))
     assert tipo == "botoes" and [o[1] for o in opcoes] == ["Cascavel", "Ponta Grossa"]
-    tipo, _, corpo, _ = passo(ligado, s, toque("wamid.5", "menu:comercial.produtor.pr.cascavel"))
-    assert tipo == "texto" and "Willian Souza" in corpo and "https://wa.me/5546999784298" in corpo
+    passo(ligado, s, toque("wamid.5", "menu:comercial.produtor.pr.cascavel"))
+    corpo, nome, numero = _link(s)
+    assert "Willian" in corpo and nome == "Willian Souza" and numero == "5546999784298"
+    assert "wa.me" not in corpo
     assert "fora do horário" not in corpo
     c = _conversa(ligado)
     assert c["situacao"] == "com_link" and c["caminho"] == ["🛒 Comercial", "Produtor rural", "PR", "Cascavel"]
@@ -58,20 +67,23 @@ def test_comercial_pr_cascavel_chega_no_willian_so_com_toques(ligado):
 
 def test_fretes_manda_a_fretebras_e_o_benedito(ligado):
     s = SaidaFalsa()
-    _, _, corpo, _ = passo(ligado, s, toque("wamid.1", "menu:fretes", lista=True))
-    assert "fretebras.com.br" in corpo and "https://wa.me/5549999190249" in corpo
+    passo(ligado, s, toque("wamid.1", "menu:fretes", lista=True))
+    corpo, _, numero = _link(s)
+    assert "fretebras.com.br" in corpo and numero == "5549999190249"
 
 
 def test_qualidade_que_hoje_esta_quebrada_passa_a_funcionar(ligado):
     s = SaidaFalsa()
-    _, _, corpo, _ = passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True))
-    assert "Alisson" in corpo and "https://wa.me/5549999410889" in corpo
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True))
+    _, nome, numero = _link(s)
+    assert nome == "Alisson" and numero == "5549999410889"
 
 
 def test_fora_do_horario_o_link_vai_com_o_aviso(ligado):
     s = SaidaFalsa()
-    _, _, corpo, _ = passo(ligado, s, toque("wamid.1", "menu:financeiro.boleto", lista=True), agora=SABADO_10H)
-    assert "Fran" in corpo and "fora do horário" in corpo
+    passo(ligado, s, toque("wamid.1", "menu:financeiro.boleto", lista=True), agora=SABADO_10H)
+    corpo, nome, _ = _link(s)
+    assert "Fran" in corpo and "fora do horário" in corpo and nome == "Fran"
 
 
 def test_encerrar(ligado):
@@ -109,7 +121,7 @@ def test_pergunta_das_4h30_sim_e_nota(ligado):
     s = SaidaFalsa()
     passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True))
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=4))
-    assert s.ultima[0] == "texto"                         # ainda nao: so depois de 4h30
+    assert s.ultima[0] == "contato"                       # ainda nao: so depois de 4h30
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=4, minutes=31))
     assert s.ultima[0] == "botoes" and s.ultima[3][0][0] == "pos:sim"
     tipo, _, _, notas = passo(ligado, s, toque("wamid.2", "pos:sim"))

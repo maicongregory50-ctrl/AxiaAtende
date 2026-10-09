@@ -122,16 +122,27 @@ def dentro_do_horario(con, agora: datetime) -> bool:
 
 
 def mandar_link(con, saida: Saida, pessoa: Pessoa, no, agora: datetime) -> str:
+    """O destino. `link_formato` (ajuste): `cartao` (o padrao, decisao do dono no ensaio de
+    09/10/2026: o endereco solto "nao sai bonito") manda o texto e depois o cartao de contato de
+    quem atende; `texto` manda o endereco wa.me no texto, como era."""
     d = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
                     (no["destino_id"],)).fetchone()
+    cartao = _ajuste(con, "link_formato", "cartao") == "cartao"
     partes = []
     if no["texto_antes"]:
         partes.append(no["texto_antes"])
-    partes.append(_ajuste(con, "link", "{nome}: {link}").format(
-        nome=d["nome"], link="https://wa.me/%s" % d["whatsapp"]))
+    if cartao:
+        partes.append(_ajuste(con, "link_cartao", "Para falar com {nome}, toque em Conversar no contato abaixo.")
+                      .format(nome=d["nome"].split()[0]))
+    else:
+        partes.append(_ajuste(con, "link", "{nome}: {link}").format(
+            nome=d["nome"], link="https://wa.me/%s" % d["whatsapp"]))
     if not dentro_do_horario(con, agora):
         partes.append(_ajuste(con, "fora_do_horario", ""))
-    return saida.texto(pessoa.para, "\n\n".join(p for p in partes if p))
+    w = saida.texto(pessoa.para, "\n\n".join(p for p in partes if p))
+    if cartao:
+        w = saida.contato(pessoa.para, d["nome"], d["whatsapp"])
+    return w
 
 
 # ── a conversa ──────────────────────────────────────────────────────────────

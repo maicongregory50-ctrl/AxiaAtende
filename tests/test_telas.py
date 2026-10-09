@@ -92,7 +92,7 @@ def test_destinos_trocar_numero_ligar_opcao_e_horario(ligado, tela):
     s = SaidaFalsa()
     R.gravar(ligado, aviso([toque("w9", "menu:comercial.produtor.pr.cascavel")]))
     R.processar_pendentes(ligado, s, None, agora=datetime(2026, 10, 8, 17, 0, tzinfo=timezone.utc))
-    assert "Rep Oeste" in s.ultima[2] and "5546988887777" in s.ultima[2]   # vale para a proxima pessoa
+    assert s.ultima[2] == "Rep Oeste" and s.ultima[3] == ["5546988887777"]   # vale para a proxima pessoa
     h = {"dias": [1, 2, 3, 4, 5, 6], "faixas": [["08:00", "12:00"]]}
     assert tela.put("/api/ajustes/horario", json=h).json() == h
     assert tela.put("/api/ajustes/horario", json={"dias": [9], "faixas": [["8", "x"]]}).status_code == 422

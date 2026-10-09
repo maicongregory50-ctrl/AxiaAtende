@@ -13,6 +13,7 @@ ate 20 caracteres; lista com ate 10 linhas, titulo da linha ate 24 e descricao a
 from dataclasses import dataclass
 
 MAX_BOTOES = 3
+EMPRESA = "Sementes Renascer"
 MAX_LINHAS = 10
 
 
@@ -36,6 +37,10 @@ class Saida:
         raise NotImplementedError
 
     def imagem(self, para: str, arquivo: str, legenda: str = "") -> str:
+        raise NotImplementedError
+
+    def contato(self, para: str, nome: str, whatsapp: str, empresa: str = EMPRESA) -> str:
+        """O cartao de contato de quem atende: a pessoa toca em Conversar, ou salva o contato."""
         raise NotImplementedError
 
     def modelo(self, para: str, nome: str, idioma: str, corpo: list[str],
@@ -91,6 +96,15 @@ class SaidaMeta(Saida):
         return self._wa.send_message(
             to=para, text=texto,
             buttons=SectionList(button_title=botao, sections=[Section(title="Opções", rows=linhas)])).id
+
+    def contato(self, para, nome, whatsapp, empresa=EMPRESA):
+        from pywa.types import Contact
+        partes = nome.split()
+        cartao = Contact(name=Contact.Name(formatted_name=nome, first_name=partes[0],
+                                           last_name=" ".join(partes[1:]) or None),
+                         phones=[Contact.Phone(phone="+" + whatsapp, wa_id=whatsapp, type="WORK")],
+                         org=Contact.Org(company=empresa))
+        return self._wa.send_contact(to=para, contact=cartao).id
 
     def nota(self) -> str:
         """A nota de qualidade do numero na Meta (GREEN/YELLOW/RED), so leitura."""

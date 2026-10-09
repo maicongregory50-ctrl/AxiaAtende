@@ -41,6 +41,16 @@ def test_botoes_vao_como_interactive_button_com_os_ids(meta):
         ("menu:a", "Produtor rural"), ("menu:b", "Corretor")]
 
 
+def test_contato_vai_como_cartao_com_o_whatsapp_de_quem_atende(meta):
+    s, pedidos = meta
+    s.contato("5549999990000", "Willian Souza", "5546999784298")
+    c = _corpo(pedidos[-1])
+    assert c["type"] == "contacts"
+    cartao = c["contacts"][0]
+    assert cartao["name"]["formatted_name"] == "Willian Souza" and cartao["name"]["first_name"] == "Willian"
+    assert cartao["phones"][0]["wa_id"] == "5546999784298" and cartao["org"]["company"] == "Sementes Renascer"
+
+
 def test_lista_vai_como_interactive_list(meta):
     s, pedidos = meta
     s.lista("5549999990000", "Escolha", "Ver opções",

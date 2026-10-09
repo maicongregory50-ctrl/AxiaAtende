@@ -31,6 +31,10 @@ class SaidaFalsa(Saida):
         self.enviadas.append(("imagem", para, arquivo, []))
         return self._id()
 
+    def contato(self, para, nome, whatsapp, empresa="Sementes Renascer"):
+        self.enviadas.append(("contato", para, nome, [whatsapp]))
+        return self._id()
+
     def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
         self.enviadas.append(("modelo", para, nome, list(corpo)))
         self.modelos.append({"para": para, "nome": nome, "corpo": list(corpo), "imagem": imagem,
