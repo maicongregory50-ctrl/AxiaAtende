@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Maquete 1 - Recepção reconhece o cadastro (#969)</title>
+<link rel="stylesheet" href="file:///C:/AxiaAtende/frontend/src/estilo.css">
+<link rel="stylesheet" href="file:///C:/AxiaAtende/frontend/src/atende.css">
+<style>
+  body { margin: 0; }
+  .chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin-left: 6px;
+          background: #e8f2ea; color: #23633a; border: 1px solid #b9d8c2; vertical-align: 1px; }
+  .chip.int { background: #e9eef8; color: #2b4a85; border-color: #bccbe6; }
+  .chip.fora { background: #f3f3f3; color: #666; border-color: #ddd; }
+  .chip.duvida { background: #fdf3e2; color: #8a5a00; border-color: #efd6a6; }
+  .novo { outline: 2px dashed #d08a00; outline-offset: 2px; }
+  .nota-maquete { font: 13px/1.4 sans-serif; color: #8a5a00; margin: 6px 0 14px; }
+  .cod { color: #777; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="casa">
+  <aside class="lateral">
+    <div class="marca">Atendimento <span>Renascer</span></div>
+    <nav>
+      <button class="ativa"><span>Recepção</span></button>
+      <button><span>Envios</span></button>
+      <button><span>Destinos</span></button>
+    </nav>
+    <div class="quem"><span>Maicon</span></div>
+  </aside>
+  <main>
+    <section class="atende">
+      <h1>Recepção</h1>
+      <p class="sub">Quem chamou no 49 3664 0121, o que escolheu e para quem foi mandado. A OlivIA atende e manda o
+        link; a conversa continua no WhatsApp de quem recebeu o link.</p>
+      <p class="nota-maquete">MAQUETE #969 — o tracejado laranja é o que entra. Nada muda no que a pessoa recebe no WhatsApp.</p>
+      <div class="filtros">
+        <select><option>Hoje e ontem</option></select>
+        <select><option>Todos os motivos</option></select>
+        <select><option>Toda situação</option></select>
+        <select class="novo"><option>Todos (cadastro e fora dele)</option><option>Só quem está no cadastro</option><option>Só quem não está</option></select>
+      </div>
+      <div class="grupo">No período escolhido</div>
+      <div class="cartoes">
+        <div class="cartao"><span>Chegaram</span><b>5</b></div>
+        <div class="cartao novo"><span>Do nosso cadastro</span><b>3</b></div>
+        <div class="cartao"><span>Receberam o link</span><b>4</b></div>
+        <div class="cartao alerta"><span>Pararam no meio</span><b>1</b></div>
+        <div class="cartao"><span>Disseram que foram atendidos</span><b>0</b></div>
+        <div class="cartao alerta"><span>Disseram que não</span><b>0</b></div>
+        <div class="cartao"><span>IA acertou / errou</span><b>1 / 0</b></div>
+      </div>
+      <table class="tabela">
+        <thead><tr><th>Quando</th><th>Quem</th><th>Caminho</th><th>Mandado para</th><th>Recebeu o atendimento?</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>hoje 17:13</td>
+            <td class="novo">Agro Real Insumos <span class="cod">· 5475</span><br><span class="chip">Cliente</span><span class="chip">contato comercial: João</span></td>
+            <td>🛒 Comercial › Produtor rural › PR › Cascavel</td>
+            <td>Willian Souza</td>
+            <td><span class="selo">pergunta às 21:43</span></td>
+          </tr>
+          <tr>
+            <td>hoje 17:05</td>
+            <td class="novo">Transportes Exemplo <span class="cod">· 8120</span><br><span class="chip">Fornecedor</span><span class="chip">contato financeiro</span></td>
+            <td>🚚 Fretes</td>
+            <td>Benedito</td>
+            <td><span class="selo">pergunta às 21:35</span></td>
+          </tr>
+          <tr>
+            <td>hoje 16:59</td>
+            <td class="novo">Maicon Gregory <span class="cod">· 12</span><br><span class="chip int">Equipe</span><span class="chip int">Representante</span></td>
+            <td>💰 Financeiro <span class="leve"> · IA acertou</span></td>
+            <td>Fran</td>
+            <td><span class="selo">pergunta às 21:29</span></td>
+          </tr>
+          <tr>
+            <td>hoje 16:47</td>
+            <td class="novo">55 49 99999-0000 <span class="leve">(João)</span><br><span class="chip fora">fora do cadastro</span></td>
+            <td>🛒 Comercial › Produtor rural › SC</td>
+            <td>Maicon Gregory</td>
+            <td><span class="selo">pergunta às 21:17</span></td>
+          </tr>
+          <tr>
+            <td>hoje 16:41</td>
+            <td class="novo">55 46 98888-7777 <span class="leve">(Ana)</span><br><span class="chip duvida">número em 2 cadastros</span></td>
+            <td><span class="leve">— só chegou</span></td>
+            <td><span class="leve">—</span></td>
+            <td><span class="selo a">parou no meio</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+</body>
+</html>
