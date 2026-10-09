@@ -30,3 +30,12 @@
 .atende input[type=time] { border: 1px solid var(--borda); border-radius: 6px; padding: 5px; }
 .atende .num { white-space: nowrap; }
 .atende .filtros label.caixa { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; width: auto; flex: none; }
+
+/* #969: quem e, pelo cadastro do ERP (maquete aprovada) */
+.chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin: 3px 6px 0 0;
+        background: #e8f2ea; color: #23633a; border: 1px solid #b9d8c2; }
+.chip.int { background: #e9eef8; color: #2b4a85; border-color: #bccbe6; }
+.chip.fora { background: #f3f3f3; color: #666; border-color: #ddd; }
+.chip.duvida { background: #fdf3e2; color: #8a5a00; border-color: #efd6a6; }
+.cod { color: #777; font-size: 12px; }
+.erro-leve { color: #a33; }
