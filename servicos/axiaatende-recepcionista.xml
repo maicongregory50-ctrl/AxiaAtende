@@ -1,0 +1,31 @@
+<service>
+  <id>axiaatende-recepcionista</id>
+  <name>AxiaAtende - Recepcionista</name>
+  <description>AxiaAtende - o recepcionista do WhatsApp 49 3664 0121 (127.0.0.1:8008, publicado pelo Funnel na 443). O unico processo que fala com a Meta. #950</description>
+  <executable>C:\AxiaAtende\.venv\Scripts\python.exe</executable>
+  <arguments>-m uvicorn backend.recepcionista:app --host 127.0.0.1 --port 8008 --proxy-headers --forwarded-allow-ips 127.0.0.1</arguments>
+  <workingdirectory>C:\AxiaAtende</workingdirectory>
+  <startmode>Automatic</startmode>
+  <depend>axiaatende-postgres</depend>
+  <!-- O processo que a internet alcanca roda com o MENOR usuario do Windows (o mesmo desenho da
+       vitrine do AxiaMarketing). Le o codigo, o ambiente Python e o .env.recepcionista; escreve
+       so o proprio log. Nao le o .env.secrets.
+       SINTAXE DO WinSW 2.12 (o .exe daqui): domain + user. O username e da 3.x e a 2.12 o ignora
+       calada, instalando como LocalSystem.
+       NUNCA dois hifens seguidos dentro de comentario: XML invalido, o WinSW nao sobe. -->
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+  <env name="AXIAATENDE_AMBIENTE" value="producao"/>
+  <env name="AXIAATENDE_PROCESSO" value="recepcionista"/>
+  <env name="AXIAATENDE_LOGS" value="C:\Logs\AxiaAtende\recepcionista"/>
+  <logpath>C:\Logs\AxiaAtende\recepcionista</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+</service>

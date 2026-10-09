@@ -1,0 +1,22 @@
+<service>
+  <id>axiaatende-backend</id>
+  <name>AxiaAtende - Telas</name>
+  <description>AxiaAtende - as telas Recepcao, Envios e Destinos e a API local (127.0.0.1:8009, sem saida externa). #950</description>
+  <executable>C:\AxiaAtende\.venv\Scripts\python.exe</executable>
+  <arguments>-m uvicorn backend.main:app --host 127.0.0.1 --port 8009</arguments>
+  <workingdirectory>C:\AxiaAtende</workingdirectory>
+  <startmode>Automatic</startmode>
+  <depend>axiaatende-postgres</depend>
+  <env name="AXIAATENDE_AMBIENTE" value="producao"/>
+  <env name="AXIAATENDE_PROCESSO" value="telas"/>
+  <!-- local = so http://127.0.0.1:8009 no proprio servidor. As telas nunca saem para a internet. -->
+  <env name="AXIAATENDE_SAIDA" value="local"/>
+  <logpath>C:\Logs\AxiaAtende</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>3</keepFiles>
+  </log>
+  <onfailure action="restart" delay="5 sec"/>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+</service>

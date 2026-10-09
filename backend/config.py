@@ -12,6 +12,16 @@ O PADRAO E `dev`, DE PROPOSITO. Quem esquece de dizer o ambiente cai no rascunho
 SEM SEGREDO NA SESSAO. A sessao de agente nao le `.env.secrets`; `dev` e `teste` nao tem senha.
 Nenhum segredo entra em `repr`, log ou mensagem de erro.
 
+DOIS PROCESSOS, DOIS ARQUIVOS DE SEGREDO (`AXIAATENDE_PROCESSO`):
+
+- `telas` (o padrao; `backend/main.py`, 127.0.0.1:8009, LocalSystem): le `.env.secrets`, que so
+  tem a senha do banco. NAO tem a chave da Meta nem a da Anthropic: as telas so gravam e leem o
+  banco (o pedido de envio entra como fila).
+- `recepcionista` (`backend/recepcionista.py`, 127.0.0.1:8008, LocalService, o unico exposto):
+  le `.env.recepcionista`, com a senha do banco, o token da Meta, o segredo do app, o token de
+  verificacao do webhook e a chave da Anthropic. E o UNICO processo que fala com a Meta: responde,
+  manda convite, imagem e aviso. Mesmo desenho do publicador do AxiaMarketing (D14 do #923).
+
 A CHAVE QUE MAIS IMPORTA E `responde`. Com ela `False` (o padrao, inclusive em producao) o
 recepcionista grava tudo o que chega e NAO responde ninguem (regra 2 do CLAUDE.md): enquanto o
 Opa atende o numero, responder faria o cliente receber duas respostas. Ela so liga pela linha
@@ -32,6 +42,8 @@ META_CONTA_WA = "1442233593867052"
 ANTHROPIC_URL = "https://api.anthropic.com"
 
 AMBIENTES = ("producao", "dev", "teste")
+# o processo e o arquivo de segredo que ele le em producao
+PROCESSOS = {"telas": ".env.secrets", "recepcionista": ".env.recepcionista"}
 
 
 @dataclass(frozen=True)
@@ -42,6 +54,7 @@ class Config:
     banco_nome: str
     banco_usuario: str
     banco_senha: str = field(repr=False)
+    processo: str = "telas"
     logs: Path = Path(r"C:\Logs\AxiaAtende")
     tela: Path = RAIZ / "frontend" / "dist"
     cookie_seguro: bool = False
@@ -91,12 +104,20 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
         raise RuntimeError("AXIAATENDE_AMBIENTE=%r nao existe; use um de %s"
                            % (ambiente, ", ".join(AMBIENTES)))
 
+    processo = os.environ.get("AXIAATENDE_PROCESSO", "telas")
+    if processo not in PROCESSOS:
+        raise RuntimeError("AXIAATENDE_PROCESSO=%r nao existe; use um de %s"
+                           % (processo, ", ".join(PROCESSOS)))
     if ambiente == "producao":
-        segredos = _ler_segredos(RAIZ / ".env.secrets")
+        arquivo = PROCESSOS[processo]
+        segredos = _ler_segredos(RAIZ / arquivo)
         senha = segredos.get("AXIAATENDE_BANCO_SENHA", "")
         if not senha:
             # Falha aqui, dizendo o que falta e sem dizer valor nenhum.
-            raise RuntimeError("producao sem AXIAATENDE_BANCO_SENHA em .env.secrets")
+            raise RuntimeError("producao sem AXIAATENDE_BANCO_SENHA em %s" % arquivo)
+        if processo == "telas":
+            # As telas nunca carregam chave de fora, mesmo que alguem as escreva no arquivo.
+            segredos = {"AXIAATENDE_BANCO_SENHA": senha}
         base = dict(
             banco_porta=5436, banco_nome="axiaatende", banco_usuario="axiaatende_app",
             banco_senha=senha,
@@ -119,6 +140,8 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             logs=Path(os.environ.get("AXIAATENDE_LOGS",
                                      r"C:\Dados\AxiaAtende\%s\logs" % ambiente)),
         )
-    base.update(ambiente=ambiente, banco_host="127.0.0.1")
+    if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
+        base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele
+    base.update(ambiente=ambiente, banco_host="127.0.0.1", processo=processo)
     base.update(trocas)
     return Config(**base)
