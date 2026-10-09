@@ -26,7 +26,9 @@ from .banco import conexao
 #: O texto dos botoes (a Meta aceita ate 25 caracteres). O sistema reconhece o toque pelo
 #: `payload` do envio, nunca pelo texto, entao mudar o texto aqui nao muda o que o toque faz.
 BOTOES_CONVITE = ("Quero receber", "Não quero receber")
-BOTAO_LINK = "Falar com meu atendimento"
+BOTAO_FALAR = "Falar com meu atendimento"
+#: O endereco publico do recepcionista (Funnel 443). O botao da direta termina em {{1}} = o codigo.
+ENDERECO_FALAR = "https://serverrenascer.taild57672.ts.net/falar/"
 LIMITE_BOTAO = 25
 
 #: Um exemplo por fonte de variavel: a Meta exige exemplo para cada {{n}}. Dados de mentira.
@@ -39,7 +41,6 @@ EXEMPLOS_AVISO = {
     "aviso_sem_atendimento": ["João (5549999999999)", "Comercial › SC, com Maicon",
                               "https://wa.me/5549999999999"],
 }
-EXEMPLO_LINK = "5549991505565"
 
 
 def _cliente(cfg) -> httpx.Client:
@@ -72,10 +73,11 @@ def componentes(m: dict, cabecalho: str | None = None) -> list[dict]:
     saida.append(corpo)
     if m["botao"] == "quero_nao_quero":
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t} for t in BOTOES_CONVITE]})
-    elif m["botao"] == "link_responsavel":
+    elif m["botao"] == "falar_responsavel":
+        # link para o NOSSO endereco: a Meta recusa link direto para o WhatsApp em modelo
         saida.append({"type": "BUTTONS", "buttons": [{
-            "type": "URL", "text": BOTAO_LINK, "url": "https://wa.me/{{1}}",
-            "example": ["https://wa.me/%s" % EXEMPLO_LINK]}]})
+            "type": "URL", "text": BOTAO_FALAR, "url": ENDERECO_FALAR + "{{1}}",
+            "example": [ENDERECO_FALAR + "1-0a1b2c3d4e5f6a7b"]}]})
     for b in (c for c in saida if c["type"] == "BUTTONS"):
         for botao in b["buttons"]:
             assert len(botao["text"]) <= LIMITE_BOTAO, botao["text"]

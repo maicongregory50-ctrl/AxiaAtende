@@ -1,5 +1,5 @@
 """E1b do plano #950 (emenda do dono, 09/10/2026): a comunicacao direta so para quem ja aceitou, com
-o botao de link do responsavel; os modelos do cadastro; as imagens de cada revenda."""
+o botao Falar com meu atendimento (o nosso endereco, que abre o WhatsApp do responsavel); os modelos do cadastro; as imagens de cada revenda."""
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
@@ -58,10 +58,28 @@ def test_direta_vai_com_o_texto_e_o_botao_de_link_do_responsavel_e_sem_imagens_d
     m = next(x for x in s.modelos if x["para"] != "5549999567572")
     assert m["nome"] == "epoca_de_plantio"
     assert m["corpo"] == ["Joao", "plantio do Trigo Mourisco", "Djeison de Oliveira"]
-    assert m["url"] == "5549999567572" and m["botoes"] is None and m["imagem"]
+    assert m["botoes"] is None and m["imagem"] and m["url"].startswith("1-")
     assert destinatarios(ligado)[1]["imagens_total"] == 0
     copia = next(x for x in s.modelos if x["para"] == "5549999567572")      # a copia ao responsavel
-    assert copia["corpo"][0] == "Djeison"
+    assert copia["corpo"][0] == "Djeison" and copia["url"].startswith("c1-")
+
+
+def test_falar_com_meu_atendimento_anota_e_abre_o_whatsapp_do_responsavel(ligado, imagens):
+    pedir(ligado, direta(imagens, [dict(cliente(1, 30, resp=("Djeison de Oliveira", "5549999567572")),
+                                        aceite_cadastro=True)]))
+    s, env = SaidaFalsa(), Envio(ler_nota=lambda: "GREEN")
+    env.rotina(ligado, s, QUINTA_9H)
+    m = next(x for x in s.modelos if x["para"] != "5549999567572")
+    copia = next(x for x in s.modelos if x["para"] == "5549999567572")
+    with TestClient(R.criar_app(ligado, saida=s, trabalhador=False)) as c:
+        assert c.get("/falar/" + copia["url"], follow_redirects=False).headers["location"] == "https://wa.me/5549999567572"
+        assert destinatarios(ligado)[1]["resposta"] is None             # o toque da copia nao conta
+        r = c.get("/falar/" + m["url"], follow_redirects=False)
+        assert r.status_code == 302 and r.headers["location"] == "https://wa.me/5549999567572"
+        assert destinatarios(ligado)[1]["resposta"] == "falar"
+        forjado = m["url"].split("-")[0] + "-0000000000000000"
+        assert c.get("/falar/" + forjado, follow_redirects=False).status_code == 404
+        assert c.get("/falar/2-" + m["url"].split("-")[1], follow_redirects=False).status_code == 404
 
 
 def test_modelo_que_nao_existe_ou_de_outro_uso_e_recusado(ligado, imagens):

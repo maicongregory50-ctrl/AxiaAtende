@@ -10,7 +10,10 @@ DOIS TIPOS DE ENVIO:
   cliente pode ter as SUAS imagens). Vai por CONVITE (modelo de uso `convite`: capa, "Quero
   receber" / "Nao quero receber"); o toque abre a janela de 24h e as imagens seguem sem custo.
 - `direta` -- campanha de arte unica ("chegou a epoca do seu Trigo Mourisco"). Uma mensagem paga
-  (modelo de uso `direta`) com a imagem, o texto e o botao de link para o WhatsApp do responsavel.
+  (modelo de uso `direta`) com a imagem, o texto e o botao de link "Falar com meu atendimento". A
+  Meta recusa link direto para o WhatsApp em modelo, entao o botao abre o NOSSO endereco
+  (`/falar/<codigo>`, no recepcionista), que anota o toque e manda na hora para o wa.me do
+  responsavel: um toque so, do modelo a conversa (decisao do dono: "cada etapa reduz a chance").
   SO VAI A QUEM JA ACEITOU: tocou "Quero receber" em algum envio, ou tem o aceite de marketing no
   cadastro do #952. Quem nunca aceitou fica "sem aceite" e recebe primeiro um convite.
 
@@ -26,8 +29,15 @@ AS REGRAS QUE VALEM PARA OS DOIS (spec, "Cuidado com a Meta"):
 - **O responsavel recebe copia** do que os clientes dele recebem (uma por envio).
 - **Quem recusa** e o responsavel dele e avisado (modelo de uso `aviso_recusa`, Utilidade).
 
-OS IDS DOS BOTOES do convite (`payload`): `envio:<id>:quero` e `envio:<id>:nao_quero`.
+OS IDS DOS BOTOES do convite (`payload`): `envio:<id>:quero` e `envio:<id>:nao_quero`. O codigo do
+link da direta e `<id da linha>-<assinatura>` (`codigo_falar`): ninguem monta um endereco nosso que
+leve a outro numero.
+
+O NUMERO DO TOQUE: a Meta manda o celular brasileiro antigo, sem o 9 (`554991505565`); a lista do ERP
+tem o 9. `com_nove` poe o 9 antes de comparar (medido no ensaio de 09/10/2026).
 """
+import hashlib
+import hmac
 import json
 import re
 from datetime import datetime, timedelta
@@ -40,6 +50,51 @@ FUSO = ZoneInfo("America/Sao_Paulo")
 JANELA = timedelta(hours=24)
 NAO_E_WHATSAPP = {"131026"}   # codigo da Meta: mensagem nao entregavel (numero sem WhatsApp)
 CELULAR = re.compile(r"^55[1-9][0-9]9[0-9]{8}$")
+
+
+def _assinatura(segredo: str, texto: str) -> str:
+    chave = hmac.new(segredo.encode(), b"axiaatende-falar", hashlib.sha256).digest()
+    return hmac.new(chave, texto.encode(), hashlib.sha256).hexdigest()[:16]
+
+
+def codigo_falar(segredo: str, dest_id: int, copia: bool = False) -> str:
+    """O final do botao de link da direta. `c` na frente: a copia do responsavel, que nao conta."""
+    base = ("c%d" if copia else "%d") % dest_id
+    return "%s-%s" % (base, _assinatura(segredo, base))
+
+
+def ler_codigo(segredo: str, codigo: str):
+    """(id da linha, e_copia), ou None se o codigo nao foi assinado por nos."""
+    base, _, sig = (codigo or "").partition("-")
+    copia = base.startswith("c")
+    numero = base[1:] if copia else base
+    if not numero.isdigit() or not hmac.compare_digest(sig, _assinatura(segredo, base)):
+        return None
+    return int(numero), copia
+
+
+def falar(con, segredo: str, codigo: str, agora: datetime) -> str | None:
+    """O toque no link da direta: anota (so o do cliente, so o primeiro) e devolve o WhatsApp do
+    responsavel para onde a pessoa vai. None: codigo que nao e nosso."""
+    lido = ler_codigo(segredo, codigo)
+    if not lido:
+        return None
+    d = con.execute("SELECT id, resposta, responsavel_whatsapp FROM atendimento.envio_destinatarios WHERE id = %s",
+                    (lido[0],)).fetchone()
+    if not d or not d["responsavel_whatsapp"]:
+        return None
+    if not lido[1] and d["resposta"] in (None, "texto"):
+        con.execute("""UPDATE atendimento.envio_destinatarios SET resposta = 'falar', resposta_em = %s
+                        WHERE id = %s""", (agora, d["id"]))
+    return d["responsavel_whatsapp"]
+
+
+def com_nove(numero: str) -> str:
+    """O celular brasileiro como a lista do ERP o guarda: 55 + DDD + 9 + oito digitos."""
+    n = "".join(c for c in (numero or "") if c.isdigit())
+    if len(n) == 12 and n.startswith("55") and n[4] in "6789":
+        return n[:4] + "9" + n[4:]
+    return n
 USO_DO_TIPO = {"material": "convite", "direta": "direta"}
 
 
@@ -153,8 +208,10 @@ class Envio:
 
     def __init__(self, ler_nota=None):
         self._ler_nota = ler_nota
+        self._segredo = ""
 
     def rotina(self, cfg, saida: Saida, agora: datetime) -> None:
+        self._segredo = cfg.meta_app_secret
         with conexao(cfg) as con:
             self.ler_nota_do_dia(con, agora)
             self.mandar_lotes(con, saida, agora)
@@ -221,7 +278,8 @@ class Envio:
         fontes = {"primeiro_nome": primeiro_nome(para_nome), "nome": para_nome, "assunto": e["assunto"],
                   "peca": e["peca"], "n_imagens": len(imagens), "responsavel": d["responsavel_nome"]}
         botoes = ["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "quero_nao_quero" else None
-        url = numero_resp if m["botao"] == "link_responsavel" else None
+        url = (codigo_falar(self._segredo, d["id"], copia=para_nome == d["responsavel_nome"])
+               if m["botao"] == "falar_responsavel" else None)
         capa = (d["capa"] or e["capa"]) if m["cabecalho_imagem"] else None
         return parametros(m, fontes), capa, botoes, url, len(imagens)
 
@@ -266,7 +324,7 @@ class Envio:
         if len(partes) != 3 or not partes[1].isdigit():
             return
         envio_id, acao = int(partes[1]), partes[2]
-        numero = entrada.pessoa.wa_id or ""
+        numero = com_nove(entrada.pessoa.wa_id)
         d = con.execute("""SELECT * FROM atendimento.envio_destinatarios
                             WHERE envio_id = %s AND whatsapp = %s""", (envio_id, numero)).fetchone()
         if acao == "copia" or not d or d["resposta"] in ("quero", "nao_quero"):
@@ -296,7 +354,7 @@ class Envio:
 
     def tratar_texto_de_convidado(self, con, entrada, agora) -> bool:
         """Quem recebeu um envio e ESCREVEU: o texto fica na linha dele na tela Envios."""
-        numero = entrada.pessoa.wa_id or ""
+        numero = com_nove(entrada.pessoa.wa_id)
         d = con.execute("""SELECT d.id FROM atendimento.envio_destinatarios d
                             WHERE d.whatsapp = %s AND d.convite_em > %s AND d.resposta IS NULL
                             ORDER BY d.convite_em DESC LIMIT 1""", (numero, agora - JANELA)).fetchone()

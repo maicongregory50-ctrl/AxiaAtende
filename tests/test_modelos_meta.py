@@ -32,7 +32,8 @@ def test_o_cadastro_vira_a_forma_da_meta(cfg):
     assert [b["text"] for b in convite[2]["buttons"]] == ["Quero receber", "Não quero receber"]
     direta = modelos_meta.componentes(por_nome["epoca_de_plantio"], "4::h")
     assert direta[1]["text"].startswith("Olá, {{1}}!")       # a 004: nao comeca por variavel
-    assert direta[2]["buttons"][0]["url"] == "https://wa.me/{{1}}"
+    botao = direta[2]["buttons"][0]
+    assert botao["type"] == "URL" and botao["url"].endswith("/falar/{{1}}") and "wa.me" not in botao["url"]
     aviso = modelos_meta.componentes(por_nome["aviso_recusa"])
     assert [c["type"] for c in aviso] == ["BODY"] and len(aviso[0]["example"]["body_text"][0]) == 3
 

@@ -59,7 +59,7 @@ export default function Envios() {
           </select>
           <select value={resposta} onChange={(e) => setResposta(e.target.value)}>
             <option value="">Toda resposta</option><option value="quero">Quero receber</option>
-            <option value="nao_quero">Não quero</option><option value="texto">Escreveu</option>
+            <option value="nao_quero">Não quero</option><option value="texto">Escreveu</option><option value="falar">Tocou em falar</option>
             <option value="sem_responsavel">Sem responsável</option><option value="sem_aceite">Sem aceite</option>
           </select>
           {lista.nota && <span className="leve">Nota do número: <b>{NOTA[lista.nota.nota]}</b></span>}
@@ -96,6 +96,7 @@ export default function Envios() {
                   <td>{l.resposta === 'quero' && <span className="selo v">Quero receber · {hora(l.resposta_em)}</span>}
                     {l.resposta === 'nao_quero' && <span className="selo r">Não quero · {hora(l.resposta_em)}
                       {l.aviso_recusa_em ? ' · responsável avisado' : ''}</span>}
+                    {l.resposta === 'falar' && <span className="selo v">tocou em falar · {hora(l.resposta_em)}</span>}
                     {l.resposta === 'texto' && <><span className="selo v">escreveu · {hora(l.resposta_em)}</span> “{l.resposta_texto}”</>}
                     {!l.resposta && <span className="leve">—</span>}</td>
                   <td>{l.resposta === 'quero' ? l.imagens : <span className="leve">—</span>}</td>

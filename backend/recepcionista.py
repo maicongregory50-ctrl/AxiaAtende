@@ -25,9 +25,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
 from . import config, migracoes, motor
+from . import envio as envio_mod
 from .banco import conexao
 
 LOTE = 20
@@ -110,7 +111,8 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
                     elif ev["tipo"] == "mensagem":
                         corpo = ev["corpo"]
                         entrada = motor.ler_mensagem({"contacts": corpo["contacts"]}, corpo["msg"])
-                        if cfg.responde_so_para and entrada.pessoa.wa_id not in cfg.responde_so_para:
+                        if cfg.responde_so_para and envio_mod.com_nove(entrada.pessoa.wa_id) not in {
+                                envio_mod.com_nove(n) for n in cfg.responde_so_para}:
                             erro = "escuta (ensaio)"   # o Opa responde a quem nao esta no ensaio
                         else:
                             motor.tratar(con, saida, ia, entrada, momento, envio)
@@ -185,6 +187,16 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "so_para": len(cfg.responde_so_para),
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None}
+
+    @app.get("/falar/{codigo}")
+    def falar(codigo: str):
+        """O botao de link da comunicacao direta: anota o toque e manda para o WhatsApp do
+        responsavel. Codigo que nao assinamos e 404 (o endereco nao serve de atalho)."""
+        with conexao(cfg) as con:
+            numero = envio_mod.falar(con, cfg.meta_app_secret, codigo, datetime.now(timezone.utc))
+        if not numero:
+            return PlainTextResponse("", status_code=404)
+        return RedirectResponse("https://wa.me/%s" % numero, status_code=302)
 
     @app.get("/webhook")
     def aperto_de_mao(request: Request):
