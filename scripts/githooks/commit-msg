@@ -1,0 +1,59 @@
+#!/bin/sh
+# commit-msg -- AxiaSecurity
+#
+# Recusa mensagem de commit que nao cite o chamado (#N).
+#
+# Por que existe (demanda #268, 08/09/2026): a medicao dos 31 chamados deste projeto achou
+# 4 numeros de chamado em todo o git log para 11 chamados resolvidos. Commit sem #N e uma
+# violacao SILENCIOSA -- ninguem percebe no dia, e meses depois nao ha como ligar o codigo
+# ao motivo. A regra da casa diz que violacao silenciosa tem de virar portao, nao placa
+# (C:\SuporteAxia\docs\PADRAO-TRABALHO.md, cabecalho).
+#
+# A saida de escape e deliberada: commit que legitimamente nao nasce de chamado (ajuste de
+# documento, correcao de digitacao) passa com "sem-chamado: <motivo>" na mensagem. Sem
+# escape, o hook vira obstaculo e alguem passa a usar --no-verify -- que e a placa de novo,
+# so que pior, porque agora parece que ha portao.
+#
+# Ligado por: git config core.hooksPath scripts/githooks
+# Desligado por: git config --unset core.hooksPath
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+
+# a mensagem sem os comentarios do git e sem CR
+corpo=$(sed -e 's/\r$//' -e '/^#/d' "$msg_file")
+
+# mensagem vazia: o proprio git aborta, nao e problema deste hook
+printf '%s' "$corpo" | tr -d '[:space:]' | grep -aq . || exit 0
+
+# merge e revert nascem com mensagem automatica do git
+primeira=$(printf '%s\n' "$corpo" | sed -n '1p')
+case "$primeira" in
+  "Merge "*|"Revert "*) exit 0 ;;
+esac
+
+# cita um chamado: #123
+printf '%s' "$corpo" | grep -aqE '#[0-9]+' && exit 0
+
+# escape declarado
+printf '%s' "$corpo" | grep -aqi 'sem-chamado:' && exit 0
+
+cat >&2 <<'FIM'
+
+  Commit recusado: a mensagem nao cita chamado.
+
+  Este repositorio exige o numero do chamado na mensagem (demanda #268).
+  Escreva #N em qualquer lugar da mensagem:
+
+      [axia-security] Desarma as tarefas de boot do RenascerGestao (#259)
+
+  Se este commit realmente nao nasce de um chamado, diga isso, com o motivo:
+
+      [axia-security] Corrige digitacao no RUNBOOK
+      sem-chamado: ajuste de texto, sem mudanca de comportamento
+
+  Nao use --no-verify. O escape acima existe para nao precisar dele, e ele
+  deixa registro; --no-verify nao deixa nenhum.
+
+FIM
+exit 1
