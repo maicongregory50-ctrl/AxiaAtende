@@ -112,6 +112,10 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
     def eu(u: dict = Depends(usuario)):
         return {"login": u["login"], "nome": u["nome"]}
 
+    # ── as tres telas (F1): Recepcao, Envios e Destinos ──
+    from .rotas_telas import rotas as rotas_telas
+    app.include_router(rotas_telas(cfg, usuario), prefix="/api")
+
     # ── a porta do AxiaMarketing (E1 e E5): fora de /api, com a chave do pedido ──
     from .rotas_pedido import rotas as rotas_pedido
     app.include_router(rotas_pedido(cfg))
