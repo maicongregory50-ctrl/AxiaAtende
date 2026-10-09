@@ -39,7 +39,9 @@ class Saida:
         raise NotImplementedError
 
     def modelo(self, para: str, nome: str, idioma: str, corpo: list[str],
-               imagem: str | None = None, botoes: list[str] | None = None) -> str:
+               imagem: str | None = None, botoes: list[str] | None = None, url: str | None = None) -> str:
+        """`botoes`: as cargas dos botoes de resposta rapida; `url`: o final do botao de link
+        (o modelo aprovado termina em {{1}}; aqui vai o numero do responsavel)."""
         raise NotImplementedError
 
 
@@ -98,7 +100,7 @@ class SaidaMeta(Saida):
     def imagem(self, para, arquivo, legenda=""):
         return self._wa.send_image(to=para, image=arquivo, caption=legenda or None).id
 
-    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None):
+    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
         # O modelo vai como JSON cru (a forma da Cloud API), sem depender da classe de modelo do
         # PyWa: o que se manda aqui e exatamente o que a documentacao da Meta mostra.
         componentes = []
@@ -112,6 +114,9 @@ class SaidaMeta(Saida):
         for i, carga in enumerate(botoes or []):
             componentes.append({"type": "button", "sub_type": "quick_reply", "index": str(i),
                                 "parameters": [{"type": "payload", "payload": carga}]})
+        if url:
+            componentes.append({"type": "button", "sub_type": "url", "index": "0",
+                                "parameters": [{"type": "text", "text": url}]})
         from pywa.types.templates import TemplateLanguage   # o PyWa pede o idioma no tipo dele
         return self._wa.send_template(to=para, name=nome, language=TemplateLanguage(idioma),
                                       params=componentes).id

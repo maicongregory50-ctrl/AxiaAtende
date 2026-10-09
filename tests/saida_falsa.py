@@ -7,6 +7,7 @@ from backend.saida import Saida, conferir_botoes, conferir_lista
 class SaidaFalsa(Saida):
     def __init__(self):
         self.enviadas = []
+        self.modelos = []
         self._n = count(1)
 
     def _id(self):
@@ -30,8 +31,10 @@ class SaidaFalsa(Saida):
         self.enviadas.append(("imagem", para, arquivo, []))
         return self._id()
 
-    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None):
+    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
         self.enviadas.append(("modelo", para, nome, list(corpo)))
+        self.modelos.append({"para": para, "nome": nome, "corpo": list(corpo), "imagem": imagem,
+                             "botoes": botoes, "url": url})
         return self._id()
 
     @property

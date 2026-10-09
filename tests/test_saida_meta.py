@@ -96,3 +96,11 @@ def test_nota_do_numero_e_so_leitura():
     s = SaidaMeta("725888737278277", "token-falso", sessao=httpx.Client(transport=httpx.MockTransport(responder)))
     assert s.nota() == "GREEN"
     assert all(p.method == "GET" for p in pedidos)
+
+
+def test_botao_de_link_do_responsavel(meta):
+    s, pedidos = meta
+    s.modelo("5549999990000", "epoca_de_plantio", "pt_BR", ["Joao", "plantio", "Djeison"], url="5549999567572")
+    comps = _corpo(pedidos[-1])["template"]["components"]
+    assert comps[-1] == {"type": "button", "sub_type": "url", "index": "0",
+                         "parameters": [{"type": "text", "text": "5549999567572"}]}

@@ -1,27 +1,34 @@
-"""O envio a carteira. #950, Fase E do plano.
+"""O envio a carteira. #950, Fase E do plano, com a emenda do dono de 09/10/2026 (E1b).
 
-QUEM PEDE E QUEM MANDA. O AxiaMarketing pede (campanha, peca, imagens e a lista de clientes ja com
-o responsavel de cada um, lido do canal comercial do cadastro no ERP), depois de o dono aprovar la
-(trava D7 do #923). As TELAS gravam o pedido (`receber_pedido`, chamado pela API local). O
-RECEPCIONISTA, unico com a chave da Meta, manda (`rotina`, a cada minuto).
+QUEM PEDE E QUEM MANDA. O AxiaMarketing pede (o tipo, o modelo, a peca, as imagens e a lista de
+clientes ja com o responsavel de cada um, lido do canal comercial do cadastro no ERP), depois de o
+dono aprovar la (trava D7 do #923). As TELAS gravam o pedido (`receber_pedido`, pela porta local).
+O RECEPCIONISTA, unico com a chave da Meta, manda (`rotina`, a cada minuto).
 
-AS REGRAS (spec, Decisao e "Cuidado com a Meta", dono 09/10/2026):
-- **Cada envio e UM convite pago** (modelo de Marketing com a capa e os botoes "Quero receber" /
-  "Nao quero receber"). O toque abre a janela de 24h e as imagens vao como mensagem livre, sem
-  custo. O aceite fica gravado.
-- **Quem recusa** sai da lista (nunca mais recebe convite) e o RESPONSAVEL dele e avisado no
-  WhatsApp por modelo de Utilidade, para um contato direto. "Quero receber" nao avisa ninguem.
-- **Sem responsavel no cadastro** (canal comercial vazio), o cliente NAO recebe: fica como
-  "sem responsavel", com o vendedor do ultimo pedido como sugestao.
+DOIS TIPOS DE ENVIO:
+- `material` -- um servico que agrega ao produto (as pecas da revenda com a logo dela; cada
+  cliente pode ter as SUAS imagens). Vai por CONVITE (modelo de uso `convite`: capa, "Quero
+  receber" / "Nao quero receber"); o toque abre a janela de 24h e as imagens seguem sem custo.
+- `direta` -- campanha de arte unica ("chegou a epoca do seu Trigo Mourisco"). Uma mensagem paga
+  (modelo de uso `direta`) com a imagem, o texto e o botao de link para o WhatsApp do responsavel.
+  SO VAI A QUEM JA ACEITOU: tocou "Quero receber" em algum envio, ou tem o aceite de marketing no
+  cadastro do #952. Quem nunca aceitou fica "sem aceite" e recebe primeiro um convite.
+
+OS MODELOS SAO CADASTRO (`atendimento.modelos`): o nome aprovado na Meta, as variaveis do texto
+em ordem (de uma lista fechada de fontes) e o tipo de botao. Modelo novo e linha nova, nao codigo.
+
+AS REGRAS QUE VALEM PARA OS DOIS (spec, "Cuidado com a Meta"):
+- **Sem responsavel no cadastro** (canal comercial vazio), o cliente NAO recebe.
 - **Degraus:** lotes de ate 20 por dia, na ordem de faturamento (Top 20, Top 50, Top 100); o
   proximo lote so sai com a nota do numero em GREEN; em YELLOW ou RED o envio para sozinho.
-- **Ninguem recebe o mesmo convite duas vezes**, e numero que a Meta recusou como "nao e
-  WhatsApp" nao e tentado de novo.
-- **O representante recebe copia do convite** dos clientes da carteira dele (uma copia por envio).
+- **Ninguem recebe o mesmo envio duas vezes**; quem recusou nao recebe mais nada; numero que a
+  Meta recusou como "nao e WhatsApp" nao e tentado de novo.
+- **O responsavel recebe copia** do que os clientes dele recebem (uma por envio).
+- **Quem recusa** e o responsavel dele e avisado (modelo de uso `aviso_recusa`, Utilidade).
 
-OS IDS DOS BOTOES do modelo (`payload` da resposta rapida): `envio:<id>:quero` e
-`envio:<id>:nao_quero`. O motor entrega ao `tratar_toque` tudo o que comeca com `envio:`.
+OS IDS DOS BOTOES do convite (`payload`): `envio:<id>:quero` e `envio:<id>:nao_quero`.
 """
+import json
 import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -30,14 +37,14 @@ from .banco import conexao
 from .saida import Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
-MODELO_CONVITE = "pecas_da_revenda"
-MODELO_RECUSA = "aviso_recusa"
-MODELO_SEM_ATENDIMENTO = "aviso_sem_atendimento"
-IDIOMA = "pt_BR"
 JANELA = timedelta(hours=24)
-# codigos da Meta para "este numero nao e WhatsApp" (131026: mensagem nao entregavel)
-NAO_E_WHATSAPP = {"131026"}
+NAO_E_WHATSAPP = {"131026"}   # codigo da Meta: mensagem nao entregavel (numero sem WhatsApp)
 CELULAR = re.compile(r"^55[1-9][0-9]9[0-9]{8}$")
+USO_DO_TIPO = {"material": "convite", "direta": "direta"}
+
+
+class PedidoInvalido(ValueError):
+    pass
 
 
 def so_digitos(numero: str) -> str:
@@ -45,6 +52,24 @@ def so_digitos(numero: str) -> str:
     if d and not d.startswith("55"):
         d = "55" + d
     return d
+
+
+def primeiro_nome(nome: str) -> str:
+    return (nome or "").split(" ")[0].title() or "tudo bem"
+
+
+def modelo(con, nome: str):
+    return con.execute("SELECT * FROM atendimento.modelos WHERE nome = %s AND ativo", (nome,)).fetchone()
+
+
+def modelo_do_uso(con, uso: str):
+    return con.execute("SELECT * FROM atendimento.modelos WHERE uso = %s AND ativo ORDER BY id LIMIT 1",
+                       (uso,)).fetchone()
+
+
+def parametros(m, fontes: dict) -> list[str]:
+    """As variaveis do modelo, na ordem do cadastro, tiradas das fontes."""
+    return [str(fontes.get(v, "")) or "-" for v in m["variaveis"]]
 
 
 # ── o pedido (lado das TELAS) ───────────────────────────────────────────────
@@ -55,24 +80,33 @@ def receber_pedido(con, pedido: dict) -> int:
     ja = con.execute("SELECT id FROM atendimento.envios WHERE pedido_ref = %s", (pedido["pedido_ref"],)).fetchone()
     if ja:
         return ja["id"]
+    tipo = pedido.get("tipo", "material")
+    if tipo not in USO_DO_TIPO:
+        raise PedidoInvalido("tipo de envio desconhecido: %s" % tipo)
+    m = modelo(con, pedido["modelo"])
+    if not m or m["uso"] != USO_DO_TIPO[tipo]:
+        raise PedidoInvalido("o modelo %r não existe ou não serve para envio %s" % (pedido["modelo"], tipo))
     envio = con.execute(
-        """INSERT INTO atendimento.envios (pedido_ref, campanha, peca, modelo, capa, imagens,
+        """INSERT INTO atendimento.envios (pedido_ref, tipo, campanha, peca, assunto, modelo, capa, imagens,
                                            aprovado_por, aprovado_em, lote_tamanho)
-           VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s) RETURNING id""",
-        (pedido["pedido_ref"], pedido["campanha"], pedido["peca"], pedido.get("modelo", MODELO_CONVITE),
-         pedido["capa"], _json(pedido["imagens"]), pedido["aprovado_por"], pedido["aprovado_em"],
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s) RETURNING id""",
+        (pedido["pedido_ref"], tipo, pedido["campanha"], pedido["peca"], pedido.get("assunto", ""), m["nome"],
+         pedido["capa"], json.dumps(pedido.get("imagens") or []), pedido["aprovado_por"], pedido["aprovado_em"],
          min(int(pedido.get("lote_tamanho", 20)), 20))).fetchone()["id"]
 
     ordenados = sorted(pedido["clientes"], key=lambda c: -float(c.get("faturamento") or 0))
     for pos, c in enumerate(ordenados, start=1):
         numero = so_digitos(c.get("whatsapp", ""))
         resp = so_digitos(c.get("responsavel_whatsapp", ""))
+        aceite_cadastro = bool(c.get("aceite_cadastro"))
         if not CELULAR.match(numero):
             situacao = "sem_whatsapp"
         elif not c.get("responsavel_nome") or not CELULAR.match(resp):
             situacao = "sem_responsavel"
-        elif _recusou(con, numero):
+        elif _ultimo_consentimento(con, numero) == "recusa":
             situacao = "recusou_antes"
+        elif tipo == "direta" and not (aceite_cadastro or _ultimo_consentimento(con, numero) == "aceite"):
+            situacao = "sem_aceite"
         elif _ja_recebeu(con, numero, pedido["peca"]):
             situacao = "ja_recebeu"
         elif _nao_e_whatsapp(con, numero):
@@ -82,23 +116,21 @@ def receber_pedido(con, pedido: dict) -> int:
         con.execute(
             """INSERT INTO atendimento.envio_destinatarios
                    (envio_id, erp_codigo, nome, cidade, uf, whatsapp, faturamento, posicao,
-                    responsavel_nome, responsavel_whatsapp, sugestao_vendedor, situacao)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    responsavel_nome, responsavel_whatsapp, sugestao_vendedor, situacao,
+                    capa, imagens, aceite_cadastro)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
                ON CONFLICT (envio_id, erp_codigo) DO NOTHING""",
             (envio, int(c["erp_codigo"]), c["nome"], c.get("cidade", ""), c.get("uf", ""), numero,
              c.get("faturamento") or 0, pos, c.get("responsavel_nome", ""), resp,
-             c.get("sugestao_vendedor", ""), situacao))
+             c.get("sugestao_vendedor", ""), situacao, c.get("capa"),
+             json.dumps(c["imagens"]) if c.get("imagens") else None, aceite_cadastro))
     return envio
 
 
-def _json(v):
-    import json
-    return json.dumps(v)
-
-
-def _recusou(con, numero):
-    return con.execute("""SELECT tipo FROM atendimento.consentimentos WHERE whatsapp = %s
-                           ORDER BY em DESC, id DESC LIMIT 1""", (numero,)).fetchone() == {"tipo": "recusa"}
+def _ultimo_consentimento(con, numero):
+    r = con.execute("""SELECT tipo FROM atendimento.consentimentos WHERE whatsapp = %s
+                        ORDER BY em DESC, id DESC LIMIT 1""", (numero,)).fetchone()
+    return r["tipo"] if r else None
 
 
 def _ja_recebeu(con, numero, peca):
@@ -121,7 +153,6 @@ class Envio:
     def __init__(self, ler_nota=None):
         self._ler_nota = ler_nota
 
-    # -- a cada minuto --
     def rotina(self, cfg, saida: Saida, agora: datetime) -> None:
         with conexao(cfg) as con:
             self.ler_nota_do_dia(con, agora)
@@ -151,13 +182,13 @@ class Envio:
         mandados = 0
         for e in con.execute("SELECT * FROM atendimento.envios WHERE situacao IN ('ativo', 'parado_nota') ORDER BY id").fetchall():
             if nota != "GREEN":
-                # Sem nota verde nao sai lote. Amarela ou vermelha PARA o envio (o dono decide);
-                # sem leitura (UNKNOWN) so espera o proximo minuto.
+                # Amarela ou vermelha PARA o envio (o dono religa na tela Envios); sem leitura
+                # (UNKNOWN) so espera o proximo minuto.
                 if nota in ("YELLOW", "RED") and e["situacao"] != "parado_nota":
                     con.execute("UPDATE atendimento.envios SET situacao = 'parado_nota' WHERE id = %s", (e["id"],))
                 continue
             if e["situacao"] == "parado_nota":
-                continue   # parado pela nota: so o dono religa (Envios), nem com a nota de volta ao verde
+                continue   # so o dono religa, mesmo com a nota de volta ao verde
             ja_hoje = con.execute(
                 """SELECT count(*) AS n FROM atendimento.envio_destinatarios
                     WHERE envio_id = %s AND convite_em IS NOT NULL
@@ -169,55 +200,66 @@ class Envio:
             fila = con.execute("""SELECT * FROM atendimento.envio_destinatarios
                                    WHERE envio_id = %s AND situacao = 'aguardando'
                                    ORDER BY posicao LIMIT %s""", (e["id"], vagas)).fetchall()
-            if not fila and not ja_hoje:
-                pend = con.execute("""SELECT 1 FROM atendimento.envio_destinatarios
-                                       WHERE envio_id = %s AND situacao = 'aguardando' LIMIT 1""", (e["id"],)).fetchone()
-                if not pend:
+            if not fila:
+                if not ja_hoje:
                     con.execute("UPDATE atendimento.envios SET situacao = 'concluido' WHERE id = %s", (e["id"],))
                 continue
+            m = modelo(con, e["modelo"])
             # o lote e o do dia: o primeiro convite do dia abre um lote novo
             ultimo = con.execute("SELECT coalesce(max(lote), 0) AS m FROM atendimento.envio_destinatarios WHERE envio_id = %s",
                                  (e["id"],)).fetchone()["m"]
             lote = ultimo if ja_hoje else ultimo + 1
             for d in fila:
-                self._convidar(con, saida, e, d, lote, agora)
+                self._mandar_um(con, saida, e, m, d, lote, agora)
                 mandados += 1
-            self._copias_aos_responsaveis(con, saida, e, fila, agora)
+            self._copias_aos_responsaveis(con, saida, e, m, fila)
         return mandados
 
-    def _convidar(self, con, saida, e, d, lote, agora):
-        primeiro_nome = d["nome"].split(" ")[0].title() if d["nome"] else "tudo bem"
-        n = len(e["imagens"])
+    def _mensagem(self, e, m, d, para_nome, numero_resp):
+        imagens = d["imagens"] if d["imagens"] is not None else e["imagens"]
+        fontes = {"primeiro_nome": primeiro_nome(para_nome), "nome": para_nome, "assunto": e["assunto"],
+                  "peca": e["peca"], "n_imagens": len(imagens), "responsavel": d["responsavel_nome"]}
+        botoes = ["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "quero_nao_quero" else None
+        url = numero_resp if m["botao"] == "link_responsavel" else None
+        capa = (d["capa"] or e["capa"]) if m["cabecalho_imagem"] else None
+        return parametros(m, fontes), capa, botoes, url, len(imagens)
+
+    def _mandar_um(self, con, saida, e, m, d, lote, agora):
+        corpo, capa, botoes, url, n = self._mensagem(e, m, d, d["nome"], d["responsavel_whatsapp"])
         try:
-            w = saida.modelo(d["whatsapp"], e["modelo"], IDIOMA, [primeiro_nome, str(n)], imagem=e["capa"],
-                             botoes=["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]])
+            w = saida.modelo(d["whatsapp"], m["nome"], m["idioma"], corpo, imagem=capa, botoes=botoes, url=url)
             con.execute("""UPDATE atendimento.envio_destinatarios
                               SET situacao = 'convidado', lote = %s, convite_wamid = %s, convite_em = %s,
                                   imagens_total = %s
-                            WHERE id = %s""", (lote, w, agora, n, d["id"]))
+                            WHERE id = %s""", (lote, w, agora, n if e["tipo"] == "material" else 0, d["id"]))
             con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
-                           VALUES (%s, %s, 'modelo', %s)""", (w, d["whatsapp"], "convite %s" % e["peca"]))
+                           VALUES (%s, %s, 'modelo', %s)""", (w, d["whatsapp"], "%s %s" % (e["tipo"], e["peca"])))
         except Exception as falha:  # noqa: BLE001 -- o proximo da fila segue
             con.execute("""UPDATE atendimento.envio_destinatarios SET situacao = 'falhou', lote = %s, erro = %s
                             WHERE id = %s""", (lote, str(falha)[:300], d["id"]))
 
-    def _copias_aos_responsaveis(self, con, saida, e, fila, agora):
-        """Uma copia do convite por responsavel por envio (o mesmo que o cliente recebe)."""
-        for resp in sorted({(d["responsavel_whatsapp"], d["responsavel_nome"]) for d in fila}):
-            numero, nome = resp
-            ja = con.execute("""SELECT 1 FROM atendimento.enviadas WHERE para = %s AND resumo = %s""",
-                             (numero, "copia %d" % e["id"])).fetchone()
-            if ja:
+    def _copias_aos_responsaveis(self, con, saida, e, m, fila):
+        """Uma copia por responsavel por envio: o mesmo que o cliente recebe (a primeira versao)."""
+        vistos = set()
+        for d in fila:
+            numero = d["responsavel_whatsapp"]
+            if numero in vistos:
                 continue
+            vistos.add(numero)
+            if con.execute("SELECT 1 FROM atendimento.enviadas WHERE para = %s AND resumo = %s",
+                           (numero, "copia %d" % e["id"])).fetchone():
+                continue
+            corpo, capa, botoes, url, _ = self._mensagem(e, m, d, d["responsavel_nome"], numero)
+            if botoes:
+                botoes = ["envio:%d:copia" % e["id"]] * len(botoes)   # o toque do responsavel nao vale
             try:
-                w = saida.modelo(numero, e["modelo"], IDIOMA, [nome.split(" ")[0], str(len(e["imagens"]))],
-                                 imagem=e["capa"], botoes=["envio:%d:copia" % e["id"], "envio:%d:copia" % e["id"]])
+                w = saida.modelo(numero, m["nome"], m["idioma"], corpo, imagem=capa, botoes=botoes, url=url)
                 con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'modelo', %s)",
                             (w, numero, "copia %d" % e["id"]))
             except Exception:  # noqa: BLE001 -- a copia nunca trava o envio
                 pass
 
-    # -- as respostas --
+    # -- as respostas ao convite --
     def tratar_toque(self, con, saida: Saida, entrada, agora: datetime) -> None:
         partes = (entrada.toque or "").split(":")
         if len(partes) != 3 or not partes[1].isdigit():
@@ -226,37 +268,33 @@ class Envio:
         numero = entrada.pessoa.wa_id or ""
         d = con.execute("""SELECT * FROM atendimento.envio_destinatarios
                             WHERE envio_id = %s AND whatsapp = %s""", (envio_id, numero)).fetchone()
-        if acao == "copia" or not d:
-            return   # o toque do representante na copia, ou de quem nao estava na lista: nada
-        if d["resposta"] in ("quero", "nao_quero"):
-            return   # ja respondeu; o segundo toque nao repete nada
-        if acao == "quero":
-            con.execute("""INSERT INTO atendimento.consentimentos (whatsapp, bsuid, erp_codigo, tipo, wamid, envio_id)
-                           VALUES (%s, %s, %s, 'aceite', %s, %s)""",
-                        (numero, entrada.pessoa.bsuid, d["erp_codigo"], entrada.wamid, envio_id))
-            con.execute("""UPDATE atendimento.envio_destinatarios SET resposta = 'quero', resposta_em = %s
-                            WHERE id = %s""", (agora, d["id"]))
-            self._mandar_imagens(con, saida, envio_id, d["id"], agora)
-        elif acao == "nao_quero":
-            con.execute("""INSERT INTO atendimento.consentimentos (whatsapp, bsuid, erp_codigo, tipo, wamid, envio_id)
-                           VALUES (%s, %s, %s, 'recusa', %s, %s)""",
-                        (numero, entrada.pessoa.bsuid, d["erp_codigo"], entrada.wamid, envio_id))
-            con.execute("""UPDATE atendimento.envio_destinatarios SET resposta = 'nao_quero', resposta_em = %s
-                            WHERE id = %s""", (agora, d["id"]))
-            # sai de todo envio ainda por mandar
-            con.execute("""UPDATE atendimento.envio_destinatarios SET situacao = 'recusou_antes'
-                            WHERE whatsapp = %s AND situacao = 'aguardando'""", (numero,))
-            w = saida.texto(numero, "Tudo certo, você não vai mais receber estas mensagens. Obrigado pela atenção.")
-            con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', 'recusa confirmada')",
-                        (w, numero))
-            e = con.execute("SELECT peca FROM atendimento.envios WHERE id = %s", (envio_id,)).fetchone()
-            sobre = "%s|%s · %s|%s|https://wa.me/%s" % (d["nome"], d["erp_codigo"], d["cidade"] or "?",
-                                                         e["peca"], numero)
-            con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
-                           VALUES ('recusa', %s, %s, %s)""", (d["responsavel_nome"], d["responsavel_whatsapp"], sobre))
+        if acao == "copia" or not d or d["resposta"] in ("quero", "nao_quero"):
+            return   # o toque do responsavel na copia, de quem nao estava na lista, ou o segundo toque
+        tipo = "aceite" if acao == "quero" else "recusa" if acao == "nao_quero" else None
+        if not tipo:
+            return
+        con.execute("""INSERT INTO atendimento.consentimentos (whatsapp, bsuid, erp_codigo, tipo, wamid, envio_id)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (numero, entrada.pessoa.bsuid, d["erp_codigo"], tipo, entrada.wamid, envio_id))
+        con.execute("""UPDATE atendimento.envio_destinatarios SET resposta = %s, resposta_em = %s WHERE id = %s""",
+                    ("quero" if tipo == "aceite" else "nao_quero", agora, d["id"]))
+        if tipo == "aceite":
+            self._mandar_imagens(con, saida, d["id"], agora)
+            return
+        # recusa: sai de todo envio ainda por mandar, confirma, e o responsavel e avisado
+        con.execute("""UPDATE atendimento.envio_destinatarios SET situacao = 'recusou_antes'
+                        WHERE whatsapp = %s AND situacao = 'aguardando'""", (numero,))
+        w = saida.texto(numero, "Tudo certo, você não vai mais receber estas mensagens. Obrigado pela atenção.")
+        con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', 'recusa confirmada')",
+                    (w, numero))
+        local = "%s · %s" % (d["erp_codigo"], d["cidade"] or "?")
+        con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
+                       VALUES ('recusa', %s, %s, %s)""",
+                    (d["responsavel_nome"], d["responsavel_whatsapp"],
+                     "|".join([d["nome"], local, "https://wa.me/%s" % numero])))
 
     def tratar_texto_de_convidado(self, con, entrada, agora) -> bool:
-        """Quem foi convidado e ESCREVEU (em vez de tocar): o texto fica na linha do Envios."""
+        """Quem recebeu um envio e ESCREVEU: o texto fica na linha dele na tela Envios."""
         numero = entrada.pessoa.wa_id or ""
         d = con.execute("""SELECT d.id FROM atendimento.envio_destinatarios d
                             WHERE d.whatsapp = %s AND d.convite_em > %s AND d.resposta IS NULL
@@ -267,18 +305,17 @@ class Envio:
                               resposta_em = %s WHERE id = %s""", (entrada.texto[:500], agora, d["id"]))
         return True
 
-    def _mandar_imagens(self, con, saida, envio_id, dest_id, agora):
-        e = con.execute("SELECT imagens, peca FROM atendimento.envios WHERE id = %s", (envio_id,)).fetchone()
-        d = con.execute("SELECT * FROM atendimento.envio_destinatarios WHERE id = %s", (dest_id,)).fetchone()
+    def _mandar_imagens(self, con, saida, dest_id, agora):
+        d = con.execute("""SELECT d.*, e.imagens AS imagens_envio, e.peca FROM atendimento.envio_destinatarios d
+                            JOIN atendimento.envios e ON e.id = d.envio_id WHERE d.id = %s""", (dest_id,)).fetchone()
         if not d["resposta_em"] or agora - d["resposta_em"] > JANELA:
             return   # fora da janela a mensagem livre nao sai; o dono decide (Envios)
-        imagens = e["imagens"]
+        imagens = d["imagens"] if d["imagens"] is not None else d["imagens_envio"]
         for i in range(d["imagens_enviadas"], len(imagens)):
             try:
-                legenda = e["peca"] if i == 0 else ""
-                w = saida.imagem(d["whatsapp"], imagens[i], legenda)
+                w = saida.imagem(d["whatsapp"], imagens[i], d["peca"] if i == 0 else "")
                 con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'imagem', %s)",
-                            (w, d["whatsapp"], "imagem %d de %s" % (i + 1, e["peca"])))
+                            (w, d["whatsapp"], "imagem %d de %s" % (i + 1, d["peca"])))
                 con.execute("UPDATE atendimento.envio_destinatarios SET imagens_enviadas = %s WHERE id = %s",
                             (i + 1, dest_id))
             except Exception as falha:  # noqa: BLE001 -- tenta de novo no proximo minuto, dentro da janela
@@ -287,26 +324,26 @@ class Envio:
                 return
 
     def mandar_imagens_pendentes(self, con, saida, agora):
-        for d in con.execute("""SELECT id, envio_id FROM atendimento.envio_destinatarios
+        for d in con.execute("""SELECT id FROM atendimento.envio_destinatarios
                                  WHERE resposta = 'quero' AND imagens_enviadas < imagens_total
                                    AND resposta_em > %s""", (agora - JANELA,)).fetchall():
-            self._mandar_imagens(con, saida, d["envio_id"], d["id"], agora)
+            self._mandar_imagens(con, saida, d["id"], agora)
 
     def mandar_avisos(self, con, saida, agora):
         for a in con.execute("""SELECT * FROM atendimento.avisos WHERE enviado_em IS NULL AND erro = ''
                                  ORDER BY id LIMIT 20""").fetchall():
+            m = modelo_do_uso(con, "aviso_" + a["tipo"])
             try:
-                if a["tipo"] == "recusa":
-                    nome, local, peca, link = (a["sobre"].split("|") + ["", "", "", ""])[:4]
-                    w = saida.modelo(a["para_whatsapp"], MODELO_RECUSA, IDIOMA, [nome, local, link])
-                else:
-                    w = saida.modelo(a["para_whatsapp"], MODELO_SEM_ATENDIMENTO, IDIOMA,
-                                     [a["sobre"][:200], "o atendimento", "veja a tela Recepção"])
+                if not m:
+                    raise RuntimeError("nenhum modelo cadastrado para aviso_%s" % a["tipo"])
+                partes = (a["sobre"].split("|") + ["", "", ""])[:3]
+                corpo = parametros(m, {"aviso1": partes[0], "aviso2": partes[1], "aviso3": partes[2]})
+                w = saida.modelo(a["para_whatsapp"], m["nome"], m["idioma"], corpo)
                 con.execute("UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s WHERE id = %s", (agora, w, a["id"]))
             except Exception as falha:  # noqa: BLE001
                 con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
 
-    # -- os status da Meta para o convite --
+    # -- os status da Meta para o envio --
     def aplicar_status(self, con, st: dict, novo: str, erro: str, agora: datetime) -> None:
         d = con.execute("SELECT id, entregue_em, lido_em FROM atendimento.envio_destinatarios WHERE convite_wamid = %s",
                         (st["id"],)).fetchone()

@@ -293,9 +293,11 @@ def responder_pos(con, saida: Saida, pessoa: Pessoa, c, toque: str, agora: datet
                            (_ajuste(con, "avisado_no_nao"),)).fetchone()
         destino = con.execute("SELECT nome FROM atendimento.destinos WHERE id = %s", (c["destino_id"],)).fetchone()
         if quem:
-            sobre = "%s (%s) disse que não recebeu retorno de %s, assunto %s" % (
-                c["nome_perfil"] or "quem chamou", c["wa_id"] or "sem número",
-                destino["nome"] if destino else "?", " › ".join(c["caminho"]) or "?")
+            # as tres partes do modelo aviso_sem_atendimento: quem, sobre o que, o contato
+            sobre = "|".join([
+                "%s (%s)" % (c["nome_perfil"] or "quem chamou", c["wa_id"] or "sem número"),
+                "%s, com %s" % (" › ".join(c["caminho"]) or "?", destino["nome"] if destino else "?"),
+                "https://wa.me/%s" % c["wa_id"] if c["wa_id"] else "sem número (veja a Recepção)"])
             con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
                            VALUES ('sem_atendimento', %s, %s, %s)""", (quem["nome"], quem["whatsapp"], sobre))
     elif toque.startswith("nota:") and toque[5:].isdigit():

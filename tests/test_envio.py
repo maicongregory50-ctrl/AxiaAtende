@@ -40,7 +40,7 @@ def cliente(codigo, fat, whatsapp="", resp=("Maicon Gregory", "5549991505565"), 
 
 
 def pedido(imagens, clientes, ref="pub-1", peca="Trigo Mourisco IPR 92"):
-    return {"pedido_ref": ref, "campanha": "Bom te ver de novo", "peca": peca, "capa": imagens[0],
+    return {"pedido_ref": ref, "modelo": "pecas_da_revenda", "campanha": "Bom te ver de novo", "peca": peca, "capa": imagens[0],
             "imagens": imagens[1:], "aprovado_por": "maicon", "aprovado_em": "2026-10-07T17:00:00-03:00",
             "clientes": clientes}
 

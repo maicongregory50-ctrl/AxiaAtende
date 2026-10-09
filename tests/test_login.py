@@ -48,4 +48,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
     with TestClient(criar_app(cfg)) as c:
         s = c.get("/saude").json()
     assert s["de_pe"] is True and s["responde"] is False
-    assert s["mudancas"] == ["001_casa_e_atendimento.sql", "002_menu_da_olivia.sql"]
+    assert s["mudancas"] == ["001_casa_e_atendimento.sql", "002_menu_da_olivia.sql",
+                            "003_modelos_e_comunicacao_direta.sql"]

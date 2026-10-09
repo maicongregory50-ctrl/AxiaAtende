@@ -14,6 +14,7 @@ import hmac
 import shutil
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -34,14 +35,20 @@ class Cliente(BaseModel):
     responsavel_nome: str = ""
     responsavel_whatsapp: str = ""
     sugestao_vendedor: str = ""
+    aceite_cadastro: bool = False          # o aceite de marketing do cadastro (#952)
+    capa: str | None = None                # a versao deste cliente (a peca da revenda com a logo dela)
+    imagens: list[str] | None = None
 
 
 class Pedido(BaseModel):
     pedido_ref: str = Field(min_length=1, max_length=120)
+    tipo: Literal["material", "direta"] = "material"
+    modelo: str                            # o nome do modelo no cadastro (atendimento.modelos)
     campanha: str
     peca: str
+    assunto: str = ""                      # o {{2}} da direta: "plantio do Trigo Mourisco"
     capa: str
-    imagens: list[str] = Field(min_length=1, max_length=20)
+    imagens: list[str] = Field(default_factory=list, max_length=20)
     aprovado_por: str
     aprovado_em: datetime
     lote_tamanho: int = 20
@@ -66,13 +73,27 @@ def rotas(cfg) -> APIRouter:
     @r.post("/pedido/envio")
     def pedir_envio(pedido: Pedido, x_axiaatende_chave: str | None = Header(default=None)):
         conferir(x_axiaatende_chave)
+        if pedido.tipo == "material" and not pedido.imagens and not any(c.imagens for c in pedido.clientes):
+            raise HTTPException(status_code=422, detail="envio de material sem imagens")
         pasta = cfg.envios_pasta / hashlib.sha256(pedido.pedido_ref.encode()).hexdigest()[:16]
         capa = copiar(pedido.capa, pasta / "capa")
         imagens = [copiar(img, pasta / ("%02d" % i)) for i, img in enumerate(pedido.imagens, start=1)]
+        clientes = []
+        for c in pedido.clientes:
+            d = c.model_dump()
+            sub = pasta / str(c.erp_codigo)
+            if c.capa:
+                d["capa"] = copiar(c.capa, sub / "capa")
+            if c.imagens:
+                d["imagens"] = [copiar(img, sub / ("%02d" % i)) for i, img in enumerate(c.imagens, start=1)]
+            clientes.append(d)
         dados = pedido.model_dump()
-        dados.update(capa=capa, imagens=imagens, clientes=[c.model_dump() for c in pedido.clientes])
+        dados.update(capa=capa, imagens=imagens, clientes=clientes)
         with conexao(cfg) as con:
-            envio_id = E.receber_pedido(con, dados)
+            try:
+                envio_id = E.receber_pedido(con, dados)
+            except E.PedidoInvalido as erro:
+                raise HTTPException(status_code=422, detail=str(erro)) from None
             contagem = {x["situacao"]: x["n"] for x in con.execute(
                 """SELECT situacao, count(*) AS n FROM atendimento.envio_destinatarios
                     WHERE envio_id = %s GROUP BY situacao""", (envio_id,))}
