@@ -49,4 +49,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
         s = c.get("/saude").json()
     assert s["de_pe"] is True and s["responde"] is False
     assert s["mudancas"] == ["001_casa_e_atendimento.sql", "002_menu_da_olivia.sql",
-                            "003_modelos_e_comunicacao_direta.sql"]
+                            "003_modelos_e_comunicacao_direta.sql",
+                            "004_modelo_nao_comeca_por_variavel.sql"]
