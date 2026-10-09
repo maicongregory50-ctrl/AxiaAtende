@@ -3,6 +3,7 @@
 **Chamado:** #969
 **Spec de origem:** `C:\AxiaAtende\docs\specs\2026-10-09-reconhecer-o-cadastro-no-atendimento.md` (documento #1174)
 **Status:** APROVADO
+**Executável pelo agente:** sim
 
 ## Contexto
 
