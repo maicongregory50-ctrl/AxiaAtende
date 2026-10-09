@@ -1,0 +1,20 @@
+# Segredos (PADRAO-TRABALHO.md §6): nunca no repositório
+.env*
+*.secrets
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# Serviços: o WinSW é copiado ao instalar; os logs ficam em C:\Logs\AxiaAtende
+servicos/*.exe
+servicos/*.log
+servicos/*.err.log
+servicos/*.out.log
