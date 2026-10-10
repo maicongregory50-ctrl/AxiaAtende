@@ -10,6 +10,8 @@ AS REGRAS DO DONO (spec, Decisao, 09/10/2026):
 - **Todo destino e link** (wa.me) de quem atende. Fora do horario, o link vai igual, com aviso.
 - **Depois de 4h30**, a pergunta "recebeu o atendimento?": Sim leva a nota de 1 a 5; Nao avisa o
   dono (fila de avisos, que o despachante manda por modelo de Utilidade).
+- **Uma pergunta por pessoa por dia** (#969, etapa 2, dono 10/10/2026): as 4h30 contam da ULTIMA
+  mensagem da pessoa, e as conversas com link do mesmo dia ficam cobertas por essa pergunta.
 
 O QUE VOLTA NO TOQUE (o `id` do botao ou da linha), e a unica coisa que o motor confia:
     menu:<chave>      uma opcao do menu
@@ -153,9 +155,19 @@ def _conversa_aberta(con, pessoa: Pessoa):
                            ORDER BY id DESC LIMIT 1""", (pessoa.bsuid,)).fetchone()
 
 
-def _ultima_com_link(con, pessoa: Pessoa):
-    return con.execute("""SELECT * FROM atendimento.conversas WHERE bsuid = %s AND situacao = 'com_link'
-                           ORDER BY id DESC LIMIT 1""", (pessoa.bsuid,)).fetchone()
+def _ultima_pergunta(con, pessoa: Pessoa):
+    """A conversa que levou a ultima pergunta: a resposta vale para todas as que ela cobre."""
+    return con.execute("""SELECT * FROM atendimento.conversas WHERE bsuid = %s AND pergunta_da = id
+                           ORDER BY pergunta_feita_em DESC, id DESC LIMIT 1""", (pessoa.bsuid,)).fetchone()
+
+
+def _chegou(con, pessoa: Pessoa, conversa, agora: datetime) -> None:
+    """Toda mensagem conta como a ultima interacao, e a pergunta ainda nao feita anda junto."""
+    con.execute("UPDATE atendimento.conversas SET ultimo_toque_em = %s WHERE id = %s", (agora, conversa["id"]))
+    horas = float(_ajuste(con, "pergunta_horas", 4.5))
+    con.execute("""UPDATE atendimento.conversas SET pergunta_em = %s
+                    WHERE bsuid = %s AND situacao = 'com_link' AND pergunta_feita_em IS NULL""",
+                (agora + timedelta(hours=horas), pessoa.bsuid))
 
 
 def _nova_conversa(con, pessoa: Pessoa, agora: datetime):
@@ -242,9 +254,9 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None) -> No
             envio.tratar_toque(con, saida, e, agora)
         return
 
-    # A pergunta das 4h30 e a nota respondem a ULTIMA conversa com link.
+    # A pergunta das 4h30 e a nota respondem a ULTIMA pergunta (e todas as conversas que ela cobre).
     if e.toque in ("pos:sim", "pos:nao") or (e.toque or "").startswith("nota:"):
-        c = _ultima_com_link(con, p)
+        c = _ultima_pergunta(con, p)
         if c:
             responder_pos(con, saida, p, c, e.toque, agora)
         return
@@ -253,6 +265,7 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None) -> No
     nova = conversa is None
     if nova:
         conversa = _nova_conversa(con, p, agora)
+    _chegou(con, p, conversa, agora)
 
     if e.toque and e.toque.startswith("menu:"):
         no = _no(con, e.toque[5:])
@@ -280,49 +293,73 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None) -> No
 
 # ── depois do link: a pergunta das 4h30 ─────────────────────────────────────
 
+_PENDENTES = "bsuid = %s AND situacao = 'com_link' AND pergunta_feita_em IS NULL"
+
+
 def fazer_perguntas_vencidas(con, saida: Saida, agora: datetime) -> int:
-    """As conversas com link cuja hora de perguntar chegou. Devolve quantas."""
-    vencidas = con.execute("""SELECT * FROM atendimento.conversas
-                               WHERE situacao = 'com_link' AND pergunta_feita_em IS NULL AND pergunta_em <= %s
-                               ORDER BY pergunta_em LIMIT 50""", (agora,)).fetchall()
-    for c in vencidas:
-        para = c["wa_id"] or c["bsuid"]
-        if agora - c["ultimo_toque_em"] > timedelta(hours=23):
-            # Fora da janela de 24h a mensagem livre nao sai; nao se insiste.
-            con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s WHERE id = %s", (agora, c["id"]))
+    """Uma pergunta por pessoa por dia, 4h30 depois da ultima mensagem dela (o `pergunta_em` anda a
+    cada mensagem, em `_chegou`). A pergunta sai na conversa com link mais nova; as outras
+    pendentes da pessoa ficam cobertas por ela. Devolve quantas perguntas sairam."""
+    pessoas = con.execute("""SELECT bsuid, max(id) AS conversa_id FROM atendimento.conversas
+                              WHERE situacao = 'com_link' AND pergunta_feita_em IS NULL AND pergunta_em <= %s
+                              GROUP BY bsuid ORDER BY min(pergunta_em) LIMIT 50""", (agora,)).fetchall()
+    meia_noite = agora.astimezone(FUSO).replace(hour=0, minute=0, second=0, microsecond=0)
+    feitas = 0
+    for p in pessoas:
+        hoje = con.execute("""SELECT id FROM atendimento.conversas
+                               WHERE bsuid = %s AND pergunta_da = id AND pergunta_feita_em >= %s
+                               ORDER BY pergunta_feita_em DESC LIMIT 1""", (p["bsuid"], meia_noite)).fetchone()
+        if hoje:
+            # Ja se perguntou hoje: fica coberta por aquela pergunta, sem mensagem nova.
+            con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s, pergunta_da = %s WHERE " + _PENDENTES,
+                        (agora, hoje["id"], p["bsuid"]))
             continue
+        ultima = con.execute("SELECT max(ultimo_toque_em) AS em FROM atendimento.conversas WHERE bsuid = %s",
+                             (p["bsuid"],)).fetchone()["em"]
+        if agora - ultima > timedelta(hours=23):
+            # Fora da janela de 24h a mensagem livre nao sai; nao se insiste.
+            con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s WHERE " + _PENDENTES,
+                        (agora, p["bsuid"]))
+            continue
+        c = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (p["conversa_id"],)).fetchone()
+        para = c["wa_id"] or c["bsuid"]
         w = saida.botoes(para, _ajuste(con, "pergunta_recebeu", "Recebeu o atendimento?"),
                          [Opcao("pos:sim", "Sim, fui atendido"), Opcao("pos:nao", "Ainda não")])
-        con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s WHERE id = %s", (agora, c["id"]))
+        con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s, pergunta_da = %s WHERE " + _PENDENTES,
+                    (agora, c["id"], p["bsuid"]))
         _registrar(con, c["id"], para, "botoes", "pergunta das 4h30", w)
-    return len(vencidas)
+        feitas += 1
+    return feitas
 
 
 def responder_pos(con, saida: Saida, pessoa: Pessoa, c, toque: str, agora: datetime) -> None:
     if toque == "pos:sim":
-        con.execute("UPDATE atendimento.conversas SET recebeu = true WHERE id = %s", (c["id"],))
+        con.execute("UPDATE atendimento.conversas SET recebeu = true WHERE pergunta_da = %s", (c["id"],))
         notas = [Opcao("nota:5", "🤩 Excelente"), Opcao("nota:4", "😃 Bom"), Opcao("nota:3", "😐 Regular"),
                  Opcao("nota:2", "🙁 Ruim"), Opcao("nota:1", "☹️ Péssimo")]
         w = saida.lista(pessoa.para, "Como foi nosso atendimento?", "Dar a nota", notas)
         _registrar(con, c["id"], pessoa.para, "lista", "pesquisa", w)
     elif toque == "pos:nao":
-        con.execute("UPDATE atendimento.conversas SET recebeu = false, aviso_nao_em = %s WHERE id = %s",
+        con.execute("UPDATE atendimento.conversas SET recebeu = false, aviso_nao_em = %s WHERE pergunta_da = %s",
                     (agora, c["id"]))
         w = saida.texto(pessoa.para, _ajuste(con, "nao_recebeu", ""))
         _registrar(con, c["id"], pessoa.para, "texto", "nao recebeu", w)
         quem = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
                            (_ajuste(con, "avisado_no_nao"),)).fetchone()
-        destino = con.execute("SELECT nome FROM atendimento.destinos WHERE id = %s", (c["destino_id"],)).fetchone()
+        # todos os assuntos do dia que a pergunta cobriu
+        cobertas = con.execute("""SELECT c.caminho, d.nome FROM atendimento.conversas c
+                                    LEFT JOIN atendimento.destinos d ON d.id = c.destino_id
+                                   WHERE c.pergunta_da = %s ORDER BY c.id""", (c["id"],)).fetchall()
         if quem:
             # as tres partes do modelo aviso_sem_atendimento: quem, sobre o que, o contato
             sobre = "|".join([
                 "%s (%s)" % (c["nome_perfil"] or "quem chamou", c["wa_id"] or "sem número"),
-                "%s, com %s" % (" › ".join(c["caminho"]) or "?", destino["nome"] if destino else "?"),
+                "; ".join("%s, com %s" % (" › ".join(x["caminho"]) or "?", x["nome"] or "?") for x in cobertas),
                 "https://wa.me/%s" % c["wa_id"] if c["wa_id"] else "sem número (veja a Recepção)"])
             con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
                            VALUES ('sem_atendimento', %s, %s, %s)""", (quem["nome"], quem["whatsapp"], sobre))
     elif toque.startswith("nota:") and toque[5:].isdigit():
-        con.execute("UPDATE atendimento.conversas SET satisfacao = %s WHERE id = %s", (int(toque[5:]), c["id"]))
+        con.execute("UPDATE atendimento.conversas SET satisfacao = %s WHERE pergunta_da = %s", (int(toque[5:]), c["id"]))
         w = saida.texto(pessoa.para, _ajuste(con, "encerrar", "Obrigado."))
         _registrar(con, c["id"], pessoa.para, "texto", "obrigado pela nota", w)
 

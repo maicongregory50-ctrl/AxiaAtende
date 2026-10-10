@@ -48,6 +48,18 @@ Medido: 884 de 3.278 cadastros têm celular válido; 23 números estão em mais 
 - **Arquivo:** `docs/manuais/recepcao.md`, com o texto da seção *Manual de uso* da spec; trocar "(não é cliente)" por "fora do cadastro".
 - **Verificação:** alguém de fora lê e usa o filtro sem perguntar.
 
+### B6 — Uma pergunta por dia (etapa 2, dono 10/10/2026)
+
+- **Arquivos:** migração `007_uma_pergunta_por_dia.sql` (+ `_VOLTA`); `backend/motor.py` (`_chegou`
+  marca a última mensagem e empurra a pergunta; `fazer_perguntas_vencidas` agrupa por pessoa, uma por
+  dia; `responder_pos` responde por todas as conversas cobertas); `rotas_telas.recepcao` e
+  `Recepcao.jsx` (estados "coberta" e "sem pergunta"); manual da Recepção.
+- **Verificação:** testes (três conversas no dia = uma pergunta, da última mensagem; mensagem depois
+  do link empurra; conversa nova depois da pergunta fica coberta; no dia seguinte volta; o "Não" leva
+  todos os assuntos).
+- **Reversão:** o código anterior e a `_VOLTA` da 007.
+- **No ar:** junto com o restart do C1 (a 007 entra com a 006).
+
 ### C — No ar e devolver
 
 **C1. Instalar** (ver *O que só você pode fazer*): fase, segredo nos dois `.env`, permissão na tela, restarts, build. **Verificação:** a Recepção mostra "cadastro lido em…" com ~880 números, e um "oi" do Maicon aparece como "Equipe · Representante".

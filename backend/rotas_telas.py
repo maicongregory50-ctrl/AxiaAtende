@@ -84,8 +84,11 @@ def rotas(cfg, usuario) -> APIRouter:
         saida = []
         for l in linhas:
             if l["link_em"]:
+                # #969: uma pergunta por dia; as outras conversas do dia ficam cobertas por ela
                 estado = ("sim" if l["recebeu"] is True else "nao" if l["recebeu"] is False
-                          else "perguntado" if l["pergunta_feita_em"] else "pergunta_marcada")
+                          else "pergunta_marcada" if not l["pergunta_feita_em"]
+                          else "perguntado" if l["pergunta_da"] == l["id"]
+                          else "coberta" if l["pergunta_da"] else "sem_pergunta")
             else:
                 estado = {"parou_no_meio": "parou", "encerrada": "encerrou"}.get(l["situacao"], "em_curso")
             if situacao and estado != situacao:

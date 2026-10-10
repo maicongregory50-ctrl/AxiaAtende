@@ -164,3 +164,35 @@ do ERP. Hoje, dos seis atendentes do menu, só dois.
 
 ## Próximo passo
 /writing-plans
+
+
+## Etapa 2 — uma pergunta por dia (dono, 10/10/2026)
+
+**O que aconteceu:** em 09/10 o dono simulou três atendimentos no mesmo dia e recebeu três vezes a
+pergunta "recebeu o atendimento?", uma por conversa com link. Pedido dele: "durante um dia uma sessão
+ativa só", com o tempo contado da **última interação** do cliente, e a sequência (pergunta e nota)
+**uma vez só**.
+
+**Decisão:**
+- A pergunta sai **uma vez por pessoa por dia** (dia de calendário, horário de Brasília), na conversa
+  com link mais nova, **4h30 depois da última mensagem** da pessoa. Toda mensagem que chega empurra a
+  hora da pergunta ainda não feita.
+- As outras conversas com link da pessoa naquele dia ficam **cobertas** por essa pergunta: a resposta
+  (Sim, Não, a nota) vale para todas. O aviso do "Não" ao gestor leva todos os assuntos do dia.
+- Se a pergunta do dia já saiu e a pessoa abre outra conversa com link, a nova fica coberta sem
+  mensagem nova. No dia seguinte, a pergunta volta.
+- A janela de 24h da Meta passa a contar da última mensagem da pessoa (em qualquer conversa).
+
+**Fios:** escreve `atendimento.conversas` (`ultimo_toque_em` a cada mensagem, `pergunta_em`,
+`pergunta_feita_em`, a coluna nova `pergunta_da`, `recebeu`, `satisfacao`, `aviso_nao_em`) e a fila
+`atendimento.avisos`; só o motor escreve nessas colunas, e quem lê para decidir é a própria rotina do
+minuto (a pergunta, "parou no meio" em 30 min) e a Recepção. "Parou no meio" passa a contar também a
+mensagem escrita, e não só o toque. **Medido:** em 09/10 três conversas do dono com link, três
+perguntas.
+
+**Migração 007:** `pergunta_da` (a conversa que levou a pergunta); as já perguntadas apontam para si
+mesmas. Volta: `007_uma_pergunta_por_dia_VOLTA.sql`.
+
+**Manual:** a linha "Disseram que foram atendidos" muda (uma vez por dia, da última mensagem) e entram
+dois sinais na coluna da pergunta: "já perguntado hoje, em outra conversa" e "não perguntado (mais de
+24h sem mensagem)".

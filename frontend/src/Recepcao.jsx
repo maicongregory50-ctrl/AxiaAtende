@@ -38,7 +38,8 @@ function Leitura({ leitura }) {
 const ESTADO = {
   sim: ['Sim', 'v'], nao: ['Não · você foi avisado', 'r'], perguntado: ['perguntado, sem resposta', ''],
   pergunta_marcada: ['pergunta às', ''], parou: ['parou no meio', 'a'], encerrou: ['encerrou', ''],
-  em_curso: ['escolhendo agora', ''],
+  em_curso: ['escolhendo agora', ''], coberta: ['já perguntado hoje, em outra conversa', ''],
+  sem_pergunta: ['não perguntado (mais de 24h sem mensagem)', ''],
 }
 
 export default function Recepcao() {

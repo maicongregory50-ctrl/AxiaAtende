@@ -163,3 +163,75 @@ def test_quem_chega_sem_numero_so_com_bsuid_e_respondido_pelo_bsuid(ligado):
     R.processar_pendentes(ligado, s, None, agora=QUINTA_14H)
     assert s.ultima[1] == "BR.sem.numero"
     assert _conversa(ligado)["wa_id"] is None
+
+
+# ── #969, etapa 2: uma pergunta por pessoa por dia, contada da ultima mensagem ──
+
+def _perguntas(s):
+    return [m for m in s.enviadas if m[0] == "botoes" and m[3] and m[3][0][0] == "pos:sim"]
+
+
+def _todas(cfg):
+    with conexao(cfg) as con:
+        return con.execute("SELECT * FROM atendimento.conversas ORDER BY id").fetchall()
+
+
+def test_tres_conversas_no_dia_levam_uma_pergunta_so_contada_da_ultima_mensagem(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True))
+    passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=QUINTA_14H + timedelta(hours=1))
+    passo(ligado, s, toque("wamid.3", "menu:financeiro.boleto", lista=True), agora=QUINTA_14H + timedelta(hours=2))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=5))
+    assert _perguntas(s) == []                            # a ultima mensagem foi as 16:00: so as 20:30
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=6, minutes=31))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=7))
+    assert len(_perguntas(s)) == 1
+    passo(ligado, s, toque("wamid.4", "pos:sim"), agora=QUINTA_14H + timedelta(hours=7))
+    passo(ligado, s, toque("wamid.5", "nota:4", lista=True), agora=QUINTA_14H + timedelta(hours=7))
+    c = _todas(ligado)
+    assert len(c) == 3 and {x["pergunta_da"] for x in c} == {c[2]["id"]}
+    assert all(x["recebeu"] is True and x["satisfacao"] == 4 for x in c)
+
+
+def test_mensagem_depois_do_link_empurra_a_pergunta(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True))
+    passo(ligado, s, texto("wamid.2", "obrigado"), agora=QUINTA_14H + timedelta(hours=3))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=5))
+    assert _perguntas(s) == []
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=7, minutes=31))
+    assert len(_perguntas(s)) == 1
+
+
+def test_ja_perguntado_hoje_a_conversa_nova_fica_coberta_sem_mensagem(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_14H - timedelta(hours=5))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H)        # 14:00: a pergunta da manha sai
+    assert len(_perguntas(s)) == 1
+    passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=QUINTA_14H + timedelta(minutes=10))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=5))
+    assert len(_perguntas(s)) == 1
+    primeira, segunda = _todas(ligado)
+    assert segunda["pergunta_feita_em"] and segunda["pergunta_da"] == primeira["id"]
+
+
+def test_no_dia_seguinte_a_pergunta_volta(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=5))
+    sexta = QUINTA_14H + timedelta(days=1)
+    passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=sexta)
+    R.rotina_do_minuto(ligado, s, agora=sexta + timedelta(hours=5))
+    assert len(_perguntas(s)) == 2
+
+
+def test_o_nao_avisa_com_todos_os_assuntos_do_dia(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True))
+    passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=QUINTA_14H + timedelta(minutes=5))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=5))
+    passo(ligado, s, toque("wamid.3", "pos:nao"), agora=QUINTA_14H + timedelta(hours=5))
+    with conexao(ligado) as con:
+        a = con.execute("SELECT * FROM atendimento.avisos").fetchall()
+    assert len(a) == 1 and "Benedito" in a[0]["sobre"] and a[0]["sobre"].count(", com ") == 2
+    assert all(x["recebeu"] is False for x in _todas(ligado))
