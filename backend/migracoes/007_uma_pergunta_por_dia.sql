@@ -10,3 +10,9 @@ ALTER TABLE atendimento.conversas
 
 -- As que ja foram perguntadas: cada uma levou a propria pergunta.
 UPDATE atendimento.conversas SET pergunta_da = id WHERE pergunta_feita_em IS NOT NULL;
+
+-- E so em horario comercial (dono, 10/10/2026): seg a sab, 08-11 e 14-17. Sabado entra para quem
+-- chamou sexta a tarde nao perder a janela de 24h da Meta ate segunda.
+INSERT INTO atendimento.ajustes (chave, valor) VALUES
+    ('pergunta_janela', '{"dias": [1, 2, 3, 4, 5, 6], "faixas": [["08:00", "11:00"], ["14:00", "17:00"]]}'::jsonb)
+ON CONFLICT (chave) DO NOTHING;

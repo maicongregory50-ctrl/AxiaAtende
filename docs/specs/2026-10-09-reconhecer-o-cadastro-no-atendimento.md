@@ -182,6 +182,17 @@ ativa só", com o tempo contado da **última interação** do cliente, e a sequ�
 - Se a pergunta do dia já saiu e a pessoa abre outra conversa com link, a nova fica coberta sem
   mensagem nova. No dia seguinte, a pergunta volta.
 - A janela de 24h da Meta passa a contar da última mensagem da pessoa (em qualquer conversa).
+- **Só em horário comercial** (dono, 10/10/2026, na mesma conversa): segunda a sábado, das 08:00 às
+  11:00 e das 14:00 às 17:00 (ajuste `pergunta_janela`, na migração 007). Fora disso a pergunta
+  espera a próxima faixa; se a faixa chegar mais de 23h depois da última mensagem, não se pergunta
+  (a Meta não deixa mensagem livre). O sábado entra para quem chama sexta à tarde não perder a
+  pergunta até segunda. "Um dia" é o dia do atendimento: quem chamou quinta à tarde e já foi
+  perguntado quinta não é perguntado de novo sexta.
+- **A nota continua logo depois do "Sim".** Pesquisado (10/10/2026): não há estudo sério de horário
+  para pesquisa por WhatsApp; o que as fontes concordam é que pesquisa curta, perto do atendimento,
+  responde mais, e que a manhã até as 10h e a tarde depois das 14h, em dia útil, respondem melhor
+  (SurveyMonkey, sobre os próprios envios). A nota é um toque a mais no embalo do "Sim": separar
+  perde quem já está com o celular na mão.
 
 **Fios:** escreve `atendimento.conversas` (`ultimo_toque_em` a cada mensagem, `pergunta_em`,
 `pergunta_feita_em`, a coluna nova `pergunta_da`, `recebeu`, `satisfacao`, `aviso_nao_em`) e a fila

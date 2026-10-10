@@ -11,7 +11,9 @@ AS REGRAS DO DONO (spec, Decisao, 09/10/2026):
 - **Depois de 4h30**, a pergunta "recebeu o atendimento?": Sim leva a nota de 1 a 5; Nao avisa o
   dono (fila de avisos, que o despachante manda por modelo de Utilidade).
 - **Uma pergunta por pessoa por dia** (#969, etapa 2, dono 10/10/2026): as 4h30 contam da ULTIMA
-  mensagem da pessoa, e as conversas com link do mesmo dia ficam cobertas por essa pergunta.
+  mensagem da pessoa, e as conversas com link do mesmo dia ficam cobertas por essa pergunta. Ela so
+  sai em horario comercial (ajuste `pergunta_janela`: seg a sab, 08-11 e 14-17); fora dele, espera a
+  proxima faixa, se ainda couber na janela de 24h da Meta. A nota vai logo depois do "Sim".
 
 O QUE VOLTA NO TOQUE (o `id` do botao ou da linha), e a unica coisa que o motor confia:
     menu:<chave>      uma opcao do menu
@@ -115,13 +117,34 @@ def perguntar(con, saida: Saida, pessoa: Pessoa, no, texto_antes: str = "") -> s
     return saida.lista(pessoa.para, texto, "Ver opções", opcoes)
 
 
-def dentro_do_horario(con, agora: datetime) -> bool:
-    h = _ajuste(con, "horario", {})
+def dentro_do_horario(con, agora: datetime, chave: str = "horario", padrao=None) -> bool:
+    h = _ajuste(con, chave, padrao or {})
     local = agora.astimezone(FUSO)
     if local.isoweekday() not in h.get("dias", []):
         return False
     hm = local.strftime("%H:%M")
     return any(ini <= hm < fim for ini, fim in h.get("faixas", []))
+
+
+# Quando a pergunta "recebeu o atendimento?" pode sair (dono, 10/10/2026). Sabado entra para quem
+# chamou sexta a tarde nao perder a janela de 24h ate segunda.
+JANELA_DA_PERGUNTA = {"dias": [1, 2, 3, 4, 5, 6], "faixas": [["08:00", "11:00"], ["14:00", "17:00"]]}
+
+
+def hora_da_pergunta(con, ultima: datetime) -> datetime:
+    """4h30 depois da ultima mensagem, empurrada para a proxima faixa da janela da pergunta."""
+    horas = float(_ajuste(con, "pergunta_horas", 4.5))
+    j = _ajuste(con, "pergunta_janela", JANELA_DA_PERGUNTA)
+    t = (ultima + timedelta(hours=horas)).astimezone(FUSO)
+    for _ in range(8):
+        if t.isoweekday() in j["dias"]:
+            for ini, fim in sorted(j["faixas"]):
+                a = t.replace(hour=int(ini[:2]), minute=int(ini[3:]), second=0, microsecond=0)
+                b = t.replace(hour=int(fim[:2]), minute=int(fim[3:]), second=0, microsecond=0)
+                if t < b:
+                    return max(t, a)
+        t = (t + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return ultima + timedelta(hours=horas)   # janela sem dia nenhum: como era
 
 
 def mandar_link(con, saida: Saida, pessoa: Pessoa, no, agora: datetime) -> str:
@@ -164,10 +187,9 @@ def _ultima_pergunta(con, pessoa: Pessoa):
 def _chegou(con, pessoa: Pessoa, conversa, agora: datetime) -> None:
     """Toda mensagem conta como a ultima interacao, e a pergunta ainda nao feita anda junto."""
     con.execute("UPDATE atendimento.conversas SET ultimo_toque_em = %s WHERE id = %s", (agora, conversa["id"]))
-    horas = float(_ajuste(con, "pergunta_horas", 4.5))
     con.execute("""UPDATE atendimento.conversas SET pergunta_em = %s
                     WHERE bsuid = %s AND situacao = 'com_link' AND pergunta_feita_em IS NULL""",
-                (agora + timedelta(hours=horas), pessoa.bsuid))
+                (hora_da_pergunta(con, agora), pessoa.bsuid))
 
 
 def _nova_conversa(con, pessoa: Pessoa, agora: datetime):
@@ -207,10 +229,9 @@ def escolher(con, saida: Saida, pessoa: Pessoa, conversa, no, agora: datetime) -
         _registrar(con, conversa["id"], pessoa.para, "botoes", no["pergunta"], w)
     elif no["acao"] == "destino":
         w = mandar_link(con, saida, pessoa, no, agora)
-        horas = float(_ajuste(con, "pergunta_horas", 4.5))
         con.execute("""UPDATE atendimento.conversas
                           SET situacao = 'com_link', destino_id = %s, link_em = %s, pergunta_em = %s
-                        WHERE id = %s""", (no["destino_id"], agora, agora + timedelta(hours=horas), conversa["id"]))
+                        WHERE id = %s""", (no["destino_id"], agora, hora_da_pergunta(con, agora), conversa["id"]))
         _registrar(con, conversa["id"], pessoa.para, "texto", "link: %s" % no["chave"], w)
     else:   # encerrar
         w = saida.texto(pessoa.para, _ajuste(con, "encerrar", "Obrigado."))
@@ -298,19 +319,22 @@ _PENDENTES = "bsuid = %s AND situacao = 'com_link' AND pergunta_feita_em IS NULL
 
 def fazer_perguntas_vencidas(con, saida: Saida, agora: datetime) -> int:
     """Uma pergunta por pessoa por dia, 4h30 depois da ultima mensagem dela (o `pergunta_em` anda a
-    cada mensagem, em `_chegou`). A pergunta sai na conversa com link mais nova; as outras
-    pendentes da pessoa ficam cobertas por ela. Devolve quantas perguntas sairam."""
-    pessoas = con.execute("""SELECT bsuid, max(id) AS conversa_id FROM atendimento.conversas
+    cada mensagem, em `_chegou`), so na janela da pergunta. A pergunta sai na conversa com link mais
+    nova; as outras pendentes da pessoa ficam cobertas por ela. Devolve quantas perguntas sairam."""
+    pessoas = con.execute("""SELECT bsuid, max(id) AS conversa_id, max(link_em) AS link_em
+                               FROM atendimento.conversas
                               WHERE situacao = 'com_link' AND pergunta_feita_em IS NULL AND pergunta_em <= %s
                               GROUP BY bsuid ORDER BY min(pergunta_em) LIMIT 50""", (agora,)).fetchall()
-    meia_noite = agora.astimezone(FUSO).replace(hour=0, minute=0, second=0, microsecond=0)
+    na_janela = dentro_do_horario(con, agora, "pergunta_janela", JANELA_DA_PERGUNTA)
     feitas = 0
     for p in pessoas:
+        # o dia e o do atendimento: quem chamou quinta a tarde e foi perguntado quinta nao e de novo sexta
+        dia = p["link_em"].astimezone(FUSO).replace(hour=0, minute=0, second=0, microsecond=0)
         hoje = con.execute("""SELECT id FROM atendimento.conversas
                                WHERE bsuid = %s AND pergunta_da = id AND pergunta_feita_em >= %s
-                               ORDER BY pergunta_feita_em DESC LIMIT 1""", (p["bsuid"], meia_noite)).fetchone()
+                               ORDER BY pergunta_feita_em DESC LIMIT 1""", (p["bsuid"], dia)).fetchone()
         if hoje:
-            # Ja se perguntou hoje: fica coberta por aquela pergunta, sem mensagem nova.
+            # Ja se perguntou naquele dia: fica coberta por aquela pergunta, sem mensagem nova.
             con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s, pergunta_da = %s WHERE " + _PENDENTES,
                         (agora, hoje["id"], p["bsuid"]))
             continue
@@ -321,6 +345,8 @@ def fazer_perguntas_vencidas(con, saida: Saida, agora: datetime) -> int:
             con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s WHERE " + _PENDENTES,
                         (agora, p["bsuid"]))
             continue
+        if not na_janela:
+            continue    # o servico ficou fora na hora certa: espera a proxima faixa
         c = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (p["conversa_id"],)).fetchone()
         para = c["wa_id"] or c["bsuid"]
         w = saida.botoes(para, _ajuste(con, "pergunta_recebeu", "Recebeu o atendimento?"),

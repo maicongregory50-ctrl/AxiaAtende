@@ -53,10 +53,13 @@ Medido: 884 de 3.278 cadastros têm celular válido; 23 números estão em mais 
 - **Arquivos:** migração `007_uma_pergunta_por_dia.sql` (+ `_VOLTA`); `backend/motor.py` (`_chegou`
   marca a última mensagem e empurra a pergunta; `fazer_perguntas_vencidas` agrupa por pessoa, uma por
   dia; `responder_pos` responde por todas as conversas cobertas); `rotas_telas.recepcao` e
-  `Recepcao.jsx` (estados "coberta" e "sem pergunta"); manual da Recepção.
+  `Recepcao.jsx` (estados "coberta" e "sem pergunta"); manual da Recepção. Só em horário comercial:
+  `hora_da_pergunta` empurra para a próxima faixa do ajuste `pergunta_janela` (seg a sáb, 08-11 e
+  14-17), e a rotina não pergunta fora da faixa.
 - **Verificação:** testes (três conversas no dia = uma pergunta, da última mensagem; mensagem depois
   do link empurra; conversa nova depois da pergunta fica coberta; no dia seguinte volta; o "Não" leva
-  todos os assuntos).
+  todos os assuntos; fora da faixa espera; serviço fora na hora certa não pergunta fora da faixa;
+  sexta à tarde pergunta sábado, sábado à tarde não pergunta).
 - **Reversão:** o código anterior e a `_VOLTA` da 007.
 - **No ar:** junto com o restart do C1 (a 007 entra com a 006).
 
