@@ -122,13 +122,36 @@ def test_sem_legenda_e_sem_palpite_a_rodada_sai_aos_dois_minutos(canal):
     assert m["data_dita"] == date(2026, 10, 9) and m["data_presumida"] is False and m["pergunta_pendente"] is None
 
 
+def test_a_frase_mandada_logo_depois_da_foto_e_a_legenda_e_nao_abre_o_menu(canal):
+    """Primeiro caso com o dono (11/10/2026): foto sem legenda e, em seguida, a frase em mensagem
+    separada. Antes, o texto caia no atendimento e vinha o menu junto com o 'Recebi'."""
+    ligar(canal)
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1"))
+    passo(canal, s, texto("wamid.t1", "Vistoria da aveia", numero=EQUIPE), agora=AGORA + timedelta(seconds=20))
+    assert [x[2] for x in s.enviadas] == [campo.RECEBI]   # nada de menu
+    with conexao(canal) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 0
+    assert material(canal)[0]["legenda"] == "Vistoria da aveia"
+    passo(canal, s, texto("wamid.t2", "campo do Jair", numero=EQUIPE), agora=AGORA + timedelta(seconds=40))
+    assert material(canal)[0]["legenda"] == "Vistoria da aveia · campo do Jair" and len(s.enviadas) == 1
+    minuto(canal, s, AGORA + 3 * MIN)
+    assert [x[2] for x in s.enviadas[1:]] == [campo.PERGUNTA_DATA]   # a legenda ja esta: so a data
+    # depois da rodada respondida, texto solto volta a ser atendimento normal (depois dos 10 min)
+    passo(canal, s, toque("wamid.t3", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 4 * MIN)
+    passo(canal, s, texto("wamid.t4", "preciso falar com o comercial", numero=EQUIPE), agora=AGORA + 15 * MIN)
+    with conexao(canal) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 1
+
+
 def test_varias_fotos_em_minutos_sao_uma_rodada_e_a_resposta_vale_para_todas(canal):
     ligar(canal)
     s = SaidaFalsa()
     passo(canal, s, foto("wamid.f1"))
     passo(canal, s, foto("wamid.f2"), agora=AGORA + MIN)
     passo(canal, s, foto("wamid.f3", tipo="video"), agora=AGORA + 2 * MIN)
-    palpite(canal, material(canal)[0]["id"], "beneficiamento", None, AGORA + MIN)
+    for m in material(canal):   # o marketing devolve o palpite de CADA foto (o lote do dono, 11/10)
+        palpite(canal, m["id"], "beneficiamento", None, AGORA + MIN)
     minuto(canal, s, AGORA + 3 * MIN)
     minuto(canal, s, AGORA + 5 * MIN)
     assert [x[2] for x in s.enviadas] == [campo.RECEBI, "Parece beneficiamento. É isso? " + campo.PERGUNTA_LEGENDA]

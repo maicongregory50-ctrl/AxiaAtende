@@ -131,15 +131,22 @@ class Campo:
                                  WHERE perguntas_em IS NULL AND recebido_em > %s
                                    AND (palpite_em IS NOT NULL OR recebido_em < %s)
                                  ORDER BY id""", (agora - JANELA, agora - ESPERA_PALPITE)).fetchall():
-            grupo = self._grupo_de(con, r)
-            if grupo and grupo[0] != r["id"]:
-                # a rodada e da PRIMEIRA linha do grupo; esta so herda a marca
-                anterior = con.execute("SELECT perguntas_em FROM atendimento.material_de_campo WHERE id = %s",
-                                       (grupo[0],)).fetchone()
-                if anterior and anterior["perguntas_em"]:
-                    con.execute("UPDATE atendimento.material_de_campo SET perguntas_em = %s WHERE id = %s",
-                                (anterior["perguntas_em"], r["id"]))
+            # a lista veio de uma vez; a rodada da primeira linha ja pode ter marcado esta (o lote
+            # de fotos do dono em 11/10 recebeu quatro rodadas por isso): le de novo antes de falar
+            agora_mesmo = con.execute("SELECT perguntas_em FROM atendimento.material_de_campo WHERE id = %s",
+                                      (r["id"],)).fetchone()
+            if agora_mesmo is None or agora_mesmo["perguntas_em"] is not None:
                 continue
+            # o grupo e o das fotos dos 10 minutos ANTERIORES tambem: se alguma ja teve a rodada,
+            # esta so herda a marca
+            anterior = con.execute("""SELECT perguntas_em FROM atendimento.material_de_campo
+                                       WHERE wa_id = %s AND id < %s AND recebido_em > %s AND perguntas_em IS NOT NULL
+                                       ORDER BY id DESC LIMIT 1""", (r["wa_id"], r["id"], r["recebido_em"] - RODADA)).fetchone()
+            if anterior:
+                con.execute("UPDATE atendimento.material_de_campo SET perguntas_em = %s WHERE id = %s",
+                            (anterior["perguntas_em"], r["id"]))
+                continue
+            grupo = self._grupo_de(con, r)
             para = r["wa_id"] or r["bsuid"]
             palpite = self._frase_do_palpite(r)
             if not (r["legenda"] or "").strip():
@@ -190,6 +197,19 @@ class Campo:
             return False
         r = self._pendente(con, e.pessoa.wa_id, agora)
         if not r:
+            # Texto solto logo depois da foto (a frase mandada em mensagem separada, o jeito mais
+            # comum de celular): e a legenda do grupo, nao um pedido de atendimento -- sem menu.
+            # Primeiro caso com o dono, 11/10/2026: "recebi o Recebi e o menu inicial".
+            if texto and not toque:
+                ids = [x["id"] for x in con.execute(
+                    """SELECT id FROM atendimento.material_de_campo
+                        WHERE wa_id = %s AND recebido_em > %s AND buscado_em IS NULL ORDER BY id""",
+                    (e.pessoa.wa_id, agora - RODADA)).fetchall()]
+                if ids:
+                    con.execute("""UPDATE atendimento.material_de_campo
+                                      SET legenda = CASE WHEN legenda = '' THEN %s ELSE legenda || ' · ' || %s END
+                                    WHERE id = ANY(%s)""", (texto[:500], texto[:300], ids))
+                    return True
             return toque.startswith("campo:")   # botao velho: engole, sem levar ao menu
         ids = self._grupo_de(con, r)
         if r["pergunta_pendente"] == "legenda":
