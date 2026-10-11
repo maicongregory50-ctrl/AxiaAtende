@@ -95,7 +95,7 @@ $eu = New-Object Security.Principal.WindowsPrincipal([Security.Principal.Windows
 if (-not $eu.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Falha 'rode este script numa janela do PowerShell COMO ADMINISTRADOR'
 }
-if (-not (Test-Path $PYTHON)) { Falha "nao achei o ambiente Python em $PYTHON. Peca a sessao: python -m venv .venv e pip install -r requirements.txt" }
+if (-not (Test-Path $PYTHON)) { Falha "nao achei o ambiente Python em $PYTHON. A pasta de bibliotecas e fechada (#912): no Terminal (Administrador), C:\Python314\python.exe -m venv C:\AxiaAtende\.venv; depois C:\AxiaSecurity\scripts\instalar_bibliotecas.ps1 -Projeto atende e aplicar_acl_bibliotecas.ps1 -Alvo atende" }
 if (-not (Test-Path (Join-Path $RAIZ 'frontend\dist\index.html'))) {
     Falha 'a tela nao esta construida (frontend\dist). Peca a sessao: npm run build'
 }
