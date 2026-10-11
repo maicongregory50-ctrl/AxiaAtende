@@ -39,3 +39,27 @@
 .chip.duvida { background: #fdf3e2; color: #8a5a00; border-color: #efd6a6; }
 .cod { color: #777; font-size: 12px; }
 .erro-leve { color: #a33; }
+
+/* Destinos, passada de design de 11/10/2026 (#970): cartoes de ajuste como no ERP (h2, ajuda em
+   cinza, cartao branco com borda e sombra leve), botoes com o estado escrito, dias em botoes. */
+.atende.destinos { max-width: 1100px; }
+.atende .ajuda { color: var(--texto-leve); font-size: 13px; margin: 0 0 10px; }
+.atende .cartao-ajuste { background: #fff; border: 1px solid var(--borda); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 14px 16px; margin-bottom: 6px; }
+.atende .cartao-ajuste .tabela { border: 0; }
+.atende .linha-ajuste { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.atende .dias { display: flex; gap: 6px; flex-wrap: wrap; }
+.atende .dia { background: #fff; color: var(--texto-leve); border: 1px solid var(--borda); border-radius: 6px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.atende .dia.ligado { background: var(--verde-escuro); color: #fff; border-color: var(--verde-escuro); font-weight: 600; }
+.atende .faixas { display: flex; gap: 12px; flex-wrap: wrap; }
+.atende .faixa { display: inline-flex; gap: 6px; align-items: center; }
+.atende .estado { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; padding: 3px 10px; border-radius: 12px; border: 1px solid transparent; }
+.atende .estado.ok { background: #EAF5EE; color: #1F7A48; border-color: #A3CAB4; }
+.atende .estado.off { background: #eef1ec; color: var(--texto-leve); border-color: var(--borda); }
+.atende .fantasma { background: transparent; color: var(--texto); border: 1px solid var(--borda); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.atende .fantasma:hover { background: var(--neutro); }
+.atende .pequeno { padding: 4px 10px; font-size: 12px; }
+.atende button.perigo { background: var(--perigo); color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+.atende .primario:disabled { opacity: .5; cursor: not-allowed; }
+.atende td.acoes { white-space: nowrap; display: flex; gap: 4px; }
+.atende tr.editando td { background: #fafbf9; }
+.atende .aviso.ok { background: #EAF5EE; color: #1F7A48; border: 1px solid #A3CAB4; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
