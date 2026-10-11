@@ -40,6 +40,8 @@ EXEMPLOS_AVISO = {
     "aviso_recusa": ["Agro Exemplo", "5475 · Chapecó", "https://wa.me/5549999999999"],
     "aviso_sem_atendimento": ["João (5549999999999)", "Comercial › SC, com Maicon",
                               "https://wa.me/5549999999999"],
+    "aviso_avaliacao_ruim": ["João (5549999999999)", "Comercial › SC, com Maicon",
+                             "https://wa.me/5549999999999"],
 }
 
 

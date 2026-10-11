@@ -8,7 +8,7 @@ AS REGRAS DO DONO (spec, Decisao, 09/10/2026):
 - **Quem escreve em vez de tocar:** a IA propoe o motivo e a pessoa confirma com "Sim" ou "Ver
   todas as opcoes". A IA so devolve uma chave do menu; o link sai sempre da tabela de destinos.
 - **Todo destino e link** (wa.me) de quem atende. Fora do horario, o link vai igual, com aviso.
-- **Depois de 4h30**, a pergunta "recebeu o atendimento?": Sim leva a nota de 1 a 5; Nao avisa o
+- **Depois de 4h30**, a pergunta "recebeu o atendimento?": Sim leva a nota em tres botoes (Bom, Normal, Ruim); o Nao e o Ruim avisam o
   dono (fila de avisos, que o despachante manda por modelo de Utilidade).
 - **Uma pergunta por pessoa por dia** (#969, etapa 2, dono 10/10/2026): as 4h30 contam da ULTIMA
   mensagem da pessoa, e as conversas com link do mesmo dia ficam cobertas por essa pergunta. Ela so
@@ -20,7 +20,7 @@ O QUE VOLTA NO TOQUE (o `id` do botao ou da linha), e a unica coisa que o motor 
     ia:sim:<chave>    a pessoa confirmou o que a IA propos
     ia:menu           a pessoa pediu o menu inteiro
     pos:sim | pos:nao a resposta da pergunta das 4h30
-    nota:<1..5>       a nota da pesquisa
+    nota:<bom|normal|ruim>  a nota da pesquisa (1..5 = a lista antiga)
     envio:...         resposta a um convite da carteira (tratada pelo modulo de envio, Fase E)
 """
 from dataclasses import dataclass
@@ -358,36 +358,52 @@ def fazer_perguntas_vencidas(con, saida: Saida, agora: datetime) -> int:
     return feitas
 
 
+#: A nota em tres botoes, direto na tela (dono, 11/10/2026): a lista de cinco pedia abrir, escolher
+#: e confirmar. Gravada 3, 2, 1. O toque numerico e o da lista antiga, que ainda pode chegar de
+#: quem a recebeu antes: 5 e 4 = bom, 3 = normal, 2 e 1 = ruim.
+NOTAS = (("bom", 3, "😃 Bom"), ("normal", 2, "😐 Normal"), ("ruim", 1, "🙁 Ruim"))
+_NOTA_DO_TOQUE = {"bom": 3, "normal": 2, "ruim": 1, "5": 3, "4": 3, "3": 2, "2": 1, "1": 1}
+
+
+def _avisar_o_gestor(con, c, tipo: str) -> None:
+    """O aviso ao gestor (o "Nao" e a nota ruim), com todos os assuntos do dia que a pergunta cobriu."""
+    quem = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
+                       (_ajuste(con, "avisado_no_nao"),)).fetchone()
+    if not quem:
+        return
+    cobertas = con.execute("""SELECT c.caminho, d.nome FROM atendimento.conversas c
+                                LEFT JOIN atendimento.destinos d ON d.id = c.destino_id
+                               WHERE c.pergunta_da = %s ORDER BY c.id""", (c["id"],)).fetchall()
+    # as tres partes do modelo de aviso: quem, sobre o que, o contato
+    sobre = "|".join([
+        "%s (%s)" % (c["nome_perfil"] or "quem chamou", c["wa_id"] or "sem número"),
+        "; ".join("%s, com %s" % (" › ".join(x["caminho"]) or "?", x["nome"] or "?") for x in cobertas),
+        "https://wa.me/%s" % c["wa_id"] if c["wa_id"] else "sem número (veja a Recepção)"])
+    con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
+                   VALUES (%s, %s, %s, %s)""", (tipo, quem["nome"], quem["whatsapp"], sobre))
+
+
 def responder_pos(con, saida: Saida, pessoa: Pessoa, c, toque: str, agora: datetime) -> None:
     if toque == "pos:sim":
         con.execute("UPDATE atendimento.conversas SET recebeu = true WHERE pergunta_da = %s", (c["id"],))
-        notas = [Opcao("nota:5", "🤩 Excelente"), Opcao("nota:4", "😃 Bom"), Opcao("nota:3", "😐 Regular"),
-                 Opcao("nota:2", "🙁 Ruim"), Opcao("nota:1", "☹️ Péssimo")]
-        w = saida.lista(pessoa.para, "Como foi nosso atendimento?", "Dar a nota", notas)
-        _registrar(con, c["id"], pessoa.para, "lista", "pesquisa", w)
+        w = saida.botoes(pessoa.para, "Como foi nosso atendimento?",
+                         [Opcao("nota:" + chave, rotulo) for chave, _, rotulo in NOTAS])
+        _registrar(con, c["id"], pessoa.para, "botoes", "pesquisa", w)
     elif toque == "pos:nao":
         con.execute("UPDATE atendimento.conversas SET recebeu = false, aviso_nao_em = %s WHERE pergunta_da = %s",
                     (agora, c["id"]))
         w = saida.texto(pessoa.para, _ajuste(con, "nao_recebeu", ""))
         _registrar(con, c["id"], pessoa.para, "texto", "nao recebeu", w)
-        quem = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
-                           (_ajuste(con, "avisado_no_nao"),)).fetchone()
-        # todos os assuntos do dia que a pergunta cobriu
-        cobertas = con.execute("""SELECT c.caminho, d.nome FROM atendimento.conversas c
-                                    LEFT JOIN atendimento.destinos d ON d.id = c.destino_id
-                                   WHERE c.pergunta_da = %s ORDER BY c.id""", (c["id"],)).fetchall()
-        if quem:
-            # as tres partes do modelo aviso_sem_atendimento: quem, sobre o que, o contato
-            sobre = "|".join([
-                "%s (%s)" % (c["nome_perfil"] or "quem chamou", c["wa_id"] or "sem número"),
-                "; ".join("%s, com %s" % (" › ".join(x["caminho"]) or "?", x["nome"] or "?") for x in cobertas),
-                "https://wa.me/%s" % c["wa_id"] if c["wa_id"] else "sem número (veja a Recepção)"])
-            con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
-                           VALUES ('sem_atendimento', %s, %s, %s)""", (quem["nome"], quem["whatsapp"], sobre))
-    elif toque.startswith("nota:") and toque[5:].isdigit():
-        con.execute("UPDATE atendimento.conversas SET satisfacao = %s WHERE pergunta_da = %s", (int(toque[5:]), c["id"]))
+        _avisar_o_gestor(con, c, "sem_atendimento")
+    elif toque.startswith("nota:") and toque[5:] in _NOTA_DO_TOQUE:
+        nota = _NOTA_DO_TOQUE[toque[5:]]
+        # so a primeira nota ruim avisa: tocar de novo no botao nao manda outro aviso
+        ja_ruim = con.execute("SELECT satisfacao FROM atendimento.conversas WHERE id = %s", (c["id"],)).fetchone()["satisfacao"] == 1
+        con.execute("UPDATE atendimento.conversas SET satisfacao = %s WHERE pergunta_da = %s", (nota, c["id"]))
         w = saida.texto(pessoa.para, _ajuste(con, "encerrar", "Obrigado."))
         _registrar(con, c["id"], pessoa.para, "texto", "obrigado pela nota", w)
+        if nota == 1 and not ja_ruim:
+            _avisar_o_gestor(con, c, "avaliacao_ruim")
 
 
 def marcar_paradas(con, agora: datetime, minutos: int = 30) -> int:

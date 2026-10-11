@@ -207,3 +207,35 @@ mesmas. Volta: `007_uma_pergunta_por_dia_VOLTA.sql`.
 **Manual:** a linha "Disseram que foram atendidos" muda (uma vez por dia, da última mensagem) e entram
 dois sinais na coluna da pergunta: "já perguntado hoje, em outra conversa" e "não perguntado (mais de
 24h sem mensagem)".
+
+
+## Etapa 2b — a nota em três botões (dono, 11/10/2026)
+
+**O pedido:** a pesquisa "ir aberta na tela". O ideal seriam cinco botões, e o WhatsApp só deixa três
+na própria mensagem (a lista leva dez, com um toque a mais para abrir e outro para confirmar). Dono:
+"Ruim, Normal, Bom, reduz calibragem, mas ficaria mais simples".
+
+**Decisão:**
+- Depois do "Sim", a nota sai em **três botões** na mensagem: Bom, Normal, Ruim. Um toque.
+- Gravada 3, 2 e 1 em `conversas.satisfacao`. Nenhuma nota tinha sido gravada na escala de cinco.
+- Quem ainda tem a lista antiga na conversa e toca nela: 5 e 4 valem Bom, 3 vale Normal, 2 e 1, Ruim.
+- **O "Ruim" avisa o gestor** no WhatsApp, como o "Não" já avisa (dono: "avisar é interessante sim"),
+  com os mesmos três dados: quem, sobre o quê, o contato. Um aviso só, mesmo com dois toques.
+- Juntar a pergunta e a nota numa mensagem só não cabe: seriam quatro respostas.
+
+**Fios:** o motor escreve `satisfacao` (como antes) e a fila `atendimento.avisos`, com o tipo novo
+`avaliacao_ruim`; quem volta depois é o despachante de avisos (`envio.mandar_avisos`), que procura o
+modelo do uso `aviso_avaliacao_ruim`. **Medido:** nenhuma conversa com nota em produção em 11/10 (a
+Recepção mostrava um "Sim" sem nota).
+
+**Migração 008:** o tipo de aviso, o uso de modelo e o modelo `aviso_avaliacao_ruim` (Utilidade).
+Volta: `008_nota_em_tres_botoes_VOLTA.sql`. **Depende da mão do dono:** a Meta precisa aprovar o
+modelo (`python -m backend.modelos_meta --propor`); até lá a nota Ruim aparece na Recepção e o aviso
+fica na fila com o erro.
+
+**Manual:** a linha da pergunta diz os três botões, e entram os sinais "Bom", "Normal" e "Ruim · você
+foi avisado".
+
+**Fora desta etapa (dono, 11/10/2026):** medir quando o atendente começa o atendimento (aviso ao
+atendente com botão que anota o toque). "Por hora não vamos medir o atendimento interno, no futuro
+talvez."

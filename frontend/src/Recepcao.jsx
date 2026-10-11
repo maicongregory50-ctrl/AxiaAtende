@@ -42,6 +42,9 @@ const ESTADO = {
   sem_pergunta: ['não perguntado (mais de 24h sem mensagem)', ''],
 }
 
+// a nota da pesquisa, em tres botoes (#969, 11/10/2026): o Ruim tambem avisa o gestor
+const NOTA = { 3: ['Bom', 'v'], 2: ['Normal', ''], 1: ['Ruim · você foi avisado', 'r'] }
+
 export default function Recepcao() {
   const [dias, setDias] = useState(7)
   const [motivo, setMotivo] = useState('')
@@ -105,7 +108,7 @@ export default function Recepcao() {
                   <td><span className={'selo ' + ESTADO[l.estado][1]}>
                     {ESTADO[l.estado][0]}{l.estado === 'pergunta_marcada' ? ' ' + hora(l.pergunta_em) : ''}
                     {l.estado === 'nao' && l.aviso_nao_em ? ' ' + hora(l.aviso_nao_em) : ''}</span>
-                    {l.satisfacao && <span className="leve"> nota {l.satisfacao}</span>}</td>
+                    {NOTA[l.satisfacao] && <> <span className={'selo ' + NOTA[l.satisfacao][1]}>{NOTA[l.satisfacao][0]}</span></>}</td>
                 </tr>
               ))}
             </tbody>

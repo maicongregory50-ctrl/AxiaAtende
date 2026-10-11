@@ -127,10 +127,27 @@ def test_pergunta_das_4h30_sim_e_nota(ligado):
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=31))
     assert s.ultima[0] == "botoes" and s.ultima[3][0][0] == "pos:sim"
     tipo, _, _, notas = passo(ligado, s, toque("wamid.2", "pos:sim"))
-    assert tipo == "lista" and len(notas) == 5
-    passo(ligado, s, toque("wamid.3", "nota:5", lista=True))
+    assert tipo == "botoes" and [n[0] for n in notas] == ["nota:bom", "nota:normal", "nota:ruim"]
+    passo(ligado, s, toque("wamid.3", "nota:bom"))
     c = _conversa(ligado)
-    assert c["recebeu"] is True and c["satisfacao"] == 5
+    assert c["recebeu"] is True and c["satisfacao"] == 3
+    with conexao(ligado) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.avisos").fetchone()["n"] == 0
+
+
+def test_nota_ruim_avisa_o_gestor_uma_vez_e_a_lista_antiga_ainda_vale(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:fretes", lista=True), agora=QUINTA_10H)
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=31))
+    passo(ligado, s, toque("wamid.2", "pos:sim"))
+    passo(ligado, s, toque("wamid.3", "nota:ruim"))
+    passo(ligado, s, toque("wamid.4", "nota:ruim"))          # tocou de novo: um aviso so
+    with conexao(ligado) as con:
+        avisos = con.execute("SELECT * FROM atendimento.avisos").fetchall()
+    assert _conversa(ligado)["satisfacao"] == 1
+    assert [a["tipo"] for a in avisos] == ["avaliacao_ruim"] and "Benedito" in avisos[0]["sobre"]
+    passo(ligado, s, toque("wamid.5", "nota:4", lista=True))  # a lista de cinco de antes: 4 = bom
+    assert _conversa(ligado)["satisfacao"] == 3
 
 
 def test_pergunta_das_4h30_nao_avisa_o_dono(ligado):
@@ -189,10 +206,10 @@ def test_tres_conversas_no_dia_levam_uma_pergunta_so_contada_da_ultima_mensagem(
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=1))
     assert len(_perguntas(s)) == 1
     passo(ligado, s, toque("wamid.4", "pos:sim"), agora=QUINTA_14H + timedelta(hours=1))
-    passo(ligado, s, toque("wamid.5", "nota:4", lista=True), agora=QUINTA_14H + timedelta(hours=1))
+    passo(ligado, s, toque("wamid.5", "nota:normal"), agora=QUINTA_14H + timedelta(hours=1))
     c = _todas(ligado)
     assert len(c) == 3 and {x["pergunta_da"] for x in c} == {c[2]["id"]}
-    assert all(x["recebeu"] is True and x["satisfacao"] == 4 for x in c)
+    assert all(x["recebeu"] is True and x["satisfacao"] == 2 for x in c)
 
 
 def test_mensagem_depois_do_link_empurra_a_pergunta(ligado):

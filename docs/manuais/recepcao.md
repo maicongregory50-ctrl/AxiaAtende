@@ -37,7 +37,7 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **Chegaram** | quantas conversas começaram no período |
 | **Receberam o link** | chegaram ao fim do menu e receberam o WhatsApp de quem atende |
 | **Pararam no meio** | começaram a escolher e ficaram 30 minutos sem tocar em nada, sem chegar ao link |
-| **Disseram que foram atendidos / que não** | a resposta à pergunta "recebeu o atendimento?". Ela vai **uma vez por dia** para cada pessoa, 4h30 depois da **última** mensagem dela, e só em horário comercial (segunda a sábado, das 8h às 11h e das 14h às 17h: fora disso, espera a próxima faixa). Logo depois do "Sim" vem a nota; se no mesmo dia ela foi mandada a mais de um atendente, a resposta vale para todas as conversas do dia (e cada uma conta no cartão) |
+| **Disseram que foram atendidos / que não** | a resposta à pergunta "recebeu o atendimento?". Ela vai **uma vez por dia** para cada pessoa, 4h30 depois da **última** mensagem dela, e só em horário comercial (segunda a sábado, das 8h às 11h e das 14h às 17h: fora disso, espera a próxima faixa). Logo depois do "Sim" vem a nota, em três botões na própria mensagem (Bom, Normal, Ruim); se no mesmo dia ela foi mandada a mais de um atendente, a resposta vale para todas as conversas do dia (e cada uma conta no cartão) |
 | **IA acertou / errou** | quem escreveu em vez de tocar recebeu a proposta da IA ("Entendi que você quer… É isso?"): **Sim** é acerto, **Ver todas as opções** é erro |
 | **Do nosso cadastro** | quantos dos que chegaram no período estão no cadastro do ERP |
 | **Quem: "Agro Real Insumos · 5475"** e as etiquetas | o número está no cadastro: o nome e o código dele. As etiquetas verdes (Cliente, Fornecedor, Produtor) e azuis (Equipe, Representante) dizem o papel; "contato comercial: João" diz de qual contato do cadastro o número veio |
@@ -53,6 +53,8 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **"já perguntado hoje, em outra conversa"** | a pessoa já tinha recebido a pergunta do dia por outra conversa; nesta não se perguntou de novo |
 | **"não perguntado (mais de 24h sem mensagem)"** | a próxima faixa de horário chegou quase um dia depois da última mensagem da pessoa, e o WhatsApp não deixa mais mandar a pergunta (acontece com quem chama sábado à tarde ou domingo cedo) |
 | **"Não · você foi avisado 15:41"** | a pessoa disse que não foi atendida; você recebeu um aviso no WhatsApp nesse horário |
+| **"Sim" seguido de "Bom" ou "Normal"** | a pessoa foi atendida e deu essa nota. Só "Sim", sem nota: ela confirmou o atendimento e não tocou na nota |
+| **"Sim" seguido de "Ruim · você foi avisado"** | a pessoa foi atendida e saiu insatisfeita; você recebeu um aviso no WhatsApp, como no "Não" |
 | **"—"** | ainda não aconteceu (não é zero) |
 
 ## 5. O que a tela NÃO faz
