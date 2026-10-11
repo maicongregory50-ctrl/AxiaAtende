@@ -18,12 +18,13 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 
 1. Mande a foto ou o vídeo para o **WhatsApp da Renascer (49 3664 0121)**, com uma frase dizendo o
    que é (*"colheita do centeio no campo do Jair"*).
-2. A OlivIA responde **"Recebi."** Se faltou a frase, ela pergunta **"O que está acontecendo nessa
-   foto?"**: responda em uma linha.
+2. A OlivIA responde **"Recebi."** Um ou dois minutos depois ela diz o que a foto parece
+   (*"Parece colheita de aveia. É isso?"*) e, se faltou a frase, pergunta **"O que está acontecendo
+   nessa foto?"**: responda em uma linha, e corrija o palpite se ele errou (*"é centeio, não aveia"*).
 3. Depois ela pergunta **"É de hoje?"**. Toque **Sim**, ou **Outra data** e diga o dia (*09/10*).
 4. Pronto. Várias fotos do mesmo lugar, mandadas em seguida, recebem **uma** rodada de perguntas:
    a resposta vale para todas.
-5. Se a foto entrar no catálogo no mesmo dia, você recebe **"Sua foto entrou no catálogo da
+5. Em poucos minutos a foto entra no catálogo e você recebe **"Sua foto entrou no catálogo da
    Renascer. Obrigado!"**; se virar Stories, **"A sua foto virou o Stories do dia."**
 
 ## 4. O que significa cada sinal
@@ -31,6 +32,7 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 | Mensagem | O que quer dizer |
 |---|---|
 | **"Recebi."** | chegou e está guardada |
+| **"Parece colheita de aveia. É isso?"** | o palpite do sistema, só para você confirmar ou corrigir; ele não é publicado |
 | **"O que está acontecendo nessa foto?"** | faltou a frase: responda em uma linha, sem número |
 | **"É de hoje?"** | a data da foto; sem resposta, vale o dia do envio |
 | **"Anotado. Obrigado!"** | a rodada acabou |

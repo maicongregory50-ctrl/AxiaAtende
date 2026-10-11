@@ -156,7 +156,9 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
     try:   # #970: os avisos do canal de campo, so dentro da janela de 24 h; nunca seguram o resto
         from .campo import Campo
         with conexao(cfg) as con:
-            Campo(cfg.campo_pasta).mandar_avisos(con, saida, momento)
+            c = Campo(cfg.campo_pasta)
+            c.fazer_perguntas(con, saida, momento)
+            c.mandar_avisos(con, saida, momento)
     except Exception as falha:  # noqa: BLE001
         print("campo: %s" % type(falha).__name__, flush=True)
 

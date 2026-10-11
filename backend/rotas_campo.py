@@ -21,6 +21,11 @@ class Buscado(BaseModel):
     linha: int | None = None
 
 
+class Palpite(BaseModel):
+    bastidor: str | None = None
+    produto: str | None = None
+
+
 class Catalogado(BaseModel):
     atv: str = Field(min_length=1, max_length=20)
 
@@ -68,6 +73,22 @@ def rotas(cfg) -> APIRouter:
         conferir(x_axiaatende_chave)
         with conexao(cfg) as con:
             x = campo.buscado(con, item_id, dados.lote, dados.linha, agora())
+        if not x:
+            raise HTTPException(status_code=404, detail="material não encontrado")
+        return x
+
+    @r.get("/campo/novos")
+    def novos(x_axiaatende_chave: str | None = Header(default=None)):
+        """O que chegou e ainda nao tem palpite: o marketing olha a foto antes da rodada de perguntas."""
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            return {"ligado": campo.ligado(con), "itens": campo.novos(con)}
+
+    @r.post("/campo/{item_id}/palpite")
+    def palpite(item_id: int, dados: Palpite, x_axiaatende_chave: str | None = Header(default=None)):
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            x = campo.palpite(con, item_id, dados.bastidor, dados.produto, agora())
         if not x:
             raise HTTPException(status_code=404, detail="material não encontrado")
         return x

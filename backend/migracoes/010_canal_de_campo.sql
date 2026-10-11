@@ -21,6 +21,10 @@ CREATE TABLE atendimento.material_de_campo (
     data_presumida         boolean NOT NULL DEFAULT false,  -- nao respondeu: vale o dia do envio, marcado
     data_perguntada_em     timestamptz,
     pergunta_pendente      text CONSTRAINT material_pergunta CHECK (pergunta_pendente IN ('legenda', 'data', 'qual_dia')),
+    perguntas_em           timestamptz,                -- quando a rodada de perguntas saiu (emenda de 11/10: no laco, com o palpite)
+    palpite_bastidor       text,                       -- o que o marketing (Gemini, listas fechadas) achou que a foto mostra
+    palpite_produto        text,
+    palpite_em             timestamptz,
     recebido_em            timestamptz NOT NULL,
     buscado_em             timestamptz,                -- o marketing levou
     lote                   text,                       -- o lote na Caixa do marketing
