@@ -65,6 +65,15 @@ Quando chegar "o endereço público saiu do ar":
    suporte do Tailscale (Funnel ligado, nome devolve NXDOMAIN).
 5. **Conferir a volta:** `http://127.0.0.1:8008/saude`, em `endereco` e em `chegadas`.
 
+**O robô do Opa, desligado e religado** (registro de 11/10/2026). O que o dono desliga é o **fluxo de
+entrada** do canal (no export de 09/10, `1-Entrada`, que dá as boas-vindas e chama `2 - Principal`).
+Religar é ligar esse mesmo fluxo. Desligar a entrada não encerra os atendimentos que já estavam
+abertos no Opa: eles seguem no fluxo em que pararam e respondem à próxima mensagem da pessoa. Em
+11/10 um atendimento parado no menu de `2 - Principal` leu o toque de um botão nosso como resposta
+errada e, no limite de erros, caiu em `Verificação de horário (Pessoal)`. Depois de desligar a
+entrada, encerrar no Opa os atendimentos abertos com o robô. Os fluxos de espera (`Looping de
+Tempo`, chamado pelo `3 -Menu Comercial`) ainda perguntam horas depois a quem já estava neles.
+
 O que o vigia de dentro não vê: a internet da empresa ou o servidor caídos (ele mora no servidor).
 Isso só um vigia de fora percebe (serviço que abre a mesma página de saúde pela internet). Decisão do
 dono em 11/10/2026: criar esse vigia se houver outra queda.
