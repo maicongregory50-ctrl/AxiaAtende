@@ -348,14 +348,31 @@ def fazer_perguntas_vencidas(con, saida: Saida, agora: datetime) -> int:
         if not na_janela:
             continue    # o servico ficou fora na hora certa: espera a proxima faixa
         c = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (p["conversa_id"],)).fetchone()
-        para = c["wa_id"] or c["bsuid"]
-        w = saida.botoes(para, _ajuste(con, "pergunta_recebeu", "Recebeu o atendimento?"),
-                         [Opcao("pos:sim", "Sim, fui atendido"), Opcao("pos:nao", "Ainda não")])
-        con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s, pergunta_da = %s WHERE " + _PENDENTES,
-                    (agora, c["id"], p["bsuid"]))
-        _registrar(con, c["id"], para, "botoes", "pergunta das 4h30", w)
+        _fazer_a_pergunta(con, saida, c, agora, "pergunta das 4h30")
         feitas += 1
     return feitas
+
+
+def _fazer_a_pergunta(con, saida: Saida, c, agora: datetime, registro: str) -> None:
+    para = c["wa_id"] or c["bsuid"]
+    w = saida.botoes(para, _ajuste(con, "pergunta_recebeu", "Recebeu o atendimento?"),
+                     [Opcao("pos:sim", "Sim, fui atendido"), Opcao("pos:nao", "Ainda não")])
+    con.execute("UPDATE atendimento.conversas SET pergunta_feita_em = %s, pergunta_da = %s WHERE " + _PENDENTES,
+                (agora, c["id"], c["bsuid"]))
+    _registrar(con, c["id"], para, "botoes", registro, w)
+
+
+def perguntar_agora(con, saida: Saida, conversa_id: int, agora: datetime) -> bool:
+    """A pergunta de UMA conversa, ja, sem esperar as 4h30 nem a faixa (prova pedida pelo dono em
+    11/10/2026, `python -m backend.pergunta_agora`). So a que esta com link, sem pergunta feita e
+    dentro das 24h da ultima mensagem; qualquer outra devolve False e nada sai."""
+    c = con.execute("""SELECT * FROM atendimento.conversas
+                        WHERE id = %s AND situacao = 'com_link' AND pergunta_feita_em IS NULL""",
+                    (conversa_id,)).fetchone()
+    if not c or agora - c["ultimo_toque_em"] > timedelta(hours=23):
+        return False
+    _fazer_a_pergunta(con, saida, c, agora, "pergunta pedida a mao")
+    return True
 
 
 #: A nota em tres botoes, direto na tela (dono, 11/10/2026): a lista de cinco pedia abrir, escolher

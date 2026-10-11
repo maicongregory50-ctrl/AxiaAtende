@@ -135,6 +135,25 @@ def test_pergunta_das_4h30_sim_e_nota(ligado):
         assert con.execute("SELECT count(*) AS n FROM atendimento.avisos").fetchone()["n"] == 0
 
 
+def test_pergunta_pedida_a_mao_sai_ja_para_uma_conversa_so_e_nao_repete(ligado):
+    from backend import motor, pergunta_agora
+    s = SaidaFalsa()
+    passo(ligado, s, toque("wamid.1", "menu:fretes", lista=True), agora=SABADO_10H)   # fora da faixa
+    numero = _conversa(ligado)["id"]
+    agora = SABADO_10H + timedelta(minutes=5)
+    with conexao(ligado) as con:
+        assert [p["id"] for p in pergunta_agora.pendentes(con)] == [numero]
+        assert motor.perguntar_agora(con, s, numero + 1, agora) is False
+        assert motor.perguntar_agora(con, s, numero, agora) is True
+        assert motor.perguntar_agora(con, s, numero, agora) is False      # ja feita
+        assert pergunta_agora.pendentes(con) == []
+    assert len(_perguntas(s)) == 1
+    tipo, _, _, notas = passo(ligado, s, toque("wamid.2", "pos:sim"), agora=agora)
+    assert [n[0] for n in notas] == ["nota:bom", "nota:normal", "nota:ruim"]
+    R.rotina_do_minuto(ligado, s, agora=SABADO_10H + timedelta(days=2))   # segunda: nao pergunta de novo
+    assert len(_perguntas(s)) == 1
+
+
 def test_nota_ruim_avisa_o_gestor_uma_vez_e_a_lista_antiga_ainda_vale(ligado):
     s = SaidaFalsa()
     passo(ligado, s, toque("wamid.1", "menu:fretes", lista=True), agora=QUINTA_10H)
