@@ -49,7 +49,10 @@ def test_assinatura_errada_ou_ausente_e_recusada_e_nada_e_gravado(ligado):
     with TestClient(R.criar_app(ligado, saida=SaidaFalsa(), trabalhador=False)) as c:
         assert _postar(c, aviso([texto("wamid.1", "oi")]), segredo="errado").status_code == 401
         assert c.post("/webhook", json=aviso([texto("wamid.1", "oi")])).status_code == 401
-    assert _eventos(ligado) == []
+        assert _postar(c, aviso([texto("wamid.2", "oi")])).status_code == 200
+        ch = c.get("/saude").json()["chegadas"]      # a recusa aparece na saude (#969, 11/10)
+        assert ch["recusadas"] == 2 and ch["aceitas"] == 1 and ch["ultima_recusada"] and ch["ultima_aceita"]
+    assert [e["chave_meta"] for e in _eventos(ligado)] == ["wamid.2"]
 
 
 def test_sem_segredo_configurado_recusa_tudo(cfg):

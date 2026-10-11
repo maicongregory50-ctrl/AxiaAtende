@@ -148,6 +148,11 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
         from .envio import Envio
         envio = Envio(ler_nota=getattr(saida, "nota", None))
     parar = threading.Event()
+    # Toda chegada da Meta, aceita ou recusada (#969, 11/10/2026): em 09/10 a Meta parou de
+    # entregar (app despublicado) e nada aqui mostrava se ela mandava e era recusada ou se nao
+    # mandava. So contagem e hora, nunca o corpo. Zera a cada subida.
+    chegadas = {"desde": datetime.now(timezone.utc).isoformat(), "aceitas": 0, "recusadas": 0,
+                "ultima_aceita": None, "ultima_recusada": None}
 
     def laco():
         segundos = 0
@@ -186,7 +191,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
         return {"de_pe": True, "ambiente": cfg.ambiente, "responde": cfg.responde,
                 "so_para": len(cfg.responde_so_para),
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
-                "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None}
+                "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
+                "chegadas": chegadas}
 
     @app.get("/falar/{codigo}")
     def falar(codigo: str):
@@ -209,8 +215,14 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
     @app.post("/webhook")
     async def aviso(request: Request):
         corpo = await request.body()
+        agora = datetime.now(timezone.utc).isoformat()
         if not assinatura_confere(cfg.meta_app_secret, corpo, request.headers.get("X-Hub-Signature-256")):
+            chegadas["recusadas"] += 1
+            chegadas["ultima_recusada"] = agora
+            print("aviso recusado: assinatura nao confere (%d bytes)" % len(corpo), flush=True)
             return PlainTextResponse("assinatura", status_code=401)
+        chegadas["aceitas"] += 1
+        chegadas["ultima_aceita"] = agora
         try:
             dados = json.loads(corpo)
         except ValueError:
