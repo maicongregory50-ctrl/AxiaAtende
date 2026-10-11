@@ -43,6 +43,10 @@ class Avisado(BaseModel):
     destino_id: int
 
 
+class CanalDeCampo(BaseModel):
+    ligado: bool
+
+
 def rotas(cfg, usuario) -> APIRouter:
     r = APIRouter(dependencies=[Depends(usuario)])
 
@@ -64,6 +68,10 @@ def rotas(cfg, usuario) -> APIRouter:
                     WHERE pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') AND ativo
                       AND acao <> 'encerrar' ORDER BY ordem""")]
             leitura = agenda.ultima_leitura(con)
+            # #970: o que a equipe mandou pelo canal de campo no mesmo periodo (nao e conversa)
+            campo = con.execute("""SELECT count(*) AS n, count(*) FILTER (WHERE catalogado_em IS NOT NULL) AS c
+                                     FROM atendimento.material_de_campo WHERE recebido_em > now() - %s * interval '1 day'""",
+                                (dias,)).fetchone()
         if motivo:
             linhas = [l for l in linhas if l["motivo"] == motivo]
         # #969: so do cadastro / so fora dele (quem nao foi conferido -- agenda vazia -- fica nos dois de fora)
@@ -72,6 +80,7 @@ def rotas(cfg, usuario) -> APIRouter:
         elif quem == "fora":
             linhas = [l for l in linhas if l["erp_cadastros"] != 1]
         cartoes = {
+            "campo": campo["n"], "campo_catalogadas": campo["c"],
             "chegaram": len(linhas),
             "do_cadastro": sum(1 for l in linhas if l["erp_cadastros"] == 1),
             "receberam_link": sum(1 for l in linhas if l["link_em"]),
@@ -188,7 +197,8 @@ def rotas(cfg, usuario) -> APIRouter:
             ds = con.execute("SELECT id, nome, whatsapp, ativo FROM atendimento.destinos ORDER BY nome").fetchall()
             aj = {a["chave"]: a["valor"] for a in con.execute("SELECT chave, valor FROM atendimento.ajustes")}
         return {"opcoes": [dict(f) for f in folhas], "destinos": [dict(d) for d in ds],
-                "horario": aj.get("horario"), "avisado_no_nao": aj.get("avisado_no_nao")}
+                "horario": aj.get("horario"), "avisado_no_nao": aj.get("avisado_no_nao"),
+                "campo_ligado": aj.get("campo.ligado") is True}   # #970: o canal de campo
 
     def _destino_valido(d: Destino) -> tuple[str, str]:
         numero = re.sub(r"\D", "", d.whatsapp or "")
@@ -239,6 +249,16 @@ def rotas(cfg, usuario) -> APIRouter:
             con.execute("""UPDATE atendimento.ajustes SET valor = %s::jsonb, atualizado_em = now()
                             WHERE chave = 'horario'""", (json.dumps(h.model_dump()),))
         return h.model_dump()
+
+    @r.put("/ajustes/campo")
+    def canal_de_campo(dados: CanalDeCampo):
+        """#970: a chave do canal de campo (decisao 8 do dono). Desligada, a foto da equipe volta a
+        ser so gravada, como sempre foi; nada se apaga."""
+        with conexao(cfg) as con:
+            con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES ('campo.ligado', %s::jsonb)
+                           ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now()""",
+                        ("true" if dados.ligado else "false",))
+        return {"campo_ligado": dados.ligado}
 
     @r.put("/ajustes/avisado")
     def avisado(a: Avisado):

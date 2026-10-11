@@ -89,6 +89,15 @@ export default function Destinos() {
           )}
           <p className="leve">Fora do horário, o link vai do mesmo jeito, com o aviso de que o retorno vem no próximo horário.</p>
 
+          <h2>Canal de campo</h2>
+          <div className="filtros">
+            <label className="caixa"><input type="checkbox" checked={!!d.campo_ligado}
+              onChange={(e) => fazer('PUT', '/ajustes/campo', { ligado: e.target.checked })} /> ligado</label>
+            <span className="leve">{d.campo_ligado
+              ? 'A foto ou o vídeo de colaborador e representante do cadastro vai para a Caixa do marketing; a OlivIA pergunta o que é e se é de hoje.'
+              : 'Desligado: a foto da equipe é só guardada, como sempre; o marketing não busca.'}</span>
+          </div>
+
           <h2>Quem é avisado quando alguém diz que não foi atendido</h2>
           <div className="filtros">
             <select value={d.avisado_no_nao || ''} onChange={(e) => fazer('PUT', '/ajustes/avisado', { destino_id: Number(e.target.value) })}>

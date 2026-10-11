@@ -12,6 +12,7 @@
 #      aparece na tela. As chaves da Meta e da Anthropic NAO sao escritas aqui: o dono as cola
 #      depois (G3), nas linhas comentadas que o arquivo ja traz;
 #   3. cria C:\Logs\AxiaAtende e C:\Logs\AxiaAtende\recepcionista (este, LocalService escreve);
+#   3b. cria C:\Dados\AxiaAtende\campo (LocalService escreve: o canal de campo, #970);
 #   4. da a LocalService leitura do codigo e do ambiente Python (.venv), e nada mais;
 #   5. instala e sobe axiaatende-backend (as telas, 127.0.0.1:8009, LocalSystem);
 #   6. instala e sobe axiaatende-recepcionista (127.0.0.1:8008, LocalService), EM ESCUTA: sem
@@ -214,6 +215,13 @@ New-Item -ItemType Directory -Force $ENVIOS | Out-Null
 & icacls $ENVIOS /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' "${LOCALSERV}:(OI)(CI)RX" | Out-Null
 if ($LASTEXITCODE -ne 0) { Falha "nao consegui fechar $ENVIOS" }
 Ok "$ENVIOS (sistema escreve, LocalService le)"
+# #970: a foto ou o video que a equipe manda pelo canal de campo. O recepcionista (LocalService)
+# baixa da Meta e GRAVA aqui; as telas (LocalSystem) leem e servem ao marketing.
+$CAMPO = Join-Path $DADOS 'campo'
+New-Item -ItemType Directory -Force $CAMPO | Out-Null
+& icacls $CAMPO /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' "${LOCALSERV}:(OI)(CI)M" | Out-Null
+if ($LASTEXITCODE -ne 0) { Falha "nao consegui fechar $CAMPO" }
+Ok "$CAMPO (LocalService escreve: o material do canal de campo, #970)"
 New-Item -ItemType Directory -Force $LOGS, $LOGRECEP | Out-Null
 & icacls $LOGRECEP /grant "${LOCALSERV}:(OI)(CI)M" | Out-Null
 if ($LASTEXITCODE -ne 0) { Falha 'nao consegui dar o log do recepcionista a LocalService' }

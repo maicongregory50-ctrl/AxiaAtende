@@ -32,6 +32,12 @@ primeira tabela.
 
 **Quem é avisado quando alguém diz que não foi atendido:** escolha a pessoa no fim da tela.
 
+**Canal de campo (#970):** a chave *ligado*. Ligada, a foto ou o vídeo que um colaborador ou
+representante do cadastro manda ao WhatsApp da Renascer é guardado, a OlivIA pergunta o que é e se é
+de hoje, e o marketing busca para a Caixa dele. Desligada, a foto da equipe é só guardada, como
+sempre foi, e o marketing não busca; nada se apaga. Nasce desligada; liga-se no primeiro caso, com
+o dono, depois de o marketing também ligar a chave dele (`AXIAMKT_CAMPO`).
+
 ## 4. O que significa cada sinal
 
 | Sinal | Quer dizer |

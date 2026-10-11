@@ -46,6 +46,15 @@ class Pessoa:
 
 
 @dataclass
+class Midia:
+    """#970: a foto ou o video que veio na mensagem (o arquivo fica na Meta ate alguem baixar)."""
+    id: str
+    tipo: str                     # foto | video
+    mime: str = ""
+    legenda: str = ""
+
+
+@dataclass
 class Entrada:
     """O que a pessoa fez, ja lido do aviso da Meta."""
     wamid: str
@@ -53,6 +62,7 @@ class Entrada:
     toque: str | None = None      # o id do botao ou da linha tocada
     texto: str | None = None      # o que ela escreveu (ou None para audio, foto...)
     contexto: str | None = None   # a mensagem nossa a que ela respondeu
+    midia: Midia | None = None    # #970: foto ou video (so o canal de campo a usa)
 
 
 # ── leitura do aviso ────────────────────────────────────────────────────────
@@ -74,6 +84,11 @@ def ler_mensagem(valor: dict, msg: dict) -> Entrada:
         e.toque = (msg.get("button") or {}).get("payload")
     elif tipo == "text":
         e.texto = (msg.get("text") or {}).get("body", "")
+    elif tipo in ("image", "video"):   # #970: lida so pelo canal de campo; para o resto segue "sem texto"
+        m = msg.get(tipo) or {}
+        if m.get("id"):
+            e.midia = Midia(id=m["id"], tipo="foto" if tipo == "image" else "video",
+                            mime=m.get("mime_type", ""), legenda=m.get("caption", "") or "")
     return e
 
 
@@ -267,13 +282,20 @@ def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas
     _registrar(con, conversa["id"], pessoa.para, "botoes", "ia propos %s" % no["chave"], w)
 
 
-def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None) -> None:
-    """Uma mensagem que chegou. `envio` trata as respostas ao convite da carteira (Fase E)."""
+def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo=None) -> None:
+    """Uma mensagem que chegou. `envio` trata as respostas ao convite da carteira (Fase E);
+    `campo` (#970) toma a foto ou o video de equipe/representante e as respostas as perguntas dele,
+    antes de qualquer conversa de atendimento abrir."""
     p = e.pessoa
     if e.toque and e.toque.startswith("envio:"):
         if envio is not None:
             envio.tratar_toque(con, saida, e, agora)
         return
+    if campo is not None:
+        if e.midia is not None and campo.receber(con, saida, e, agora):
+            return
+        if campo.responder(con, saida, e, agora):
+            return
 
     # A pergunta das 4h30 e a nota respondem a ULTIMA pergunta (e todas as conversas que ela cobre).
     if e.toque in ("pos:sim", "pos:nao") or (e.toque or "").startswith("nota:"):

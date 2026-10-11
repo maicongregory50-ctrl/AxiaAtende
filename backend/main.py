@@ -137,12 +137,15 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
     # ── a porta do AxiaMarketing (E1 e E5): fora de /api, com a chave do pedido ──
     from .rotas_pedido import rotas as rotas_pedido
     app.include_router(rotas_pedido(cfg))
+    # ── o canal de campo (#970): o marketing busca o que a equipe mandou, com a mesma chave ──
+    from .rotas_campo import rotas as rotas_campo
+    app.include_router(rotas_campo(cfg))
 
     # ── a tela ───────────────────────────────────────────────────────────────
 
     @app.get("/{caminho:path}", include_in_schema=False)
     def tela(caminho: str):
-        if caminho.startswith(("api/", "pedido/")):
+        if caminho.startswith(("api/", "pedido/", "campo/")):
             raise HTTPException(status_code=404)
         raiz = cfg.tela.resolve()
         pedido = (raiz / caminho).resolve()

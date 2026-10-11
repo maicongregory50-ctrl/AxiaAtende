@@ -60,6 +60,9 @@ class Config:
     chave_pedido: str = field(default="", repr=False)
     # As imagens de cada envio, copiadas do Marketing para ca, onde o recepcionista (LocalService) le.
     envios_pasta: Path = Path(r"C:\Dados\AxiaAtende\envios")
+    # O material do canal de campo (#970): a foto ou o video que a equipe mandou, baixado da Meta
+    # pelo recepcionista (LocalService escreve aqui; o instalar.ps1 da a permissao) e lido pelas telas.
+    campo_pasta: Path = Path(r"C:\Dados\AxiaAtende\campo")
     logs: Path = Path(r"C:\Logs\AxiaAtende")
     tela: Path = RAIZ / "frontend" / "dist"
     cookie_seguro: bool = False
@@ -160,6 +163,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             logs=Path(os.environ.get("AXIAATENDE_LOGS",
                                      r"C:\Dados\AxiaAtende\%s\logs" % ambiente)),
             envios_pasta=Path(r"C:\Dados\AxiaAtende\%s\envios" % ambiente),
+            campo_pasta=Path(r"C:\Dados\AxiaAtende\%s\campo" % ambiente),
         )
     if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
         base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele

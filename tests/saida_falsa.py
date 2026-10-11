@@ -35,6 +35,16 @@ class SaidaFalsa(Saida):
         self.enviadas.append(("contato", para, nome, [whatsapp]))
         return self._id()
 
+    def baixar(self, media_id, destino):
+        from pathlib import Path
+        if getattr(self, "baixar_falha", False):
+            raise RuntimeError("a Meta nao entregou a midia")
+        destino = Path(destino)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(b"MIDIA:" + media_id.encode())
+        self.baixadas = getattr(self, "baixadas", []) + [(media_id, str(destino))]
+        return str(destino)
+
     def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
         self.enviadas.append(("modelo", para, nome, list(corpo)))
         self.modelos.append({"para": para, "nome": nome, "corpo": list(corpo), "imagem": imagem,

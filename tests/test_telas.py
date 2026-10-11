@@ -97,3 +97,7 @@ def test_destinos_trocar_numero_ligar_opcao_e_horario(ligado, tela):
     assert tela.put("/api/ajustes/horario", json=h).json() == h
     assert tela.put("/api/ajustes/horario", json={"dias": [9], "faixas": [["8", "x"]]}).status_code == 422
     assert tela.put("/api/ajustes/avisado", json={"destino_id": novo["id"]}).status_code == 200
+    # #970: a chave do canal de campo nasce desligada e liga pela tela
+    assert tela.get("/api/destinos").json()["campo_ligado"] is False
+    assert tela.put("/api/ajustes/campo", json={"ligado": True}).json() == {"campo_ligado": True}
+    assert tela.get("/api/destinos").json()["campo_ligado"] is True

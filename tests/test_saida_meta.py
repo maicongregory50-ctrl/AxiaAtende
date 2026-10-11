@@ -41,6 +41,28 @@ def test_botoes_vao_como_interactive_button_com_os_ids(meta):
         ("menu:a", "Produtor rural"), ("menu:b", "Corretor")]
 
 
+def test_baixar_pede_a_url_da_midia_e_grava_o_arquivo(tmp_path):
+    """#970: a midia que a pessoa mandou e baixada com o mesmo token: primeiro a URL (vale 5 min),
+    depois o arquivo, gravado onde o canal de campo pediu."""
+    pedidos = []
+
+    def responder(req: httpx.Request):
+        pedidos.append(req)
+        if req.url.path.endswith("/midia-1"):
+            return httpx.Response(200, json={"url": "https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=1",
+                                             "mime_type": "image/jpeg", "sha256": "x", "file_size": 5, "id": "midia-1",
+                                             "messaging_product": "whatsapp"})
+        if "lookaside" in str(req.url):
+            return httpx.Response(200, content=b"JPEG!", headers={"Content-Type": "image/jpeg"})
+        return httpx.Response(404)
+
+    s = SaidaMeta("725888737278277", "token-falso", sessao=httpx.Client(transport=httpx.MockTransport(responder)))
+    destino = tmp_path / "campo" / "2026-10-12" / "wamid.1.jpg"
+    assert s.baixar("midia-1", destino) == str(destino)
+    assert destino.read_bytes() == b"JPEG!"
+    assert all(r.headers.get("Authorization") == "Bearer token-falso" for r in pedidos)
+
+
 def test_contato_vai_como_cartao_com_o_whatsapp_de_quem_atende(meta):
     s, pedidos = meta
     s.contato("5549999990000", "Willian Souza", "5546999784298")

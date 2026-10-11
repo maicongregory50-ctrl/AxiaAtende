@@ -49,6 +49,11 @@ class Saida:
         (o modelo aprovado termina em {{1}}; aqui vai o numero do responsavel)."""
         raise NotImplementedError
 
+    def baixar(self, media_id: str, destino) -> str:
+        """#970: baixa a midia que a pessoa mandou (o id vem no aviso da Meta) para `destino`
+        (Path), com o mesmo token. Devolve o caminho gravado. A URL da Meta vale 5 minutos."""
+        raise NotImplementedError
+
 
 def wa_id_do_whatsapp(numero: str) -> str:
     """O id do WhatsApp de um celular brasileiro e o numero ANTIGO, sem o 9 (o seu chega assim nos
@@ -123,6 +128,14 @@ class SaidaMeta(Saida):
 
     def imagem(self, para, arquivo, legenda=""):
         return self._wa.send_image(to=para, image=arquivo, caption=legenda or None).id
+
+    def baixar(self, media_id, destino):
+        from pathlib import Path
+        destino = Path(destino)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        url = self._wa.get_media_url(media_id).url
+        self._wa.download_media(url=url, path=str(destino.parent), filename=destino.name)
+        return str(destino)
 
     def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
         # O modelo vai como JSON cru (a forma da Cloud API), sem depender da classe de modelo do

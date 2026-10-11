@@ -93,6 +93,7 @@ export default function Recepcao() {
             <div className="cartao"><span>Disseram que foram atendidos</span><b>{d.cartoes.disseram_sim}</b></div>
             <div className="cartao alerta"><span>Disseram que não</span><b>{d.cartoes.disseram_nao}</b></div>
             <div className="cartao"><span>IA acertou / errou</span><b>{d.cartoes.ia_acertou} / {d.cartoes.ia_errou}</b></div>
+            {d.cartoes.campo > 0 && <div className="cartao"><span>Fotos do campo (equipe)</span><b>{d.cartoes.campo}{d.cartoes.campo_catalogadas ? ` · ${d.cartoes.campo_catalogadas} no catálogo` : ''}</b></div>}
           </div>
           <Leitura leitura={d.leitura} />
           <table className="tabela">

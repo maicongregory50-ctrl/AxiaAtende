@@ -56,6 +56,7 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **"Sim" seguido de "Bom" ou "Normal"** | a pessoa foi atendida e deu essa nota. Só "Sim", sem nota: ela confirmou o atendimento e não tocou na nota |
 | **"Sim" seguido de "Ruim · você foi avisado"** | a pessoa foi atendida e saiu insatisfeita; você recebeu um aviso no WhatsApp, como no "Não" |
 | **"—"** | ainda não aconteceu (não é zero) |
+| **Fotos do campo (equipe)** | quantas fotos e vídeos colaboradores e representantes do cadastro mandaram pelo **canal de campo** no período, e quantas já estão no catálogo do marketing (#970). Não são conversas: a OlivIA responde "Recebi", pergunta o que é e se é de hoje, e o marketing busca para a Caixa. O cartão só aparece quando houve alguma; o canal se liga na tela **Destinos** |
 
 ## 5. O que a tela NÃO faz
 
@@ -65,3 +66,4 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 - **Não corrige o cadastro:** número faltando ou repetido se corrige no ERP.
 - **Não reconhece de novo conversas antigas:** cada conversa guarda quem era no momento em que chegou.
 - **Não mostra valor, crédito nem documento** de ninguém.
+- **Não mostra a foto do campo:** ela vai para a Caixa do marketing (manual `caixa.md` do AxiaMarketing); aqui só a contagem. O que a equipe deve mandar está no `campo-equipe.md`.

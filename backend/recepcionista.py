@@ -91,9 +91,13 @@ def aplicar_status(con, st: dict, agora: datetime, envio=None) -> None:
         envio.aplicar_status(con, st, novo, erro, agora)
 
 
-def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: datetime | None = None) -> int:
+def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: datetime | None = None,
+                        campo=None) -> int:
     """Processa ate LOTE eventos, cada um na sua transacao. Devolve quantos."""
     feitos = 0
+    if campo is None:   # #970: o canal de campo; com a chave desligada ele nao faz nada
+        from .campo import Campo
+        campo = Campo(cfg.campo_pasta)
     for _ in range(LOTE):
         with conexao(cfg) as con:
             ev = con.execute("""SELECT * FROM atendimento.eventos_meta WHERE processado_em IS NULL
@@ -115,7 +119,7 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
                                 envio_mod.com_nove(n) for n in cfg.responde_so_para}:
                             erro = "escuta (ensaio)"   # o Opa responde a quem nao esta no ensaio
                         else:
-                            motor.tratar(con, saida, ia, entrada, momento, envio)
+                            motor.tratar(con, saida, ia, entrada, momento, envio, campo)
             except Exception as falha:  # noqa: BLE001 -- um evento ruim nao trava a fila
                 erro = "%s: %s" % (type(falha).__name__, str(falha)[:300])
             con.execute("UPDATE atendimento.eventos_meta SET processado_em = %s, erro = %s WHERE id = %s",
@@ -149,6 +153,12 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
             print("vigia: %s" % type(falha).__name__, flush=True)
     if envio is not None:
         envio.rotina(cfg, saida, momento)
+    try:   # #970: os avisos do canal de campo, so dentro da janela de 24 h; nunca seguram o resto
+        from .campo import Campo
+        with conexao(cfg) as con:
+            Campo(cfg.campo_pasta).mandar_avisos(con, saida, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("campo: %s" % type(falha).__name__, flush=True)
 
 
 def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
