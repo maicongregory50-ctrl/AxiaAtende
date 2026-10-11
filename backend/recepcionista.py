@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 
-from . import config, migracoes, motor
+from . import config, migracoes, motor, vigia
 from . import envio as envio_mod
 from .banco import conexao
 
@@ -124,13 +124,29 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
     return feitos
 
 
-def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | None = None) -> None:
+def vigiar_o_endereco(cfg: config.Config, perguntar, agora: datetime) -> None:
+    """#969: a cada 5 min, o nome publico ainda existe la fora? A pergunta vai fora da transacao."""
+    with conexao(cfg) as con:
+        if not vigia.venceu(con, agora):
+            return
+    resposta = perguntar()
+    with conexao(cfg) as con:
+        vigia.anotar(con, resposta, agora)
+
+
+def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | None = None,
+                     perguntar=None) -> None:
     if not cfg.responde:
         return
     momento = agora or datetime.now(timezone.utc)
     with conexao(cfg) as con:
         motor.fazer_perguntas_vencidas(con, saida, momento)
         motor.marcar_paradas(con, momento)
+    if perguntar is not None:
+        try:
+            vigiar_o_endereco(cfg, perguntar, momento)
+        except Exception as falha:  # noqa: BLE001 -- o vigia nunca segura a pergunta nem o envio
+            print("vigia: %s" % type(falha).__name__, flush=True)
     if envio is not None:
         envio.rotina(cfg, saida, momento)
 
@@ -163,7 +179,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 segundos += 1
                 if segundos >= 60 and saida is not None:
                     segundos = 0
-                    rotina_do_minuto(cfg, saida, envio)
+                    rotina_do_minuto(cfg, saida, envio, perguntar=vigia.existe)
             except Exception as falha:  # noqa: BLE001 -- o laco nunca morre
                 print("trabalhador: %s" % falha, flush=True)
 
@@ -185,6 +201,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
             with conexao(cfg) as con:
                 r = con.execute("""SELECT count(*) FILTER (WHERE processado_em IS NULL) AS pendentes,
                                           max(recebido_em) AS ultimo FROM atendimento.eventos_meta""").fetchone()
+                endereco = vigia.estado(con)
         except Exception as erro:  # noqa: BLE001
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
@@ -192,7 +209,10 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "so_para": len(cfg.responde_so_para),
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
-                "chegadas": chegadas}
+                "chegadas": chegadas,
+                # o nome publico la fora (vigia.py): None = ainda nao conferido
+                "endereco": endereco and {"situacao": endereco["situacao"], "desde": endereco["desde"].isoformat(),
+                                          "conferido_em": endereco["conferido_em"].isoformat()}}
 
     @app.get("/falar/{codigo}")
     def falar(codigo: str):

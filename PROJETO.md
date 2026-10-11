@@ -43,3 +43,26 @@ que fica contratado e parado por um mês depois da troca. O envio à carteira pa
 fora do que foi aprovado: o convite que não saiu não sai depois sozinho.
 
 Antes da troca, cair não afeta ninguém: o recepcionista está em escuta e o Opa atende.
+
+## Se o endereço público cair
+
+O recepcionista confere a cada 5 minutos se o nome público (`serverrenascer.taild57672.ts.net`) existe
+na internet e avisa o gestor no WhatsApp quando some e quando volta (#969, 11/10/2026). Do mesmo nome
+dependem as mensagens da Meta, o botão "Falar com meu atendimento" e a arte que o Instagram baixa do
+AxiaMarketing.
+
+Quando chegar "o endereço público saiu do ar":
+
+1. **Confirmar de fora:** abrir `https://serverrenascer.taild57672.ts.net/saude` no celular, no 4G, com
+   o Tailscale do aparelho desligado. De dentro do servidor o nome sempre resolve, e por isso
+   navegador e `Invoke-WebRequest` daqui não provam nada.
+2. **Religar o Funnel** (PowerShell elevado):
+   `& 'C:\Program Files\Tailscale\tailscale.exe' funnel --https=443 off; & 'C:\Program Files\Tailscale\tailscale.exe' funnel --bg --https=443 http://127.0.0.1:8008`
+3. **Reiniciar o Tailscale:** `Restart-Service Tailscale` (derruba a rede interna por alguns segundos).
+   Em 11/10/2026 o nome voltou uns dez minutos depois dos passos 2 e 3.
+4. **Não voltou em 30 minutos:** religar o robô do Opa para o número não ficar mudo e abrir chamado no
+   suporte do Tailscale (Funnel ligado, nome devolve NXDOMAIN).
+5. **Conferir a volta:** `http://127.0.0.1:8008/saude`, em `endereco` e em `chegadas`.
+
+O que o vigia de dentro não vê (o nome existir e o Funnel não repassar; internet ou servidor caídos)
+fica com o vigia de fora, que abre a mesma página de saúde pela internet.

@@ -239,3 +239,50 @@ foi avisado".
 **Fora desta etapa (dono, 11/10/2026):** medir quando o atendente começa o atendimento (aviso ao
 atendente com botão que anota o toque). "Por hora não vamos medir o atendimento interno, no futuro
 talvez."
+
+
+## Etapa 3 — o vigia do endereço público (dono, 11/10/2026)
+
+**O que aconteceu:** de 09/10 às 22:31 até 11/10 às 11:08 o recepcionista não recebeu nenhuma mensagem.
+O nome público do Funnel (`serverrenascer.taild57672.ts.net`) devolvia "domínio inexistente" no Google,
+na Cloudflare, no Quad9 e no servidor de nomes do Tailscale, com o Funnel ligado no nó e a marca
+"Funnel" no painel. A Meta não achava o endereço; o Opa continuou recebendo. Voltou uns dez minutos
+depois de religar o Funnel e reiniciar o serviço do Tailscale; a causa do sumiço não é conhecida.
+Ninguém foi avisado: de dentro do servidor o nome resolve pela rede interna mesmo sem existir lá fora.
+
+**Os caminhos pesados com o dono:** A, vigiar o endereço atual; B, túnel da Cloudflare com
+`atende.sementesrenascer.com.br` (o DNS do domínio inteiro iria para a Cloudflare, que passaria a ler
+as mensagens no caminho); C, um servidor pequeno na nuvem como porta de entrada (máquina exposta para
+manter, mensalidade). Apontar o subdomínio direto para a empresa ficou fora: abriria a 443 do servidor
+do ERP. **Decisão do dono: A.** "Me parece que o A já é uma solução sólida, todas têm riscos."
+
+**Decisão:**
+- A cada 5 minutos o recepcionista pergunta a dois resolvedores públicos, por HTTPS, se o nome existe.
+- **Dois "não existe" seguidos** = fora do ar: um aviso no WhatsApp do gestor (o mesmo do "Não"), pela
+  fila de avisos. O aviso sai do servidor para a Meta e não depende do endereço que caiu.
+- Quando o nome volta, outro aviso, com quanto tempo ficou fora.
+- Não conseguir perguntar (sem internet, resolvedor fora) não é "fora": sem resposta, nada se afirma.
+- A saúde do recepcionista (`/saude`) passa a dizer `endereco`: no ar ou fora, desde quando.
+- **O vigia de fora** (serviço gratuito que abre `/saude` pela internet a cada 5 minutos e avisa por
+  e-mail ou aplicativo) cobre o que este não vê. É conta do dono, feita pela mão dele.
+
+**O que este vigia não vê:** o nome existir e o Funnel não repassar; a internet da empresa ou o
+servidor caídos (ele mora no servidor).
+
+**Fios:** escreve a tabela nova `atendimento.vigia_endereco` (uma linha; só o vigia escreve, a saúde
+lê) e a fila `atendimento.avisos`, com os tipos novos `endereco_fora` e `endereco_voltou`; quem volta
+depois é o despachante de avisos (`envio.mandar_avisos`), pelos modelos dos usos
+`aviso_endereco_fora` e `aviso_endereco_voltou`. O destinatário é o do ajuste `avisado_no_nao`. Do
+mesmo nome dependem o endereço cadastrado no app da Meta, o botão `/falar/` (dentro dos modelos
+aprovados) e a vitrine do AxiaMarketing na porta 10000: o aviso vale para os três.
+
+**Medido:** 37 horas sem nenhuma chegada (09/10 22:31 a 11/10 11:08); o contador de chegadas da saúde
+em zero aceitas e zero recusadas nesse intervalo; em 11/10 às 12h o vigia devolve "existe" para o nome
+real e "não existe" para um nome inventado na mesma rede.
+
+**Migração 009:** a tabela do vigia, os dois tipos de aviso e os dois modelos de Utilidade. Volta:
+`009_vigia_do_endereco_VOLTA.sql`. **Depende da mão do dono:** a Meta aprovar os dois modelos
+(`python -m backend.modelos_meta --propor`); até lá o aviso fica na fila com o erro e só a saúde mostra.
+
+**Manual:** não há tela nova. O que fazer quando o aviso chega está no `PROJETO.md`, em "Se o
+endereço público cair".
