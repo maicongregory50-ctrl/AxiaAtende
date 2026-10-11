@@ -1,6 +1,7 @@
 """A troca do dia (#950, Fases G5 e H): o app do AxiaAtende passa a OUVIR a conta do WhatsApp.
 
     python -m backend.troca --ver        so leitura: quem ouve a conta e o estado do numero
+    python -m backend.troca --app        so leitura: o que o app assina (campos e endereco do aviso)
     python -m backend.troca --assinar    o app do AxiaAtende passa a ouvir a conta (POST subscribed_apps)
 
 Roda em janela elevada, com AXIAATENDE_AMBIENTE=producao e AXIAATENDE_PROCESSO=recepcionista (le o
@@ -41,6 +42,21 @@ def ver(cfg, http=None) -> dict:
     return {"apps": apps, "numero": numero}
 
 
+def ver_app(cfg, http=None) -> dict:
+    """So GET: o que o APP assina (objeto, endereco, campos, ativo). `--ver` mostra quem ouve a
+    conta; isto mostra se o app pediu o campo `messages` (#969, 11/10/2026: conta e numero certos
+    e nenhum aviso chegando). A chave do app vai no cabecalho, nunca no endereco nem na saida."""
+    if not cfg.meta_app_secret:
+        raise SystemExit("falta o META_APP_SECRET no .env.recepcionista (rode como administrador, em producao)")
+    with (http or _cliente(cfg)) as c:
+        app = c.get("/app", params={"fields": "id,name"}).json()
+        if "id" not in app:
+            return {"app": app}
+        assinaturas = c.get("/%s/subscriptions" % app["id"],
+                            headers={"Authorization": "Bearer %s|%s" % (app["id"], cfg.meta_app_secret)}).json()
+    return {"app": app, "assinaturas": assinaturas}
+
+
 def assinar(cfg, http=None) -> dict:
     """O app do AxiaAtende passa a ouvir a conta. Nao mexe na assinatura de ninguem mais."""
     with (http or _cliente(cfg)) as c:
@@ -52,9 +68,10 @@ def main(argv=None) -> int:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--ver", action="store_true")
     g.add_argument("--assinar", action="store_true")
+    g.add_argument("--app", action="store_true")
     a = ap.parse_args(argv)
     cfg = config.carregar()
-    r = ver(cfg) if a.ver else assinar(cfg)
+    r = ver(cfg) if a.ver else ver_app(cfg) if a.app else assinar(cfg)
     print(json.dumps(r, ensure_ascii=False, indent=2))
     return 0
 
