@@ -5,12 +5,15 @@ publico: a Meta nao achava o recepcionista, ninguem recebeu resposta por um dia 
 avisou. De DENTRO do servidor o nome resolve pela rede do Tailscale mesmo sem existir la fora,
 entao a conferencia pergunta a dois resolvedores publicos, por HTTPS.
 
-A cada 5 minutos. Dois "nao existe" seguidos = fora do ar: um aviso ao gestor (o mesmo da pergunta
+Existindo o nome, ele abre a propria saude pelo IP publico que o resolvedor devolveu (a entrada do
+Funnel), e assim ve tambem o nome existir e o Funnel nao repassar (reforco, dono 11/10/2026).
+
+A cada 5 minutos. Dois "nao" seguidos = fora do ar: um aviso ao gestor (o mesmo da pergunta
 "Nao"), pela fila de avisos, que SAI do servidor e nao depende do endereco. Quando volta, outro.
 Nao conseguir perguntar (sem internet) nao e "fora": sem resposta, nao se afirma nada.
 
-O QUE ELE NAO VE: o nome existir e o Funnel nao repassar; a internet ou o servidor caidos (ele mora
-aqui). Para isso serve o vigia de fora (PROJETO.md, "Se eu cair").
+O QUE ELE NAO VE: a internet ou o servidor caidos (ele mora aqui). Para isso so um vigia de fora
+(PROJETO.md, "Se o endereco publico cair"); o dono cria se houver outra queda.
 """
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
@@ -26,9 +29,9 @@ INTERVALO = timedelta(minutes=5)
 FALHAS_PARA_AVISAR = 2
 
 
-def existe(nome: str = NOME, http=None) -> bool | None:
-    """True: algum resolvedor publico devolve o endereco. False: todos dizem que o nome nao existe.
-    None: nao deu para perguntar a todos (sem internet, resolvedor fora): nao se afirma nada."""
+def resolver(nome: str = NOME, http=None) -> tuple[bool | None, str | None]:
+    """(True, ip): algum resolvedor publico devolve o endereco. (False, None): todos dizem que o nome
+    nao existe. (None, None): nao deu para perguntar a todos (sem internet, resolvedor fora)."""
     respostas = []
     with (http or httpx.Client(timeout=10)) as c:
         for url in RESOLVEDORES:
@@ -38,9 +41,35 @@ def existe(nome: str = NOME, http=None) -> bool | None:
                 respostas.append(None)
                 continue
             if r.get("Status") == 0 and r.get("Answer"):
-                return True
+                ips = [a.get("data") for a in r["Answer"] if a.get("type", 1) == 1]
+                return True, (ips[0] if ips else None)
             respostas.append(False if r.get("Status") in (0, 3) else None)
-    return False if all(x is False for x in respostas) else None
+    return (False if all(x is False for x in respostas) else None), None
+
+
+def existe(nome: str = NOME, http=None) -> bool | None:
+    return resolver(nome, http)[0]
+
+
+def responde(ip: str, nome: str = NOME, http=None) -> bool:
+    """Abre a saude pelo IP PUBLICO da entrada do Funnel, com o nome no TLS: o pedido sai para a
+    internet e volta, como o da Meta. Pelo nome ele iria pelo atalho da rede interna e nao provaria
+    nada. Qualquer resposta HTTP serve (ate 503: o caminho chegou aqui); nao conectar e "nao"."""
+    try:
+        with (http or httpx.Client(timeout=15)) as c:
+            c.get("https://%s/saude" % ip, headers={"host": nome}, extensions={"sni_hostname": nome})
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def confere(nome: str = NOME, resolver=resolver, responde=responde) -> bool | None:
+    """A pergunta do vigia: o nome existe la fora E o Funnel repassa. Quem chegou a resolver o nome
+    tem internet, entao nao conseguir abrir e "fora" (e so dois seguidos avisam)."""
+    ha, ip = resolver(nome)
+    if ha and ip:
+        return responde(ip, nome)
+    return ha
 
 
 def estado(con) -> dict | None:

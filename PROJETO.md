@@ -47,7 +47,8 @@ Antes da troca, cair não afeta ninguém: o recepcionista está em escuta e o Op
 ## Se o endereço público cair
 
 O recepcionista confere a cada 5 minutos se o nome público (`serverrenascer.taild57672.ts.net`) existe
-na internet e avisa o gestor no WhatsApp quando some e quando volta (#969, 11/10/2026). Do mesmo nome
+na internet e se o Funnel repassa (abre a própria saúde pelo IP público da entrada do Tailscale), e
+avisa o gestor no WhatsApp quando cai e quando volta (#969, 11/10/2026). Do mesmo nome
 dependem as mensagens da Meta, o botão "Falar com meu atendimento" e a arte que o Instagram baixa do
 AxiaMarketing.
 
@@ -64,5 +65,6 @@ Quando chegar "o endereço público saiu do ar":
    suporte do Tailscale (Funnel ligado, nome devolve NXDOMAIN).
 5. **Conferir a volta:** `http://127.0.0.1:8008/saude`, em `endereco` e em `chegadas`.
 
-O que o vigia de dentro não vê (o nome existir e o Funnel não repassar; internet ou servidor caídos)
-fica com o vigia de fora, que abre a mesma página de saúde pela internet.
+O que o vigia de dentro não vê: a internet da empresa ou o servidor caídos (ele mora no servidor).
+Isso só um vigia de fora percebe (serviço que abre a mesma página de saúde pela internet). Decisão do
+dono em 11/10/2026: criar esse vigia se houver outra queda.

@@ -179,7 +179,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 segundos += 1
                 if segundos >= 60 and saida is not None:
                     segundos = 0
-                    rotina_do_minuto(cfg, saida, envio, perguntar=vigia.existe)
+                    rotina_do_minuto(cfg, saida, envio, perguntar=vigia.confere)
             except Exception as falha:  # noqa: BLE001 -- o laco nunca morre
                 print("trabalhador: %s" % falha, flush=True)
 

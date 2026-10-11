@@ -266,8 +266,8 @@ do ERP. **Decisão do dono: A.** "Me parece que o A já é uma solução sólida
 - **O vigia de fora** (serviço gratuito que abre `/saude` pela internet a cada 5 minutos e avisa por
   e-mail ou aplicativo) cobre o que este não vê. É conta do dono, feita pela mão dele.
 
-**O que este vigia não vê:** o nome existir e o Funnel não repassar; a internet da empresa ou o
-servidor caídos (ele mora no servidor).
+**O que este vigia não vê:** a internet da empresa ou o servidor caídos (ele mora no servidor). O
+nome existir e o Funnel não repassar passou a ser visto no reforço, abaixo.
 
 **Fios:** escreve a tabela nova `atendimento.vigia_endereco` (uma linha; só o vigia escreve, a saúde
 lê) e a fila `atendimento.avisos`, com os tipos novos `endereco_fora` e `endereco_voltou`; quem volta
@@ -286,3 +286,19 @@ real e "não existe" para um nome inventado na mesma rede.
 
 **Manual:** não há tela nova. O que fazer quando o aviso chega está no `PROJETO.md`, em "Se o
 endereço público cair".
+
+### Reforço: o Funnel repassa? (dono, 11/10/2026, "sim, reforço")
+
+O dono perguntou se o vigia de dentro podia cobrir o que ficava com o de fora. Uma das duas lacunas
+pode: existindo o nome, o vigia abre a própria saúde pelo **IP público** que o resolvedor devolveu (a
+entrada do Funnel), com o nome no TLS. O pedido sai para a internet e volta, como o da Meta; pelo nome
+ele iria pelo atalho da rede interna. Qualquer resposta HTTP vale como "repassa"; não conectar conta
+como "não", e continuam valendo os dois seguidos antes do aviso. Os avisos e os modelos são os mesmos.
+
+**Medido em 11/10:** pelo IP público 209.177.145.137 a saúde respondeu 200 em 1,2 s; um IP que não
+atende devolve "não".
+
+**Risco aceito:** a outra lacuna (internet da empresa ou servidor caídos) continua sem aviso. Só um
+vigia de fora cobre. Decisão do dono: "vou fazer se tivermos mais uma queda".
+
+**Sem migração.** Entra no ar com o reinício do recepcionista.

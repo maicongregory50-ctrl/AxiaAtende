@@ -83,3 +83,32 @@ def _http(respostas):
 ])
 def test_existe_pergunta_a_dois_resolvedores_publicos(respostas, esperado):
     assert vigia.existe("nome.exemplo", http=_http(respostas)) is esperado
+
+
+def test_resolver_devolve_o_ip_publico_e_pula_o_apelido():
+    resposta = {"Status": 0, "Answer": [{"type": 5, "data": "outro.nome."}, {"type": 1, "data": "9.9.9.9"}]}
+    assert vigia.resolver("nome.exemplo", http=_http([resposta])) == (True, "9.9.9.9")
+
+
+def test_responde_abre_a_saude_pelo_ip_com_o_nome_no_tls():
+    pedidos = []
+
+    def responder(req):
+        pedidos.append(req)
+        return httpx.Response(503)                       # banco fora: mesmo assim o caminho chegou
+    assert vigia.responde("9.9.9.9", "nome.exemplo", http=httpx.Client(transport=httpx.MockTransport(responder)))
+    p = pedidos[0]
+    assert str(p.url) == "https://9.9.9.9/saude" and p.headers["host"] == "nome.exemplo"
+    assert p.extensions["sni_hostname"] == "nome.exemplo"
+    assert vigia.responde("9.9.9.9", "nome.exemplo", http=_http([None])) is False
+
+
+@pytest.mark.parametrize("resolvido, abre, esperado", [
+    ((True, "9.9.9.9"), True, True),
+    ((True, "9.9.9.9"), False, False),      # o nome existe e o Funnel nao repassa
+    ((False, None), True, False),
+    ((None, None), True, None),             # sem internet: nao se afirma
+    ((True, None), False, True),            # existe, sem IP para abrir: vale o nome
+])
+def test_confere_junta_o_nome_e_o_repasse(resolvido, abre, esperado):
+    assert vigia.confere("nome.exemplo", resolver=lambda n: resolvido, responde=lambda ip, n: abre) is esperado
