@@ -307,3 +307,37 @@ def test_colaborador_so_recebe_o_menu_se_pedir_e_a_frase_antes_da_foto_e_a_legen
     s2 = SaidaFalsa()
     passo(canal, s2, texto("wamid.t3", "qualquer coisa", numero=EQUIPE), agora=AGORA + 40 * MIN)
     assert s2.enviadas and s2.enviadas[-1][2] != campo.ANOTADO_FRASE
+
+
+def test_a_pergunta_pendente_segura_o_grupo_inteiro(canal):
+    """12/10/2026: a segunda foto do lote entrou no catalogo antes da resposta. Enquanto a primeira
+    espera 'o que esta acontecendo', nenhuma do grupo e oferecida; respondida, vao todas."""
+    ligar(canal)
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1"))
+    passo(canal, s, foto("wamid.f2"), agora=AGORA + timedelta(seconds=5))
+    minuto(canal, s, AGORA + 3 * MIN)
+    with conexao(canal) as con:
+        assert campo.pendentes(con, AGORA + 4 * MIN) == []   # as duas esperam a resposta
+    passo(canal, s, texto("wamid.t1", "Carregando a carreta", numero=EQUIPE), agora=AGORA + 5 * MIN)
+    passo(canal, s, toque("wamid.t2", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 6 * MIN)
+    with conexao(canal) as con:
+        prontos = campo.pendentes(con, AGORA + 7 * MIN)
+    assert [p["legenda"] for p in prontos] == ["Carregando a carreta"] * 2
+    # sem resposta nenhuma, as duas vao juntas depois de 10 minutos da pergunta
+    s2 = SaidaFalsa()
+    passo(canal, s2, foto("wamid.f3"), agora=AGORA + 30 * MIN)
+    passo(canal, s2, foto("wamid.f4"), agora=AGORA + 31 * MIN)
+    minuto(canal, s2, AGORA + 33 * MIN)
+    with conexao(canal) as con:
+        assert [p["id"] for p in campo.pendentes(con, AGORA + 40 * MIN) if p["legenda"] == ""] == []
+        assert len([p for p in campo.pendentes(con, AGORA + 44 * MIN) if p["legenda"] == ""]) == 2
+
+
+def test_interno_com_figurinha_nao_recebe_a_linha_curta(canal):
+    ligar(canal)
+    s = SaidaFalsa()
+    figurinha = {"from": EQUIPE, "id": "wamid.s1", "timestamp": "1760040000", "type": "sticker",
+                 "sticker": {"id": "stk-1", "mime_type": "image/webp"}}
+    passo(canal, s, figurinha)
+    assert s.enviadas == []

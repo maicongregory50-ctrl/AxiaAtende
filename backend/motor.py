@@ -311,6 +311,12 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     if e.tipo == "reaction":
         return
     if not e.texto and not e.toque:
+        # quem e da equipe com o canal de campo ligado nao recebe esta linha: o que ele manda e
+        # material, e a duvida fica no log (12/10/2026: a segunda foto do lote do dono recebeu-a)
+        if campo is not None and campo.e_interno(con, p.wa_id):
+            print("campo: %s de %s (%s) sem texto nem midia: ignorado" % (e.tipo or "?", p.wa_id, e.wamid), flush=True)
+            return
+        print("motor: %s de %s (%s) nao e texto nem botao: linha curta" % (e.tipo or "?", p.wa_id, e.wamid), flush=True)
         w = saida.texto(p.para, NAO_ENTENDO)
         aberta = _conversa_aberta(con, p)
         if aberta:

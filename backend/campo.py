@@ -199,6 +199,11 @@ class Campo:
                 WHERE wa_id = %s AND recebido_em >= %s AND recebido_em < %s ORDER BY id""",
             (r["wa_id"], r["recebido_em"], r["recebido_em"] + RODADA)).fetchall()]
 
+    @staticmethod
+    def e_interno(con, wa_id: str | None) -> bool:
+        """Equipe ou representante reconhecido, com o canal ligado."""
+        return ligado(con) and quem_e(con, wa_id) is not None
+
     def texto_de_interno(self, con, saida, e, agora: datetime) -> bool:
         """Decisao 13 do dono (12/10/2026): colaborador e representante so recebem o menu se
         pedirem. O texto deles, com o canal ligado, fica guardado como a frase da proxima foto; a
@@ -352,11 +357,20 @@ def ler_data(texto: str, agora: datetime) -> date | None:
 def pendentes(con, agora: datetime) -> list[dict]:
     """O material baixado que o marketing ainda nao levou e esta PRONTO: sem pergunta pendente, ou
     com mais de 10 minutos desde a ultima pergunta (quem nao respondeu nao e esperado)."""
-    linhas = con.execute("""SELECT * FROM atendimento.material_de_campo
-                             WHERE buscado_em IS NULL AND arquivo IS NOT NULL
-                               AND ((perguntas_em IS NOT NULL AND pergunta_pendente IS NULL)
-                                    OR coalesce(data_perguntada_em, legenda_perguntada_em, recebido_em) < %s)
-                             ORDER BY id""", (agora - RODADA,)).fetchall()
+    # A pergunta pendente segura o GRUPO inteiro (as fotos do mesmo numero nos 10 minutos em volta),
+    # nao so a primeira: em 12/10 a segunda foto do lote do dono entrou no catalogo antes da resposta.
+    linhas = con.execute("""SELECT m.* FROM atendimento.material_de_campo m
+                             WHERE m.buscado_em IS NULL AND m.arquivo IS NOT NULL
+                               AND m.perguntas_em IS NOT NULL
+                               AND NOT EXISTS (SELECT 1 FROM atendimento.material_de_campo g
+                                                WHERE g.wa_id = m.wa_id AND g.pergunta_pendente IS NOT NULL
+                                                  AND g.recebido_em BETWEEN m.recebido_em - %s AND m.recebido_em + %s
+                                                  AND coalesce(g.data_perguntada_em, g.legenda_perguntada_em, g.recebido_em) >= %s)
+                             ORDER BY m.id""", (RODADA, RODADA, agora - RODADA)).fetchall()
+    # quem nunca teve a rodada (chave desligada no meio, falha) e ja esperou 10 minutos tambem vai
+    linhas += con.execute("""SELECT * FROM atendimento.material_de_campo
+                              WHERE buscado_em IS NULL AND arquivo IS NOT NULL AND perguntas_em IS NULL
+                                AND recebido_em < %s ORDER BY id""", (agora - RODADA,)).fetchall()
     return [descrever(r) for r in linhas]
 
 
