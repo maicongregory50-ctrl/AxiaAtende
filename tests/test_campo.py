@@ -138,9 +138,14 @@ def test_a_frase_mandada_logo_depois_da_foto_e_a_legenda_e_nao_abre_o_menu(canal
     assert material(canal)[0]["legenda"] == "Vistoria da aveia · campo do Jair" and len(s.enviadas) == 1
     minuto(canal, s, AGORA + 3 * MIN)
     assert [x[2] for x in s.enviadas[1:]] == [campo.PERGUNTA_DATA]   # a legenda ja esta: so a data
-    # depois da rodada respondida, texto solto volta a ser atendimento normal (depois dos 10 min)
+    # depois da rodada respondida, o texto do colaborador e a frase da proxima foto (decisao 13):
+    # "anotado" uma vez, e o menu so quando ele pedir
     passo(canal, s, toque("wamid.t3", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 4 * MIN)
     passo(canal, s, texto("wamid.t4", "preciso falar com o comercial", numero=EQUIPE), agora=AGORA + 15 * MIN)
+    assert s.ultima[2] == campo.ANOTADO_FRASE
+    with conexao(canal) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 0
+    passo(canal, s, texto("wamid.t5", "menu", numero=EQUIPE), agora=AGORA + 16 * MIN)
     with conexao(canal) as con:
         assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 1
 
@@ -274,3 +279,31 @@ def test_os_avisos_saem_so_dentro_da_janela_e_uma_vez(canal):
     n = len(s2.enviadas)
     minuto(canal, s2, AGORA + timedelta(hours=30, minutes=1))
     assert len(s2.enviadas) == n and material(canal)[0]["aviso_ar"] == "fora_da_janela"
+
+
+def test_colaborador_so_recebe_o_menu_se_pedir_e_a_frase_antes_da_foto_e_a_legenda(canal):
+    """Decisao 13 do dono (12/10/2026): o texto de colaborador/representante com o canal ligado e a
+    frase da proxima foto, com uma linha de 'anotado' uma vez por dia; 'menu' abre o atendimento."""
+    ligar(canal)
+    s = SaidaFalsa()
+    passo(canal, s, texto("wamid.t0", "Colheita do centeio no campo do Jair", numero=EQUIPE))
+    assert [x[2] for x in s.enviadas] == [campo.ANOTADO_FRASE]
+    with conexao(canal) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 0
+    passo(canal, s, foto("wamid.f1"), agora=AGORA + MIN)
+    m = material(canal)[0]
+    assert m["legenda"] == "Colheita do centeio no campo do Jair" and s.ultima[2] == campo.RECEBI
+    minuto(canal, s, AGORA + 4 * MIN)
+    assert s.ultima[2] == campo.PERGUNTA_DATA   # a legenda ja estava: so a data
+    # segundo texto do dia: guardado em silencio; "menu" abre o atendimento de sempre
+    passo(canal, s, texto("wamid.t1", "outra frase", numero=EQUIPE), agora=AGORA + 30 * MIN)
+    assert s.ultima[2] == campo.PERGUNTA_DATA
+    passo(canal, s, texto("wamid.t2", "menu", numero=EQUIPE), agora=AGORA + 31 * MIN)
+    with conexao(canal) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 1
+    assert s.ultima[0] in ("lista", "botoes", "texto") and s.ultima[2] != campo.PERGUNTA_DATA
+    # com o canal desligado, o texto do colaborador segue como o de qualquer um
+    ligar(canal, False)
+    s2 = SaidaFalsa()
+    passo(canal, s2, texto("wamid.t3", "qualquer coisa", numero=EQUIPE), agora=AGORA + 40 * MIN)
+    assert s2.enviadas and s2.enviadas[-1][2] != campo.ANOTADO_FRASE

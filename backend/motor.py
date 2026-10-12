@@ -302,6 +302,8 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
             return
         if campo.responder(con, saida, e, agora):
             return
+        if campo.texto_de_interno(con, saida, e, agora):
+            return
     # O que nao e texto nem botao (dono, 12/10/2026, depois de um menu as 00:15): a REACAO (o joinha
     # numa mensagem nossa) nao e pedido de nada e nao se responde; figurinha, audio, foto de quem
     # nao e da equipe, localizacao, contato e documento recebem uma linha curta, nunca as

@@ -46,6 +46,8 @@ PERGUNTA_QUAL_DIA = "Qual dia? (ex.: 09/10)"
 ANOTADO = "Anotado. Obrigado!"
 NAO_ENTENDI_DATA = "Não entendi a data; vale o dia do envio."
 AVISO_CATALOGO = "Sua foto entrou no catálogo da Renascer. Obrigado!"
+ANOTADO_FRASE = "Anotado. Se for para falar com alguém da empresa, me escreva *menu*."
+PEDE_MENU = ("menu", "menu.", "atendimento", "opções", "opcoes", "ajuda", "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite")
 AVISO_AR = "A sua foto virou o Stories do dia."
 
 
@@ -102,6 +104,13 @@ class Campo:
         except Exception as falha:  # noqa: BLE001 -- a midia fica em eventos_meta; a linha diz o erro
             erro = ("%s: %s" % (type(falha).__name__, falha))[:300]
         legenda = (m.legenda or "").strip() or (primeiro["legenda"] if primeiro else "")
+        if not legenda:   # a frase escrita ANTES da foto (decisao 13 do dono, 12/10/2026)
+            frase = con.execute("""SELECT id, texto FROM atendimento.campo_frases
+                                    WHERE wa_id = %s AND usada_em IS NULL AND recebido_em > %s
+                                    ORDER BY id DESC LIMIT 1""", (e.pessoa.wa_id, agora - RODADA)).fetchone()
+            if frase:
+                legenda = frase["texto"]
+                con.execute("UPDATE atendimento.campo_frases SET usada_em = %s WHERE id = %s", (agora, frase["id"]))
         linha = con.execute("""INSERT INTO atendimento.material_de_campo
                    (bsuid, wa_id, erp_codigo, erp_papel, erp_nome, wamid, tipo, mime, arquivo, legenda,
                     legenda_perguntada_em, data_dita, data_presumida, data_perguntada_em, recebido_em, erro)
@@ -189,6 +198,26 @@ class Campo:
             """SELECT id FROM atendimento.material_de_campo
                 WHERE wa_id = %s AND recebido_em >= %s AND recebido_em < %s ORDER BY id""",
             (r["wa_id"], r["recebido_em"], r["recebido_em"] + RODADA)).fetchall()]
+
+    def texto_de_interno(self, con, saida, e, agora: datetime) -> bool:
+        """Decisao 13 do dono (12/10/2026): colaborador e representante so recebem o menu se
+        pedirem. O texto deles, com o canal ligado, fica guardado como a frase da proxima foto; a
+        primeira vez no dia, uma linha diz isso e ensina o "menu". True quando o canal o tomou."""
+        texto = (e.texto or "").strip()
+        if not texto or e.toque or not ligado(con):
+            return False
+        if texto.lower().strip(" !") in PEDE_MENU:
+            return False   # pediu: o atendimento de sempre
+        if not quem_e(con, e.pessoa.wa_id):
+            return False
+        avisado = con.execute("""SELECT 1 FROM atendimento.campo_frases
+                                  WHERE wa_id = %s AND avisado AND recebido_em > %s""",
+                              (e.pessoa.wa_id, agora - JANELA)).fetchone() is not None
+        con.execute("""INSERT INTO atendimento.campo_frases (wa_id, texto, recebido_em, avisado)
+                       VALUES (%s, %s, %s, %s)""", (e.pessoa.wa_id, texto[:500], agora, not avisado))
+        if not avisado:
+            saida.texto(e.pessoa.para, ANOTADO_FRASE)
+        return True
 
     def responder(self, con, saida, e, agora: datetime) -> bool:
         """Texto ou toque `campo:*` de quem tem pergunta pendente. True quando o canal o tomou."""

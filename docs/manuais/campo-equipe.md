@@ -40,6 +40,10 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 | **"Virou o Stories do dia"** | foi ao ar no Instagram |
 | Nenhum aviso até o dia seguinte | a foto pode ter entrado mesmo assim: o aviso só vai nas primeiras 24 horas depois da sua última mensagem |
 
+**Escreveu antes de mandar a foto?** Vale do mesmo jeito: a frase fica guardada e vira a legenda da
+foto que chegar nos dez minutos seguintes. Por isso, quem é da equipe **não recebe o menu de
+atendimento** ao escrever; para falar com alguém da empresa pelo caminho normal, escreva **menu**.
+
 ## 5. O que NÃO faz
 
 - **Não publica nada sozinho:** quem decide é o marketing, e quem aprova é o dono.
