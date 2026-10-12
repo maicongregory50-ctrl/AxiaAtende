@@ -63,6 +63,7 @@ class Entrada:
     texto: str | None = None      # o que ela escreveu (ou None para audio, foto...)
     contexto: str | None = None   # a mensagem nossa a que ela respondeu
     midia: Midia | None = None    # #970: foto ou video (so o canal de campo a usa)
+    tipo: str = ""                # o `type` da Meta: text, interactive, button, image, reaction, sticker...
 
 
 # ── leitura do aviso ────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ def ler_mensagem(valor: dict, msg: dict) -> Entrada:
     pessoa = Pessoa(bsuid=bsuid, wa_id=wa_id, nome=(contato.get("profile") or {}).get("name", ""))
     e = Entrada(wamid=msg["id"], pessoa=pessoa, contexto=(msg.get("context") or {}).get("id"))
     tipo = msg.get("type")
+    e.tipo = tipo or ""
     if tipo == "interactive":
         i = msg.get("interactive", {})
         e.toque = (i.get("button_reply") or i.get("list_reply") or {}).get("id")
@@ -262,6 +264,10 @@ def mostrar_menu(con, saida: Saida, pessoa: Pessoa, conversa, com_boas_vindas: b
     _registrar(con, conversa["id"], pessoa.para, "lista", "menu principal", w)
 
 
+NAO_ENTENDO = ("Recebi, mas por aqui eu entendo texto e os botões. Me conta em uma linha o que você "
+               "precisa.")
+
+
 def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas_vindas: bool) -> None:
     """Quem escreveu: a IA propoe; sem proposta (ou sem IA), o menu."""
     chave = None
@@ -296,6 +302,19 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
             return
         if campo.responder(con, saida, e, agora):
             return
+    # O que nao e texto nem botao (dono, 12/10/2026, depois de um menu as 00:15): a REACAO (o joinha
+    # numa mensagem nossa) nao e pedido de nada e nao se responde; figurinha, audio, foto de quem
+    # nao e da equipe, localizacao, contato e documento recebem uma linha curta, nunca as
+    # boas-vindas com o menu inteiro -- o menu vem quando a pessoa escrever.
+    if e.tipo == "reaction":
+        return
+    if not e.texto and not e.toque:
+        w = saida.texto(p.para, NAO_ENTENDO)
+        aberta = _conversa_aberta(con, p)
+        if aberta:
+            _chegou(con, p, aberta, agora)
+            _registrar(con, aberta["id"], p.para, "texto", "nao entendo: %s" % (e.tipo or "?"), w)
+        return
 
     # A pergunta das 4h30 e a nota respondem a ULTIMA pergunta (e todas as conversas que ela cobre).
     if e.toque in ("pos:sim", "pos:nao") or (e.toque or "").startswith("nota:"):

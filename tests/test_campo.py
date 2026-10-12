@@ -68,7 +68,8 @@ def test_com_a_chave_desligada_a_foto_da_equipe_segue_como_hoje(canal):
     s = SaidaFalsa()
     passo(canal, s, foto("wamid.f1", "Colheita do centeio"))
     assert material(canal) == []
-    assert s.enviadas and s.enviadas[0][0] in ("texto", "lista", "botoes")   # o menu, como sempre
+    # a foto de quem nao esta no canal nao abre o menu: uma linha curta (dono, 12/10/2026)
+    assert [(x[0], x[2]) for x in s.enviadas] == [("texto", R.motor.NAO_ENTENDO)]
 
 
 def test_foto_com_legenda_e_baixada_e_a_rodada_sai_com_o_palpite(canal):
@@ -172,8 +173,9 @@ def test_cliente_com_foto_segue_para_o_menu_e_quem_nao_responde_nao_e_cobrado(ca
     s = SaidaFalsa()
     passo(canal, s, foto("wamid.c1", "oi", numero=CLIENTE), numero=CLIENTE, bsuid="BR.cliente")
     assert material(canal) == []
+    assert s.ultima[2] == R.motor.NAO_ENTENDO   # o cliente com foto: a linha curta, sem menu
     with conexao(canal) as con:
-        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 1
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 0
     # a equipe manda e some: a rodada sai aos 2 min, e 10 min depois dela o material esta pronto, com "falta"
     passo(canal, s, foto("wamid.f1"))
     minuto(canal, s, AGORA + 3 * MIN)

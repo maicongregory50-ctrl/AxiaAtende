@@ -305,3 +305,23 @@ def test_o_nao_avisa_com_todos_os_assuntos_do_dia(ligado):
         a = con.execute("SELECT * FROM atendimento.avisos").fetchall()
     assert len(a) == 1 and "Benedito" in a[0]["sobre"] and a[0]["sobre"].count(", com ") == 2
     assert all(x["recebeu"] is False for x in _todas(ligado))
+
+
+def test_reacao_nao_responde_e_figurinha_recebe_uma_linha_sem_menu(ligado):
+    """Dono, 12/10/2026: um menu as 00:15 sem ninguem escrever. O que nao e texto nem botao nao abre
+    as boas-vindas: reacao fica em silencio; figurinha, audio e afins recebem uma linha curta."""
+    from backend import motor
+    s = SaidaFalsa()
+    reacao = {"from": "5549999990000", "id": "wamid.r1", "timestamp": "1760040000", "type": "reaction",
+              "reaction": {"message_id": "wamid.nosso", "emoji": "👍"}}
+    R.gravar(ligado, aviso([reacao]))
+    R.processar_pendentes(ligado, s, None, agora=QUINTA_14H)
+    assert s.enviadas == []
+    figurinha = {"from": "5549999990000", "id": "wamid.s1", "timestamp": "1760040000", "type": "sticker",
+                 "sticker": {"id": "stk-1", "mime_type": "image/webp"}}
+    R.gravar(ligado, aviso([figurinha]))
+    R.processar_pendentes(ligado, s, None, agora=QUINTA_14H)
+    assert [(x[0], x[2]) for x in s.enviadas] == [("texto", motor.NAO_ENTENDO)]
+    assert _conversa(ligado) is None   # nada de conversa aberta: ela nasce quando a pessoa escrever
+    passo(ligado, s, texto("wamid.t1", "preciso de semente"))
+    assert _conversa(ligado) is not None and len(s.enviadas) > 1
