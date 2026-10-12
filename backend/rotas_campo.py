@@ -24,6 +24,7 @@ class Buscado(BaseModel):
 class Palpite(BaseModel):
     bastidor: str | None = None
     produto: str | None = None
+    fase: str | None = None
 
 
 class Catalogado(BaseModel):
@@ -88,7 +89,7 @@ def rotas(cfg) -> APIRouter:
     def palpite(item_id: int, dados: Palpite, x_axiaatende_chave: str | None = Header(default=None)):
         conferir(x_axiaatende_chave)
         with conexao(cfg) as con:
-            x = campo.palpite(con, item_id, dados.bastidor, dados.produto, agora())
+            x = campo.palpite(con, item_id, dados.bastidor, dados.produto, agora(), dados.fase)
         if not x:
             raise HTTPException(status_code=404, detail="material não encontrado")
         return x

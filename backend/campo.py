@@ -369,7 +369,7 @@ def descrever(r) -> dict:
         falta.append("data")
     return {"id": r["id"], "contato": {"codigo": r["erp_codigo"], "papel": r["erp_papel"], "nome": r["erp_nome"]},
             "tipo": r["tipo"], "mime": r["mime"], "arquivo": r["arquivo"], "legenda": r["legenda"],
-            "palpite": ({"bastidor": r["palpite_bastidor"], "produto": r["palpite_produto"]}
+            "palpite": ({"bastidor": r["palpite_bastidor"], "produto": r["palpite_produto"], "fase": r["palpite_fase"]}
                         if r["palpite_em"] else None),
             "perguntado": r["perguntas_em"] is not None,
             "data": data.isoformat(), "data_presumida": r["data_dita"] is None or r["data_presumida"],
@@ -389,13 +389,15 @@ def buscado(con, item_id: int, lote: str, linha: int | None, agora: datetime) ->
     return descrever(con.execute("SELECT * FROM atendimento.material_de_campo WHERE id = %s", (item_id,)).fetchone())
 
 
-def palpite(con, item_id: int, bastidor: str | None, produto: str | None, agora: datetime) -> dict | None:
+def palpite(con, item_id: int, bastidor: str | None, produto: str | None, agora: datetime,
+            fase: str | None = None) -> dict | None:
     """O que o marketing achou que a foto mostra (listas fechadas de la). Vazio tambem conta: a
     rodada de perguntas deixa de esperar."""
     n = con.execute("""UPDATE atendimento.material_de_campo SET palpite_bastidor = %s, palpite_produto = %s,
-                       palpite_em = coalesce(palpite_em, %s) WHERE id = %s""",
-                    ((bastidor or "").strip()[:40] or None, (produto or "").strip()[:80] or None, agora, item_id)).rowcount
-    return {"id": item_id, "bastidor": bastidor, "produto": produto} if n else None
+                       palpite_fase = %s, palpite_em = coalesce(palpite_em, %s) WHERE id = %s""",
+                    ((bastidor or "").strip()[:40] or None, (produto or "").strip()[:80] or None,
+                     (fase or "").strip()[:20] or None, agora, item_id)).rowcount
+    return {"id": item_id, "bastidor": bastidor, "produto": produto, "fase": fase} if n else None
 
 
 def novos(con) -> list[dict]:

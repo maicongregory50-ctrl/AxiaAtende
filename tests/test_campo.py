@@ -99,7 +99,7 @@ def test_foto_com_legenda_e_baixada_e_a_rodada_sai_com_o_palpite(canal):
     assert s.ultima[2] == campo.ANOTADO
     with conexao(canal) as con:
         p = campo.pendentes(con, AGORA + 3 * MIN)
-    assert len(p) == 1 and p[0]["palpite"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89"} and p[0]["falta"] == []
+    assert len(p) == 1 and p[0]["palpite"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None} and p[0]["falta"] == []
 
 
 def test_sem_legenda_e_sem_palpite_a_rodada_sai_aos_dois_minutos(canal):
@@ -234,7 +234,7 @@ def test_as_rotas_do_marketing_so_com_a_chave(canal):
     item = r["itens"][0]
     assert item["contato"] == {"codigo": 12, "papel": "equipe", "nome": "Maicon Gregory"}
     assert item["legenda"] == "Colheita do centeio" and item["data"] == "2026-10-12" and item["falta"] == []
-    assert item["palpite"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89"}
+    assert item["palpite"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None}
     arq = api.get("/campo/%d/arquivo" % item["id"], headers=chave)
     assert arq.status_code == 200 and arq.content.startswith(b"MIDIA:")
     assert api.post("/campo/%d/buscado" % item["id"], json={"lote": "2026-10-12-campo-maicon", "linha": 0}, headers=chave).json()["lote"] == "2026-10-12-campo-maicon"
