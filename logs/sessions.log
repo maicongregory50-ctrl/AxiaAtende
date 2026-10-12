@@ -4,3 +4,4 @@
 [2026-10-12 09:50][ATENDE-END] #970 reacao em silencio e nao-texto com linha curta (menu as 00:15); Destinos redesenhada; rodada por lote e texto solto como legenda; pede Restart-Service axiaatende-recepcionista
 [2026-10-12][AXIAATENDE-END] #970 decisao 14: o atendente de campo com objetivo (IA.ler_campo, migracao 013, rotas classificados/classe-aplicada/portfolio); master 5c87030 enviado; falta Restart-Service axiaatende-backend e axiaatende-recepcionista (dono)
 [2026-10-12][AXIAATENDE-END] #970 decisao 15: perguntas abertas lidas pela IA, cada uma uma vez (migracao 014), pendentes so grupo fechado; a01f964 enviado; falta Restart-Service axiaatende-backend e recepcionista (dono)
+[2026-10-12][AXIAATENDE-END] #970 emenda (c) da decisao 15: uma conversa aberta por pessoa (grupo_id, migracao 015), texto a mais na legenda; fe28042 enviado; aberto #981 (acesso de leitura da sessao ao banco de producao, molde do ERP); falta Restart-Service dos dois servicos (dono)
