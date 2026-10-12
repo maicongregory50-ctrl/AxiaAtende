@@ -171,16 +171,19 @@ class Campo:
         # grupo aberto espera a conversa, como as outras
         linha = con.execute("""INSERT INTO atendimento.material_de_campo
                    (bsuid, wa_id, erp_codigo, erp_papel, erp_nome, wamid, tipo, mime, arquivo, legenda, recebido_em, erro,
-                    classe_bastidor, classe_produto, classe_fase, data_dita, data_presumida, lida_em, perguntas_em, fechado_em)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    classe_bastidor, classe_produto, classe_fase, data_dita, data_presumida, lida_em, perguntas_em, fechado_em,
+                    grupo_id)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    ON CONFLICT (wamid) DO NOTHING RETURNING id""",
                             (e.pessoa.bsuid, e.pessoa.wa_id, quem["codigo"], quem["papel"], quem["nome"],
                              e.wamid, m.tipo, m.mime or "", arquivo, legenda, agora, erro,
                              herda["classe_bastidor"], herda["classe_produto"], herda["classe_fase"], herda["data_dita"],
                              bool(lider and lider["data_presumida"]), herda["lida_em"], herda["perguntas_em"],
-                             herda["fechado_em"])).fetchone()
+                             herda["fechado_em"], lider["grupo_id"] if lider else 0)).fetchone()
         if not linha:
             return True   # o mesmo aviso de novo: ja esta aqui
+        if not lider:   # a primeira do grupo: o grupo e ela
+            con.execute("UPDATE atendimento.material_de_campo SET grupo_id = id WHERE id = %s", (linha["id"],))
         if lider:
             # o grupo ja tem lider: a conversa e dele; esta so acompanha. Se a legenda chegou agora
             # (a foto nova trouxe caption) e o lider nao tinha, vale para o grupo
@@ -197,21 +200,25 @@ class Campo:
         return True
 
     def _lider(self, con, wa_id, agora):
-        """A primeira linha do grupo em curso deste numero (as fotos dos ultimos 10 minutos)."""
-        return con.execute("""SELECT * FROM atendimento.material_de_campo
-                               WHERE wa_id = %s AND recebido_em > %s ORDER BY id LIMIT 1""",
-                           (wa_id, agora - RODADA)).fetchone()
+        """O lider da conversa em curso deste numero: UMA conversa aberta por pessoa (12/10/2026, 14:25:
+        cinco lembrancas de uma vez, uma por grupo de 10 min). Primeiro a conversa ABERTA (sem fechar,
+        dentro das 24 h), mesmo que a ultima foto tenha mais de 10 min; senao, o grupo dos ultimos 10
+        minutos (fechado: a foto entra com ele)."""
+        aberta = con.execute("""SELECT l.* FROM atendimento.material_de_campo l
+                                 WHERE l.wa_id = %s AND l.id = l.grupo_id AND l.fechado_em IS NULL
+                                   AND l.desistiu_em IS NULL AND l.recebido_em > %s
+                                 ORDER BY l.id DESC LIMIT 1""", (wa_id, agora - JANELA)).fetchone()
+        if aberta:
+            return aberta
+        r = con.execute("""SELECT * FROM atendimento.material_de_campo
+                            WHERE wa_id = %s AND recebido_em > %s ORDER BY id LIMIT 1""",
+                        (wa_id, agora - RODADA)).fetchone()
+        return self._linha(con, r["grupo_id"]) if r else None
 
     def _grupo_de(self, con, r) -> list[int]:
-        """As linhas do mesmo grupo (mesmo numero, 10 minutos a partir do lider). `r` pode ser qualquer
-        linha do grupo: o lider e achado antes (a segunda foto do lote nao e lider de nada)."""
-        lider = con.execute("""SELECT id, wa_id, recebido_em FROM atendimento.material_de_campo
-                                WHERE wa_id = %s AND id <= %s AND recebido_em > %s ORDER BY id LIMIT 1""",
-                            (r["wa_id"], r["id"], r["recebido_em"] - RODADA)).fetchone() or r
+        """As linhas da mesma conversa (`grupo_id`). `r` pode ser qualquer linha do grupo."""
         return [x["id"] for x in con.execute(
-            """SELECT id FROM atendimento.material_de_campo
-                WHERE wa_id = %s AND recebido_em >= %s AND recebido_em < %s ORDER BY id""",
-            (lider["wa_id"], lider["recebido_em"], lider["recebido_em"] + RODADA)).fetchall()]
+            "SELECT id FROM atendimento.material_de_campo WHERE grupo_id = %s ORDER BY id", (r["grupo_id"],)).fetchall()]
 
     def _linha(self, con, id_):
         return con.execute("SELECT * FROM atendimento.material_de_campo WHERE id = %s", (id_,)).fetchone()
@@ -248,16 +255,17 @@ class Campo:
         respondeu (uma vez, 2 h depois) e a desistencia (fecha com o que tem)."""
         feitas = 0
         lideres = con.execute("""SELECT m.id FROM atendimento.material_de_campo m
-                                  WHERE m.fechado_em IS NULL AND m.desistiu_em IS NULL AND m.arquivo IS NOT NULL
+                                  WHERE m.id = m.grupo_id AND m.fechado_em IS NULL AND m.desistiu_em IS NULL
                                     AND m.recebido_em > %s
-                                    AND NOT EXISTS (SELECT 1 FROM atendimento.material_de_campo a
-                                                     WHERE a.wa_id = m.wa_id AND a.id < m.id
-                                                       AND a.recebido_em > m.recebido_em - %s)
-                                  ORDER BY m.id""", (agora - JANELA, RODADA)).fetchall()
+                                    AND EXISTS (SELECT 1 FROM atendimento.material_de_campo a
+                                                 WHERE a.grupo_id = m.id AND a.arquivo IS NOT NULL)
+                                  ORDER BY m.id""", (agora - JANELA,)).fetchall()
+        falados = set()   # uma mensagem por pessoa por volta: nunca a rajada de 14:25
         for x in lideres:
             r = self._linha(con, x["id"])
-            if r is None or r["fechado_em"] or r["desistiu_em"]:
+            if r is None or r["fechado_em"] or r["desistiu_em"] or r["wa_id"] in falados:
                 continue
+            falados.add(r["wa_id"])
             if r["pergunta_pendente"]:
                 if r["retomar_em"] and agora >= r["retomar_em"]:
                     if not r["retomada"] and self._dentro_da_janela(con, r, agora):
@@ -463,6 +471,12 @@ class Campo:
                 r = self._gravar(con, r, data_dita=dia, data_presumida=False)
                 saida.texto(e.pessoa.para, ANOTADO)
                 self._perguntar_proxima(con, saida, r, agora)
+                return True
+            if texto:   # "Foto da safra 2025" com a data em aberto: complementa a legenda, em silencio
+                con.execute("""UPDATE atendimento.material_de_campo
+                                  SET legenda = CASE WHEN legenda = '' THEN %s ELSE legenda || ' · ' || %s END
+                                WHERE id = ANY(%s)""", (texto[:500], texto[:300], self._grupo_de(con, r)))
+                self._ler(con, r["id"], texto, agora)
                 return True
             return toque.startswith("campo:")
         if q == "qual_dia":

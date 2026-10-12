@@ -106,6 +106,10 @@ def test_a_frase_lida_pela_ia_fecha_tudo_e_so_a_data_e_perguntada(canal):
     minuto(canal, s, AGORA + 3 * MIN, ia=ia)
     assert [(x[0], x[2]) for x in s.enviadas[1:]] == [("botoes", campo.PERGUNTA_DATA)]   # bastidor e produto ja estao
     assert material(canal)[0]["pergunta_n"] == 0   # a data nao conta no limite
+    # o texto que nao e data, com a data em aberto, complementa a legenda em silencio (14:34 de 12/10)
+    passo(canal, s, texto("wamid.t0", "Foto da safra 2025", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
+    assert len(s.enviadas) == 2 and material(canal)[0]["legenda"].endswith(" · Foto da safra 2025")
+    assert material(canal)[0]["pergunta_pendente"] == "data" and conversas(canal) == 0
     passo(canal, s, toque("wamid.t1", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
     m = material(canal)[0]
     assert m["data_dita"] == date(2026, 10, 12) and m["fechado_em"] is not None and s.ultima[2] == campo.ANOTADO
@@ -206,6 +210,31 @@ def test_o_palpite_de_imagem_molda_a_pergunta_do_bastidor(canal):
     m = material(canal)[0]
     assert m["classe_bastidor"] == "beneficiamento" and s.ultima[2] == campo.PERGUNTA_DATA   # institucional: sem produto
     assert m["legenda"] == "beneficiamento na UBS" and m["pergunta_n"] == 2
+
+
+def test_uma_conversa_aberta_por_pessoa_a_foto_de_depois_entra_nela_e_a_lembranca_e_uma_so(canal):
+    """12/10/2026, 14:25: cinco lembrancas de uma vez, uma por grupo de 10 min. Agora a foto que chega
+    com pergunta pendente entra na mesma conversa, mesmo 20 min depois, e a lembranca e uma so."""
+    ligar(canal)
+    ia = IAFalsa(campo={"bastidor": "entrega", "produto": None, "fase": None})
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1"), ia=ia)
+    minuto(canal, s, AGORA + 3 * MIN, ia=ia)
+    assert textos(s) == [campo.RECEBI, campo.PERGUNTA_LEGENDA]
+    passo(canal, s, foto("wamid.f2"), agora=AGORA + 20 * MIN, ia=ia)    # 20 min depois, sem resposta
+    passo(canal, s, foto("wamid.f3"), agora=AGORA + 50 * MIN, ia=ia)
+    assert len(s.enviadas) == 2   # nem "Recebi" de novo, nem pergunta nova: a conversa e a mesma
+    assert len({m["grupo_id"] for m in material(canal)}) == 1
+    minuto(canal, s, AGORA + 2 * H + 4 * MIN, ia=ia)
+    assert textos(s)[2:] == [campo.RETOMANDO + campo.PERGUNTA_LEGENDA]   # uma lembranca, nao tres
+    minuto(canal, s, AGORA + 2 * H + 5 * MIN, ia=ia)
+    assert len(s.enviadas) == 3
+    passo(canal, s, texto("wamid.t1", "carregamento pra Agro Real", numero=EQUIPE), agora=AGORA + 2 * H + 6 * MIN, ia=ia)
+    assert s.ultima[2] == campo.PERGUNTA_DATA and all(m["classe_bastidor"] == "entrega" for m in material(canal))
+    passo(canal, s, toque("wamid.t2", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 2 * H + 7 * MIN, ia=ia)
+    assert all(m["fechado_em"] is not None for m in material(canal))
+    with conexao(canal) as con:
+        assert len(campo.pendentes(con, AGORA + 3 * H)) == 3   # as tres entram juntas, classificadas
 
 
 def test_quem_nao_responde_e_lembrado_uma_vez_e_depois_o_grupo_fecha_com_o_que_tem(canal):
