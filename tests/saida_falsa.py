@@ -57,8 +57,15 @@ class SaidaFalsa(Saida):
 
 
 class IAFalsa:
-    def __init__(self, resposta=None, falha=False):
+    def __init__(self, resposta=None, falha=False, campo=None):
         self.resposta, self.falha, self.perguntas = resposta, falha, []
+        self.campo, self.frases = campo, []   # #970: o que `ler_campo` devolve, e as frases lidas
+
+    def ler_campo(self, texto, produtos):
+        self.frases.append(texto)
+        if self.falha:
+            raise TimeoutError("a IA demorou")
+        return self.campo
 
     def classificar(self, texto, opcoes):
         self.perguntas.append(texto)

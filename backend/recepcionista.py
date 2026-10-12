@@ -97,7 +97,7 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
     feitos = 0
     if campo is None:   # #970: o canal de campo; com a chave desligada ele nao faz nada
         from .campo import Campo
-        campo = Campo(cfg.campo_pasta)
+        campo = Campo(cfg.campo_pasta, ia)
     for _ in range(LOTE):
         with conexao(cfg) as con:
             ev = con.execute("""SELECT * FROM atendimento.eventos_meta WHERE processado_em IS NULL
@@ -139,7 +139,7 @@ def vigiar_o_endereco(cfg: config.Config, perguntar, agora: datetime) -> None:
 
 
 def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | None = None,
-                     perguntar=None) -> None:
+                     perguntar=None, ia=None) -> None:
     if not cfg.responde:
         return
     momento = agora or datetime.now(timezone.utc)
@@ -156,7 +156,7 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
     try:   # #970: os avisos do canal de campo, so dentro da janela de 24 h; nunca seguram o resto
         from .campo import Campo
         with conexao(cfg) as con:
-            c = Campo(cfg.campo_pasta)
+            c = Campo(cfg.campo_pasta, ia)
             c.fazer_perguntas(con, saida, momento)
             c.mandar_avisos(con, saida, momento)
     except Exception as falha:  # noqa: BLE001
@@ -191,7 +191,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 segundos += 1
                 if segundos >= 60 and saida is not None:
                     segundos = 0
-                    rotina_do_minuto(cfg, saida, envio, perguntar=vigia.confere)
+                    rotina_do_minuto(cfg, saida, envio, perguntar=vigia.confere, ia=ia)
             except Exception as falha:  # noqa: BLE001 -- o laco nunca morre
                 print("trabalhador: %s" % falha, flush=True)
 

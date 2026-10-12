@@ -35,6 +35,10 @@ class FoiAoAr(BaseModel):
     peca: str = Field(min_length=1, max_length=200)
 
 
+class Portfolio(BaseModel):
+    produtos: list[str] = Field(max_length=200)
+
+
 def rotas(cfg) -> APIRouter:
     r = APIRouter()
 
@@ -77,6 +81,29 @@ def rotas(cfg) -> APIRouter:
         if not x:
             raise HTTPException(status_code=404, detail="material não encontrado")
         return x
+
+    @r.get("/campo/classificados")
+    def classificados(x_axiaatende_chave: str | None = Header(default=None)):
+        """Os grupos que o atendente fechou e o marketing ainda nao aplicou no catalogo (decisao 14)."""
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            return {"itens": campo.classificados(con)}
+
+    @r.post("/campo/{item_id}/classe-aplicada")
+    def classe_aplicada(item_id: int, x_axiaatende_chave: str | None = Header(default=None)):
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            x = campo.classe_aplicada(con, item_id, agora())
+        if not x:
+            raise HTTPException(status_code=404, detail="material não encontrado")
+        return x
+
+    @r.post("/campo/portfolio")
+    def portfolio(dados: Portfolio, x_axiaatende_chave: str | None = Header(default=None)):
+        """A lista de produtos do marketing, para a IA de texto e para casar o que a pessoa escreve."""
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            return {"produtos": campo.guardar_produtos(con, dados.produtos)}
 
     @r.get("/campo/novos")
     def novos(x_axiaatende_chave: str | None = Header(default=None)):
