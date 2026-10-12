@@ -24,8 +24,10 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
    está na embalagem), em que fase está a lavoura, e **"É de hoje?"** (toque **Sim**, ou **Outra
    data** e diga o dia, *09/10*). Responda escrevendo, com as suas palavras; ela encaixa. Com a
    frase completa, ela só pergunta a data.
-3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida, são **um
-   grupo**: as respostas valem para todas.
+3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida, são **uma
+   conversa só**: as respostas valem para todas. Enquanto uma pergunta estiver sem resposta, a foto
+   que chegar entra nessa mesma conversa, mesmo meia hora depois. Escreveu algo a mais no meio
+   ("foto da safra 2025")? Fica anotado na foto.
 4. Fechada a conversa, a foto entra no catálogo e você recebe **"Sua foto entrou no catálogo da
    Renascer. Obrigado!"**; se virar Stories, **"A sua foto virou o Stories do dia."**
 5. Não deu para responder na hora? Ela lembra **uma vez, duas horas depois**. Depois disso a foto
