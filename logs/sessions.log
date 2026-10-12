@@ -1,1 +1,5 @@
 [09/10/2026][ATENDE-END] nascimento pelo /projeto-novo (#950, passo B1): AGENTS, CLAUDE, PROJETO, .gitignore; exijo sem FALTA; /security fica para o G6
+[2026-10-11 16:49][ATENDE-END] #970 bloco 1 do canal de campo commitado (migracao 010, Saida.baixar, campo.py, rotas /campo, avisos na janela, chave em Destinos); falta o dono: instalar.ps1 (pasta campo) e Restart-Service dos dois servicos
+[2026-10-11 17:57][ATENDE-END] #970 emenda de 11/10: rodada no laco com o palpite do marketing, rotas novos/palpite; 010 ainda espera o Restart do dono
+[2026-10-12 09:50][ATENDE-END] #970 reacao em silencio e nao-texto com linha curta (menu as 00:15); Destinos redesenhada; rodada por lote e texto solto como legenda; pede Restart-Service axiaatende-recepcionista
+[2026-10-12][AXIAATENDE-END] #970 decisao 14: o atendente de campo com objetivo (IA.ler_campo, migracao 013, rotas classificados/classe-aplicada/portfolio); master 5c87030 enviado; falta Restart-Service axiaatende-backend e axiaatende-recepcionista (dono)
