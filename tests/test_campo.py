@@ -99,9 +99,8 @@ def test_a_frase_lida_pela_ia_fecha_tudo_e_so_a_data_e_perguntada(canal):
     assert (m["classe_bastidor"], m["classe_produto"], m["classe_fase"], m["lida_em"] is not None) == ("colheita", "CENTEIO IPR 89", None, True)
     assert conversas(canal) == 0
     with conexao(canal) as con:
-        assert [p["id"] for p in campo.pendentes(con, AGORA)] == [m["id"]]   # entra na hora
-        assert campo.pendentes(con, AGORA)[0]["classe"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None}
-        assert campo.classificados(con) == []   # ainda nao fechou
+        assert campo.pendentes(con, AGORA) == []   # entra no catalogo quando a conversa fecha (decisao 15)
+        assert campo.classificados(con) == []
     minuto(canal, s, AGORA + MIN, ia=ia)   # sem palpite e antes de 2 min: espera
     assert len(s.enviadas) == 1
     minuto(canal, s, AGORA + 3 * MIN, ia=ia)
@@ -111,7 +110,10 @@ def test_a_frase_lida_pela_ia_fecha_tudo_e_so_a_data_e_perguntada(canal):
     m = material(canal)[0]
     assert m["data_dita"] == date(2026, 10, 12) and m["fechado_em"] is not None and s.ultima[2] == campo.ANOTADO
     with conexao(canal) as con:
-        campo.buscado(con, m["id"], "lote", 0, AGORA + 2 * MIN)
+        p = campo.pendentes(con, AGORA + 4 * MIN)
+        assert [x["id"] for x in p] == [m["id"]] and p[0]["fechado"] is True   # agora sim
+        assert p[0]["classe"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None}
+        campo.buscado(con, m["id"], "lote", 0, AGORA + 5 * MIN)
         assert campo.classificados(con) == []          # sem ATV ainda, nada a aplicar
         campo.catalogado(con, m["id"], "ATV-0700", AGORA + 2 * MIN)
         cl = campo.classificados(con)
@@ -120,11 +122,12 @@ def test_a_frase_lida_pela_ia_fecha_tudo_e_so_a_data_e_perguntada(canal):
         assert campo.classificados(con) == []
 
 
-def test_sem_frase_pergunta_o_que_falta_em_lista_e_para_no_limite(canal):
-    """Sem frase e sem palpite: pergunta o que e (texto); a resposta e lida; depois o produto (texto)
-    e a fase (lista). Tres perguntas de classificacao e para; a data ainda sai."""
+def test_sem_frase_pergunta_o_que_falta_em_texto_e_a_ia_encaixa(canal):
+    """Sem frase e sem palpite: pergunta o que e (texto); a resposta e lida; depois o produto (texto,
+    casado com a lista) e a fase (texto, lido pela IA). As listas sao do agente (decisao 15)."""
     ligar(canal)
-    ia = IAFalsa(campo={"bastidor": "campo-de-sementes", "produto": None, "fase": None})
+    ia = IAFalsa(campo=[{"bastidor": "campo-de-sementes", "produto": None, "fase": None},
+                        {"bastidor": None, "produto": None, "fase": "flor"}])
     s = SaidaFalsa()
     passo(canal, s, foto("wamid.f1"), ia=ia)
     minuto(canal, s, AGORA + 3 * MIN, ia=ia)
@@ -135,48 +138,74 @@ def test_sem_frase_pergunta_o_que_falta_em_lista_e_para_no_limite(canal):
     assert s.ultima[2] == campo.PERGUNTA_PRODUTO and m["pergunta_n"] == 2
     passo(canal, s, texto("wamid.t2", "aveia preta iapar61", numero=EQUIPE), agora=AGORA + 5 * MIN, ia=ia)
     m = material(canal)[0]
-    assert m["classe_produto"] == "AVEIA PRETA IAPAR61" and s.ultima[0] == "lista" and s.ultima[2] == campo.PERGUNTA_FASE
-    assert m["pergunta_n"] == 3 and [o[0] for o in s.ultima[3]][:2] == ["campo:fase:inicial", "campo:fase:vegetativo"]
-    passo(canal, s, toque("wamid.t3", "campo:fase:flor", numero=EQUIPE, lista=True), agora=AGORA + 6 * MIN, ia=ia)
+    assert m["classe_produto"] == "AVEIA PRETA IAPAR61" and s.ultima[0] == "texto" and s.ultima[2] == campo.PERGUNTA_FASE
+    assert m["pergunta_n"] == 3 and all(x[0] != "lista" for x in s.enviadas)   # nenhuma lista para a pessoa
+    passo(canal, s, texto("wamid.t3", "tá florindo", numero=EQUIPE), agora=AGORA + 6 * MIN, ia=ia)
     m = material(canal)[0]
     assert m["classe_fase"] == "flor" and s.ultima[2] == campo.PERGUNTA_DATA   # a data nao conta no limite
+    assert ia.frases == ["vistoria no campo do Jair", "tá florindo"]
     passo(canal, s, toque("wamid.t4", "campo:hoje:outra", numero=EQUIPE), agora=AGORA + 7 * MIN, ia=ia)
     assert s.ultima[2] == campo.PERGUNTA_QUAL_DIA
     passo(canal, s, texto("wamid.t5", "09/10", numero=EQUIPE), agora=AGORA + 8 * MIN, ia=ia)
     m = material(canal)[0]
     assert m["data_dita"] == date(2026, 10, 9) and m["fechado_em"] is not None and m["desistiu_em"] is None
+    assert sorted(m["perguntas_feitas"]) == ["data", "fase", "legenda", "produto", "qual_dia"]
 
 
 def test_o_limite_de_tres_perguntas_deixa_o_resto_a_classificar(canal):
-    """Quem responde fora da lista gasta as perguntas; no limite, so a data sai e o grupo fecha."""
+    """A resposta que a IA nao encaixa fica na legenda e a pergunta nao se repete; no limite de tres,
+    so a data sai e o grupo fecha com o que tem."""
     ligar(canal)
-    ia = IAFalsa(campo=None)   # a IA nao le nada
+    ia = IAFalsa(campo=[None, {"bastidor": "colheita", "produto": None, "fase": None}])
     s = SaidaFalsa()
     passo(canal, s, foto("wamid.f1"), ia=ia)
     minuto(canal, s, AGORA + 3 * MIN, ia=ia)                       # 1: o que e
     passo(canal, s, texto("wamid.t1", "coisa do dia", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
-    assert s.ultima[0] == "lista" and s.ultima[2] == campo.PERGUNTA_BASTIDOR   # 2: a lista
-    passo(canal, s, toque("wamid.t2", "campo:bastidor:colheita", numero=EQUIPE, lista=True), agora=AGORA + 5 * MIN, ia=ia)
+    assert s.ultima[0] == "texto" and s.ultima[2] == campo.PERGUNTA_BASTIDOR   # 2: nao encaixou: pergunta aberta
+    passo(canal, s, texto("wamid.t2", "colhendo no Jair", numero=EQUIPE), agora=AGORA + 5 * MIN, ia=ia)
     assert s.ultima[2] == campo.PERGUNTA_PRODUTO                   # 3: o produto
     passo(canal, s, texto("wamid.t3", "nao sei", numero=EQUIPE), agora=AGORA + 6 * MIN, ia=ia)
     assert campo.NAO_ACHEI_PRODUTO in textos(s) and s.ultima[2] == campo.PERGUNTA_DATA   # estourou: so a data
     m = material(canal)[0]
     assert (m["classe_bastidor"], m["classe_produto"], m["pergunta_n"]) == ("colheita", None, 3)
+    assert m["legenda"] == "coisa do dia · colhendo no Jair"
+
+
+def test_o_que_a_ia_nao_encaixa_fica_na_legenda_e_a_pergunta_nao_se_repete(canal):
+    """O manejo do cliente, que nao esta na lista: duas respostas sem encaixe, nenhuma pergunta
+    repetida, e o grupo fecha a classificar com o texto como legenda (para o dono)."""
+    ligar(canal)
+    ia = IAFalsa(campo=None)
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1"), ia=ia)
+    minuto(canal, s, AGORA + 3 * MIN, ia=ia)
+    passo(canal, s, texto("wamid.t1", "cliente fazendo o manejo do azevem", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
+    assert s.ultima[2] == campo.PERGUNTA_BASTIDOR
+    passo(canal, s, texto("wamid.t2", "e a dessecacao antes do plantio", numero=EQUIPE), agora=AGORA + 5 * MIN, ia=ia)
+    assert s.ultima[2] == campo.PERGUNTA_DATA   # nao repete; nao ha produto a perguntar sem bastidor
+    passo(canal, s, toque("wamid.t3", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 6 * MIN, ia=ia)
+    m = material(canal)[0]
+    assert m["fechado_em"] is not None and m["classe_bastidor"] is None and m["pergunta_n"] == 2
+    assert m["legenda"] == "cliente fazendo o manejo do azevem · e a dessecacao antes do plantio"
+    with conexao(canal) as con:
+        assert campo.pendentes(con, AGORA + 6 * MIN)[0]["falta"] == ["bastidor"]
 
 
 def test_o_palpite_de_imagem_molda_a_pergunta_do_bastidor(canal):
     ligar(canal)
+    ia = IAFalsa(campo={"bastidor": "beneficiamento", "produto": None, "fase": None})
     s = SaidaFalsa()
-    passo(canal, s, foto("wamid.f1"))
+    passo(canal, s, foto("wamid.f1"), ia=ia)
     palpite(canal, material(canal)[0]["id"], "entrega", None, AGORA + MIN)
-    minuto(canal, s, AGORA + MIN)   # com o palpite nao espera os 2 min
+    minuto(canal, s, AGORA + MIN, ia=ia)   # com o palpite nao espera os 2 min
     assert s.ultima[0] == "botoes" and s.ultima[2] == "Parece entrega / carregamento. É isso?"
-    assert s.ultima[3] == [("campo:bastidor:entrega", "Sim"), ("campo:bastidor:lista", "Outra coisa")]
-    passo(canal, s, toque("wamid.t1", "campo:bastidor:lista", numero=EQUIPE), agora=AGORA + 2 * MIN)
-    assert s.ultima[0] == "lista" and s.ultima[2] == campo.PERGUNTA_BASTIDOR
-    passo(canal, s, toque("wamid.t2", "campo:bastidor:beneficiamento", numero=EQUIPE, lista=True), agora=AGORA + 3 * MIN)
+    assert s.ultima[3] == [("campo:bastidor:entrega", "Sim"), ("campo:bastidor:outra", "Outra coisa")]
+    passo(canal, s, toque("wamid.t1", "campo:bastidor:outra", numero=EQUIPE), agora=AGORA + 2 * MIN, ia=ia)
+    assert s.ultima[0] == "texto" and s.ultima[2] == campo.PERGUNTA_LEGENDA   # o palpite errou: pergunta aberta
+    passo(canal, s, texto("wamid.t2", "beneficiamento na UBS", numero=EQUIPE), agora=AGORA + 3 * MIN, ia=ia)
     m = material(canal)[0]
     assert m["classe_bastidor"] == "beneficiamento" and s.ultima[2] == campo.PERGUNTA_DATA   # institucional: sem produto
+    assert m["legenda"] == "beneficiamento na UBS" and m["pergunta_n"] == 2
 
 
 def test_quem_nao_responde_e_lembrado_uma_vez_e_depois_o_grupo_fecha_com_o_que_tem(canal):
@@ -293,20 +322,21 @@ def test_as_rotas_do_marketing_so_com_a_chave(canal):
     assert novos["ligado"] is True and len(novos["itens"]) == 1 and novos["itens"][0]["palpite"] is None
     item = novos["itens"][0]
     assert api.post("/campo/%d/palpite" % item["id"], json={"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": "pre-colheita"}, headers=chave).status_code == 200
+    assert api.get("/campo/pendentes", headers=chave).json() == {"ligado": True, "itens": []}   # a conversa ainda nao fechou
+    minuto(canal, s, AGORA + MIN, ia=ia)
+    passo(canal, s, toque("wamid.t1", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 2 * MIN, ia=ia)
     r = api.get("/campo/pendentes", headers=chave).json()
-    assert r["ligado"] is True and len(r["itens"]) == 1   # entra na hora, antes de qualquer resposta
+    assert r["ligado"] is True and len(r["itens"]) == 1   # fechou: entra
     item = r["itens"][0]
     assert item["contato"] == {"codigo": 12, "papel": "equipe", "nome": "Maicon Gregory"}
-    assert item["classe"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None} and item["fechado"] is False
+    assert item["classe"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None} and item["fechado"] is True
     assert item["palpite"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": "pre-colheita"}
     arq = api.get("/campo/%d/arquivo" % item["id"], headers=chave)
     assert arq.status_code == 200 and arq.content.startswith(b"MIDIA:")
     assert api.post("/campo/%d/buscado" % item["id"], json={"lote": "2026-10-12-campo-maicon", "linha": 0}, headers=chave).json()["lote"] == "2026-10-12-campo-maicon"
     assert api.get("/campo/pendentes", headers=chave).json()["itens"] == []   # ja levado
+    assert api.get("/campo/classificados", headers=chave).json()["itens"] == []   # sem ATV ainda
     assert api.post("/campo/%d/catalogado" % item["id"], json={"atv": "atv-0700"}, headers=chave).json()["atv"] == "ATV-0700"
-    assert api.get("/campo/classificados", headers=chave).json()["itens"] == []   # a data ainda esta aberta
-    minuto(canal, s, AGORA + MIN, ia=ia)
-    passo(canal, s, toque("wamid.t1", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 2 * MIN, ia=ia)
     cl = api.get("/campo/classificados", headers=chave).json()["itens"]
     assert [c["id"] for c in cl] == [item["id"]] and cl[0]["data"] == "2026-10-12"
     assert api.post("/campo/%d/classe-aplicada" % item["id"], headers=chave).status_code == 200

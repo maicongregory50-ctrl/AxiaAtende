@@ -65,6 +65,8 @@ class IAFalsa:
         self.frases.append(texto)
         if self.falha:
             raise TimeoutError("a IA demorou")
+        if isinstance(self.campo, list):   # uma leitura por frase, na ordem
+            return self.campo.pop(0) if self.campo else None
         return self.campo
 
     def classificar(self, texto, opcoes):

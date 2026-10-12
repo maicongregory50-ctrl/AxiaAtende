@@ -1,5 +1,5 @@
 """O CANAL DE CAMPO (#970; spec C:\\AxiaMarketing\\docs\\specs\\2026-10-10-canal-de-campo-no-whatsapp.md,
-decisoes 1 a 14 do dono).
+decisoes 1 a 15 do dono).
 
 Quem esta no cadastro do ERP como EQUIPE ou REPRESENTANTE (#969) manda uma foto ou um video ao
 WhatsApp da Renascer. Com a chave `campo.ligado` ligada, o recepcionista:
@@ -12,13 +12,15 @@ WhatsApp da Renascer. Com a chave `campo.ligado` ligada, o recepcionista:
    beneficiamento, controle de qualidade, entrega); se campo ou colheita, o PRODUTO e a FASE; e a
    DATA. Ele le o que a pessoa escreveu (a frase antes ou junto da foto) com a IA de texto da casa,
    com as listas como trava, e SO PERGUNTA O QUE FALTOU, uma por vez, no maximo tres perguntas de
-   classificacao: lista para o bastidor e a fase, texto para o produto (casado com a lista do
-   portfolio que o marketing manda), botoes para a data. O palpite de imagem do marketing (Gemini)
-   e segunda opiniao: so molda a pergunta do bastidor quando a pessoa nao escreveu nada.
-3. A foto ENTRA NO CATALOGO NA HORA, sempre (o marketing busca `pendentes` sem esperar); a
-   classificacao e aplicada la quando FECHA (`classificados`), mesmo horas depois. Quem nao responde
-   e lembrado UMA vez, duas horas depois, dentro da janela de 24 h; depois disso o grupo fecha com o
-   que tem, e o que ficou "a classificar" vai ao dono.
+   classificacao. AS LISTAS SAO DO AGENTE, NAO DE QUEM MANDA (decisao 15, 12/10/2026): as perguntas
+   sao abertas ("o que a foto mostra?", "de que produto?", "em que fase?") e a IA encaixa a resposta;
+   o que nao encaixa fica como legenda, a classificar para o dono. Cada pergunta e feita UMA vez.
+   So a data e por botoes. O palpite de imagem do marketing (Gemini) e segunda opiniao: so molda a
+   pergunta do bastidor ("Parece entrega. E isso?") quando a pessoa nao escreveu nada.
+3. A foto ENTRA NO CATALOGO QUANDO A CONVERSA FECHA (decisao 15; o marketing busca `pendentes`, que
+   so devolve grupo fechado): uma entrada so, ja classificada, e o aviso "entrou" vem depois do
+   "Anotado". Quem nao responde e lembrado UMA vez, duas horas depois, dentro da janela de 24 h;
+   depois disso o grupo fecha com o que tem, e o que ficou "a classificar" vai ao dono.
 4. Colaborador e representante so recebem o menu se pedirem ("menu"); o texto deles e a frase da
    proxima foto (decisao 13). Reacao e silencio; figurinha e afins tambem, para eles.
 
@@ -53,10 +55,11 @@ COM_PRODUTO = ("campo-de-sementes", "colheita")
 
 RECEBI = "Recebi."
 PERGUNTA_LEGENDA = "O que está acontecendo nessa foto?"
-PERGUNTA_BASTIDOR = "O que a foto mostra?"
+PERGUNTA_BASTIDOR = ("Não entendi bem o que a foto mostra: é a lavoura em pé, a colheita, o beneficiamento, "
+                     "a qualidade ou uma entrega? Me conta em uma linha.")
 PERGUNTA_PALPITE = "Parece %s. É isso?"
 PERGUNTA_PRODUTO = "De que produto é? (o nome como está na embalagem)"
-PERGUNTA_FASE = "Em que fase está a lavoura?"
+PERGUNTA_FASE = "Em que fase está a lavoura? (recém-nascida, verde, florindo, madura ou já em semente)"
 PERGUNTA_DATA = "É de hoje?"
 PERGUNTA_QUAL_DIA = "Qual dia? (ex.: 09/10)"
 RETOMANDO = "Ainda sobre a foto de há pouco: "
@@ -164,6 +167,8 @@ class Campo:
                 con.execute("UPDATE atendimento.campo_frases SET usada_em = %s WHERE id = %s", (agora, frase["id"]))
         herda = {k: (lider[k] if lider else None) for k in
                  ("classe_bastidor", "classe_produto", "classe_fase", "data_dita", "lida_em", "perguntas_em", "fechado_em")}
+        # a foto que chega ao grupo ja fechado entra com ele (fechado_em herdado); a que chega ao
+        # grupo aberto espera a conversa, como as outras
         linha = con.execute("""INSERT INTO atendimento.material_de_campo
                    (bsuid, wa_id, erp_codigo, erp_papel, erp_nome, wamid, tipo, mime, arquivo, legenda, recebido_em, erro,
                     classe_bastidor, classe_produto, classe_fase, data_dita, data_presumida, lida_em, perguntas_em, fechado_em)
@@ -269,17 +274,23 @@ class Campo:
 
     @staticmethod
     def _falta(r) -> str | None:
-        """O que ainda falta para classificar: a proxima pergunta, ou None quando esta fechado."""
-        if not (r["legenda"] or "").strip() and r["classe_bastidor"] is None and r["pergunta_n"] == 0 \
-                and r["palpite_bastidor"] is None:
-            return "legenda"
+        """O que ainda falta para classificar: a proxima pergunta, ou None quando esta fechado. Cada
+        pergunta e feita UMA vez (decisao 15): a resposta que a IA nao encaixou fica na legenda."""
+        feitas = r["perguntas_feitas"] or []
+        legenda = (r["legenda"] or "").strip()
         if r["classe_bastidor"] is None:
-            return "bastidor"
-        if r["classe_bastidor"] in COM_PRODUTO and r["classe_produto"] is None:
+            if not legenda and r["palpite_bastidor"] in BASTIDORES and "bastidor" not in feitas:
+                return "bastidor"   # "Parece X. E isso?": so quando a pessoa nao escreveu nada
+            if not legenda and "legenda" not in feitas:
+                return "legenda"
+            if legenda and "bastidor" not in feitas:
+                return "bastidor"   # escreveu, mas a IA nao encaixou: pergunta aberta, uma vez
+        if r["classe_bastidor"] in COM_PRODUTO and r["classe_produto"] is None and "produto" not in feitas:
             return "produto"
-        if r["classe_bastidor"] == "campo-de-sementes" and r["classe_produto"] and r["classe_fase"] is None:
+        if r["classe_bastidor"] == "campo-de-sementes" and r["classe_produto"] and r["classe_fase"] is None \
+                and "fase" not in feitas:
             return "fase"
-        if r["data_dita"] is None:
+        if r["data_dita"] is None and "data" not in feitas:
             return "data"
         return None
 
@@ -300,16 +311,15 @@ class Campo:
         if qual == "legenda":
             saida.texto(para, prefixo + PERGUNTA_LEGENDA)
         elif qual == "bastidor":
-            if r["palpite_bastidor"] in BASTIDORES and not retomando and not r["retomada"]:
+            if r["palpite_bastidor"] in BASTIDORES and not (r["legenda"] or "").strip() and not retomando and not r["retomada"]:
                 saida.botoes(para, PERGUNTA_PALPITE % BASTIDORES[r["palpite_bastidor"]].lower(),
-                             [Opcao("campo:bastidor:" + r["palpite_bastidor"], "Sim"), Opcao("campo:bastidor:lista", "Outra coisa")])
+                             [Opcao("campo:bastidor:" + r["palpite_bastidor"], "Sim"), Opcao("campo:bastidor:outra", "Outra coisa")])
             else:
-                saida.lista(para, prefixo + PERGUNTA_BASTIDOR, "Escolher",
-                            [Opcao("campo:bastidor:" + k, v) for k, v in BASTIDORES.items()])
+                saida.texto(para, prefixo + PERGUNTA_BASTIDOR)
         elif qual == "produto":
             saida.texto(para, prefixo + PERGUNTA_PRODUTO)
         elif qual == "fase":
-            saida.lista(para, prefixo + PERGUNTA_FASE, "Escolher", [Opcao("campo:fase:" + k, v) for k, v in FASES.items()])
+            saida.texto(para, prefixo + PERGUNTA_FASE)
         elif qual == "data":
             saida.botoes(para, prefixo + PERGUNTA_DATA, [Opcao("campo:hoje:sim", "Sim"), Opcao("campo:hoje:outra", "Outra data")])
         elif qual == "qual_dia":
@@ -318,10 +328,12 @@ class Campo:
         con.execute("""UPDATE atendimento.material_de_campo
                           SET pergunta_pendente = %s, perguntas_em = coalesce(perguntas_em, %s), pergunta_n = %s,
                               retomar_em = %s, retomada = %s,
+                              perguntas_feitas = CASE WHEN %s = ANY(perguntas_feitas) THEN perguntas_feitas
+                                                      ELSE array_append(perguntas_feitas, %s) END,
                               legenda_perguntada_em = CASE WHEN %s = 'legenda' THEN %s ELSE legenda_perguntada_em END,
                               data_perguntada_em = CASE WHEN %s IN ('data', 'qual_dia') THEN %s ELSE data_perguntada_em END
                         WHERE id = %s""",
-                    (qual, agora, n, agora + RETOMADA, bool(retomando or r["retomada"]), qual, agora, qual, agora, r["id"]))
+                    (qual, agora, n, agora + RETOMADA, bool(retomando or r["retomada"]), qual, qual, qual, agora, qual, agora, r["id"]))
         con.execute("""UPDATE atendimento.material_de_campo SET perguntas_em = coalesce(perguntas_em, %s)
                         WHERE id = ANY(%s)""", (agora, self._grupo_de(con, r)))
 
@@ -389,20 +401,23 @@ class Campo:
             self._perguntar_proxima(con, saida, self._linha(con, r["id"]), agora)
             return True
         if q == "bastidor":
-            if toque == "campo:bastidor:lista":
-                saida.lista(e.pessoa.para, PERGUNTA_BASTIDOR, "Escolher", [Opcao("campo:bastidor:" + k, v) for k, v in BASTIDORES.items()])
-                con.execute("UPDATE atendimento.material_de_campo SET retomar_em = %s WHERE id = %s", (agora + RETOMADA, r["id"]))
+            if toque == "campo:bastidor:outra":   # o palpite errou: a pergunta aberta
+                r = self._gravar(con, r)
+                self._perguntar(con, saida, r, agora, "legenda")
                 return True
             if toque.startswith("campo:bastidor:") and toque[15:] in BASTIDORES:
                 r = self._gravar(con, r, classe_bastidor=toque[15:])
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
-            if texto:   # escreveu em vez de tocar: a IA le
-                lido = self._ler(con, r["id"], texto, agora)
-                if lido and lido.get("bastidor"):
-                    r = self._gravar(con, r)
-                    self._perguntar_proxima(con, saida, r, agora)
-                    return True
+            if texto:   # a resposta aberta: a IA encaixa; o que nao encaixa fica na legenda
+                ids = self._grupo_de(con, r)
+                con.execute("""UPDATE atendimento.material_de_campo
+                                  SET legenda = CASE WHEN legenda = '' THEN %s ELSE legenda || ' · ' || %s END
+                                WHERE id = ANY(%s)""", (texto[:500], texto[:300], ids))
+                r = self._gravar(con, r)
+                self._ler(con, r["id"], texto, agora)
+                self._perguntar_proxima(con, saida, self._linha(con, r["id"]), agora)
+                return True
             return toque.startswith("campo:")
         if q == "produto":
             if not texto:
@@ -421,6 +436,16 @@ class Campo:
         if q == "fase":
             if toque.startswith("campo:fase:") and toque[11:] in FASES:
                 r = self._gravar(con, r, classe_fase=toque[11:])
+                self._perguntar_proxima(con, saida, r, agora)
+                return True
+            if texto:   # "madura", "florindo", "ta verde ainda": a IA encaixa; sem encaixe, fica sem fase
+                fase = None
+                if self.ia is not None and hasattr(self.ia, "ler_campo"):
+                    try:
+                        fase = (self.ia.ler_campo(texto, produtos(con)) or {}).get("fase")
+                    except Exception:  # noqa: BLE001
+                        fase = None
+                r = self._gravar(con, r, classe_fase=fase if fase in FASES else None)
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
             return toque.startswith("campo:")
@@ -554,10 +579,12 @@ def ler_data(texto: str, agora: datetime) -> date | None:
 # ── o que o marketing busca e devolve (as rotas chamam) ─────────────────────
 
 def pendentes(con, agora: datetime) -> list[dict]:
-    """O material baixado que o marketing ainda nao levou. Entra no catalogo NA HORA (decisao 14):
-    a classificacao chega depois, por `classificados`."""
+    """O material baixado, de grupo FECHADO, que o marketing ainda nao levou (decisao 15: entra no
+    catalogo quando a conversa fecha, ja com a classe; `classificados` fica para o que fechar de
+    novo depois de levado)."""
     linhas = con.execute("""SELECT * FROM atendimento.material_de_campo
-                             WHERE buscado_em IS NULL AND arquivo IS NOT NULL ORDER BY id""").fetchall()
+                             WHERE buscado_em IS NULL AND arquivo IS NOT NULL AND fechado_em IS NOT NULL
+                             ORDER BY id""").fetchall()
     return [descrever(r) for r in linhas]
 
 

@@ -20,13 +20,13 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
    que é e de que produto (*"colheita do centeio IPR 89 no campo do Jair"*). A frase pode ir antes
    ou junto da foto.
 2. A OlivIA responde **"Recebi."** Ela lê a sua frase e, um ou dois minutos depois, pergunta **só o
-   que faltou**, uma coisa por vez: o que a foto mostra (uma lista: campo de sementes, colheita,
-   beneficiamento, controle de qualidade, entrega), o produto (escreva o nome como está na
-   embalagem), a fase da lavoura (lista) e **"É de hoje?"** (toque **Sim**, ou **Outra data** e
-   diga o dia, *09/10*). Com a frase completa, ela só pergunta a data.
+   que faltou**, uma coisa por vez, em conversa: o que a foto mostra, de que produto é (o nome como
+   está na embalagem), em que fase está a lavoura, e **"É de hoje?"** (toque **Sim**, ou **Outra
+   data** e diga o dia, *09/10*). Responda escrevendo, com as suas palavras; ela encaixa. Com a
+   frase completa, ela só pergunta a data.
 3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida, são **um
    grupo**: as respostas valem para todas.
-4. Em poucos minutos a foto entra no catálogo e você recebe **"Sua foto entrou no catálogo da
+4. Fechada a conversa, a foto entra no catálogo e você recebe **"Sua foto entrou no catálogo da
    Renascer. Obrigado!"**; se virar Stories, **"A sua foto virou o Stories do dia."**
 5. Não deu para responder na hora? Ela lembra **uma vez, duas horas depois**. Depois disso a foto
    fica no catálogo com o que você disse, e o marketing completa.
@@ -37,10 +37,10 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 |---|---|
 | **"Recebi."** | chegou e está guardada |
 | **"O que está acontecendo nessa foto?"** | não veio frase: responda em uma linha (o que é e de que produto) |
-| **"O que a foto mostra?"** (lista) | não deu para entender da frase: escolha na lista |
-| **"Parece entrega. É isso?"** | o palpite do sistema pela imagem, quando você não escreveu nada; toque **Sim** ou **Outra coisa** |
+| **"Não entendi bem o que a foto mostra..."** | a frase não disse se é lavoura, colheita, beneficiamento, qualidade ou entrega: diga em uma linha. Se não for nenhuma dessas (o manejo de um cliente, por exemplo), escreva o que é: fica anotado para o marketing |
+| **"Parece entrega. É isso?"** | o palpite do sistema pela imagem, quando você não escreveu nada; toque **Sim** ou **Outra coisa** (e aí ela pergunta o que é) |
 | **"De que produto é?"** | a foto é de campo ou de colheita e faltou o produto: escreva o nome da embalagem |
-| **"Em que fase está a lavoura?"** (lista) | só para foto de campo de sementes |
+| **"Em que fase está a lavoura?"** | só para foto de campo de sementes: recém-nascida, verde, florindo, madura ou já em semente, com as suas palavras |
 | **"É de hoje?"** | a data da foto; sem resposta, vale o dia do envio |
 | **"Ainda sobre a foto de há pouco: ..."** | a lembrança, duas horas depois; é a última vez que ela pergunta |
 | **"Anotado. Obrigado!"** | fechou |
@@ -56,8 +56,9 @@ atendimento** ao escrever; para falar com alguém da empresa pelo caminho normal
 ## 5. O que NÃO faz
 
 - **Não publica nada sozinho:** quem decide é o marketing, e quem aprova é o dono.
-- **Não faz mais de três perguntas** sobre a mesma foto (fora a data). O que ficar sem resposta o
-  marketing classifica.
+- **Não faz mais de três perguntas** sobre a mesma foto (fora a data), **nem repete a mesma
+  pergunta**: o que ela não entendeu fica escrito na foto e o marketing classifica.
+- **Não manda lista para você escolher:** a conversa é em texto; a classificação é do sistema.
 - **Não aceita foto de quem não está no cadastro** da empresa: o número segue o atendimento normal.
 - **Não pede cidade.** Se quiser, diga na frase.
 - **Vídeo deitado e vídeo acima de 60 segundos** entram no catálogo, mas não viram Stories.
