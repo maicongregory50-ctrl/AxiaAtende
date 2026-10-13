@@ -1,146 +1,141 @@
-# A tela de Conversas e a resposta de pessoa
+# A retomada pela OlivIA: a conversa que parou no meio recebe a opção que resolve
 **Data:** 2026-10-13
 **Chamado:** #989
 **Status:** PROPOSTO
 
+> O arquivo nasceu como "a tela de Conversas e a resposta de pessoa" e foi refeito no mesmo dia: o
+> dono recusou a tela ("precisa muita coisa, não penso em rodar agora; só leitura agora e a resposta
+> por IA") e escolheu a retomada pelo menu. O nome do arquivo ficou, para o chamado achar.
+
 ## Contexto
 
-O número da Renascer no WhatsApp (49 3664 0121) só fala pela API da Meta, pelo recepcionista. Quando
-a OlivIA não resolve (o Vinicius às 14:00 de 13/10, pedindo os contatos de SC, refez o menu três
-vezes; a Giovana às 11:31 tocou uma lista antiga e parou), **ninguém da casa consegue responder**: o
-dono em 13/10, *"não existe mandar à mão; não temos comunicador, não tem tela para digitar e ver
-conversa"*. O pedido original do chamado (a sessão lê a conversa que parou e manda a informação) vem
-depois disso: antes de propor resposta, falta o básico, ver a conversa e responder.
+O número da Renascer só fala pela API da Meta, pelo recepcionista; ninguém da casa responde à mão.
+Quando a OlivIA não resolve e a pessoa para (o Vinicius às 14:00 de 13/10, pedindo os contatos de
+SC; a Giovana às 11:31, numa lista antiga), a conversa fica "parou no meio" na Recepção e a pessoa
+fica sem nada. A leitura pela sessão já existe (#981) e o menu já entende texto e lista antiga desde
+o #988; o que falta é alguém voltar à conversa parada.
 
-O que existe e que esta etapa reaproveita (inventário de 13/10):
-- A conversa inteira está no banco: o que chega em `atendimento.eventos_meta`, o que a OlivIA manda
-  em `atendimento.enviadas` (desde o #981 também as falas do canal de campo), a conversa de menu em
-  `conversas` (situação `parou_no_meio` marcada 30 min depois do último toque, D5 do #950), o canal
-  de campo em `material_de_campo`. O leitor `scripts/ler_conversa.py` (#981) já monta a conversa em
-  ordem de tempo.
-- O recepcionista (127.0.0.1:8008, LocalService) é o único processo com o token; roda um laço de 1 s
-  (`processar_pendentes`) e um de 1 min. As telas (8009, LocalSystem) nunca falam com a Meta
-  (`rotas_telas.py`): o que muda é o banco, e o recepcionista lê. É o mesmo corte do marketing: a
-  tela enfileira, o processo com o segredo envia.
-- A janela de 24 h da Meta já é medida (`campo.ultima_mensagem_de`: a última mensagem recebida da
-  pessoa); fora dela a mensagem livre não sai (seria modelo pago).
-- As telas: `App.jsx` com três abas (Recepção, Envios, Destinos), `api.js` (`pegar`, `mandar` com o
-  cabeçalho da tela), login único (`casa.usuarios`, sem direitos por pessoa: decisão do dono em 13/10,
-  "qualquer login responde"), `Recepcao.jsx` como molde de tela e `test_telas.py` como molde de teste.
+O dono em 13/10: a resposta é **por IA, pelo menu**: 30 minutos depois de a conversa parar, a OlivIA
+relê a conversa inteira, acha a opção do menu que resolve e pergunta "Pelo que entendi, você quer
+X. É isso?", com Sim e Ver opções; o Sim manda o link. **Nunca texto livre**: só o que o menu já daria
+a quem tocasse certo. Sem pessoa no meio, dentro das 24 h da última mensagem.
+
+O que existe e que a etapa reaproveita (inventário de 13/10):
+- `motor.marcar_paradas` (laço de 1 min) marca `situacao = 'parou_no_meio'` 30 min depois do último
+  toque (D5 do #950). `conversas` guarda `ia_proposta_id` e `ia_confirmou` (a proposta da IA e o
+  acerto), e o toque `ia:sim:<chave>` / `ia:menu` já é tratado no motor (`escolher` manda o link).
+- `motor.propor` manda a confirmação "Entendi que você quer: X. É isso?" com os dois botões e
+  registra em `enviadas`; `ia.classificar(texto, folhas_e_menus)` lê um texto contra a árvore
+  inteira, com a chave fechada por `json_schema`.
+- O que a pessoa escreveu está em `eventos_meta` (texto e toques), lido em ordem pelo leitor do #981.
+- A janela de 24 h é medida pela última mensagem recebida (`campo.ultima_mensagem_de`).
 
 ## Os fios que encostam
 
-**Quem mais escreve.** `atendimento.enviadas` tem quatro escritores (o motor, o envio, o canal de
-campo e, agora, a resposta de pessoa): todos gravam a mesma forma (`wamid`, `para`, `tipo`, `resumo`)
-e o status chega pelo webhook pela `wamid`; nada muda neles. A tabela nova `atendimento.respostas` tem
-dois escritores com colunas distintas: as telas inserem (`texto`, `autor_id`, `criada_em`) e o
-recepcionista fecha (`enviada_em`, `wamid`, `erro`). `conversas` não é tocada (a resposta não muda o
-nó nem a situação; a Recepção continua dizendo "parou no meio", e a tela nova diz "respondida por
-pessoa" pela própria `respostas`).
+**Quem mais escreve.** `conversas.situacao` tem três escritores (o motor ao abrir, escolher e
+encerrar; `marcar_paradas`; e o que fecha ao chegar o toque) e ganha um quarto: a retomada volta a
+conversa a `em_curso` ao mandar a pergunta, para o Sim da pessoa cair nela (e não numa conversa
+nova) e `escolher` mandar o link. A coluna nova `retomada_em` tem um escritor só (a retomada) e é o
+que garante **uma retomada por conversa**: sem resposta, `marcar_paradas` a marca de novo em 30 min
+e a retomada não repete. `ia_proposta_id` é escrito por `propor` e pela retomada (a mesma coisa: o
+que a IA propôs); `ia_confirmou` continua sendo escrito pelo toque. `enviadas` ganha a linha da
+retomada como qualquer fala.
 
-**Quem lê para decidir.** O recepcionista lê `respostas` a cada segundo e decide pela janela: a
-última mensagem da pessoa há menos de 24 h envia; senão marca `erro = 'fora da janela'` e não envia
-(a tela já tinha recusado; o segundo portão é para a fila que atravessou a meia-noite). A Recepção lê
-`conversas` como antes.
+**Quem lê para decidir.** A Recepção lê `situacao` (a conversa retomada volta a "escolhendo agora" e,
+com o Sim, "recebeu o link"; sem Sim, "parou no meio" de novo em 30 min, sem nova retomada). A
+pergunta das 4h30 lê `com_link`: a conversa retomada com Sim entra nela como qualquer outra. O
+cartão "IA acertou / errou" lê `ia_proposta_id` + `ia_confirmou`: a retomada conta ali (acerto quando a
+pessoa diz Sim).
 
-**Quem volta depois.** O webhook de status da Meta atualiza `enviadas` pela `wamid` (como qualquer
-fala). O backup do banco leva a tabela nova por ser do schema. O leitor da sessão (#981) passa a
-mostrar a resposta de pessoa como `←` com o nome de quem respondeu (já lê `enviadas`).
+**Quem volta depois.** `marcar_paradas` (de novo em 30 min). O leitor da sessão mostra a retomada
+como `←` (de `enviadas`, resumo "ia retomou <chave>").
 
 ## O universo medido
 
-- Conversas que pararam no meio: a Recepção conta por período (cartão "Pararam no meio"); em 13/10,
-  as duas de fora do dia (Vinicius chegou ao link por insistência; Giovana parou). A tela nova mede
-  o que importa daqui em diante: quantas conversas recebem resposta de pessoa por semana.
-- Janela de 24 h: medida pela última mensagem recebida (`eventos_meta`), como no canal de campo.
-- Escritores de `enviadas`: 3 hoje (medido por `grep INSERT INTO atendimento.enviadas`), 4 depois.
-- Logins das telas: 1 hoje (`casa.usuarios`), por isso "qualquer login responde".
+- Conversas que param no meio: contadas pela Recepção; em 13/10, duas de fora. Com o #988 no ar
+  desde 14:35 o número tende a cair; a retomada mede o resto: quantas retomadas por semana e quantas
+  viram link (acerto), pelos mesmos cartões.
+- O que a IA lê: os textos e os títulos dos toques da pessoa na conversa (de `eventos_meta` desde
+  `iniciada_em`), juntos, até 1000 caracteres (o limite que `classificar` já corta).
+- Escritores de `conversas.situacao`: 3 hoje, 4 depois (medido por `grep situacao = ` no motor).
 
 ## Conformidade com o Manual legal
 
-Não se aplica: não há regra tributária. Dado pessoal: a conversa já está no banco e na Recepção; a
-tela mostra o número mascarado na lista e inteiro só dentro da conversa aberta, como a Recepção.
+Não se aplica. A mensagem sai dentro das 24 h da última mensagem da pessoa (mensagem de sessão da
+Meta, sem modelo); fora dela não sai.
 
 ## Decisão
 
-- **A, conservador:** só a tela de leitura (ver a conversa), sem responder. Não resolve o pedido.
-- **B, o escolhido:** a tela **Conversas** (lista de quem escreveu, a conversa em ordem, a caixa de
-  resposta), a fila `atendimento.respostas` que as telas enchem e o recepcionista envia dentro das
-  24 h, gravada em `enviadas` com o nome de quem respondeu. Qualquer login responde. A proposta por
-  IA (o pedido original) é a etapa seguinte, na mesma tela, depois de medir quantas conversas ainda
-  param com o #988 no ar.
-- **C, progressivo:** B mais a proposta por IA já nesta etapa. Amplia o desenho antes de medir se
-  ainda há o que propor (o #988 entende "Sc" e lista antiga desde 13/10). Fora.
+Caminho B, escolhido pelo dono em 13/10/2026 ("retomada pelo menu"):
+
+- **A, conservador:** nada automático; só a leitura (#981) e a Recepção dizendo quem parou. Não dá
+  nada à pessoa.
+- **B, o escolhido:** a retomada pela OlivIA, só pelo menu, uma vez por conversa, dentro das 24 h.
+- **C, progressivo:** texto livre escrito pela IA com o ok do dono por botões no WhatsApp dele.
+  Fica para depois, se a retomada mostrar pedidos que o menu não cobre.
 
 ## Escopo desta etapa
 
 **Dentro**
-1. Migração 016: `atendimento.respostas` (`id`, `wa_id`, `bsuid`, `conversa_id` opcional, `texto`
-   até 1000 caracteres, `autor_id` → `casa.usuarios`, `criada_em`, `enviada_em`, `wamid`, `erro`).
-2. A leitura da conversa sai do script para `backend/leitura.py` (`ultimas`, `conversa`), usada
-   pelo leitor da sessão (#981, que continua lendo pelo papel só-leitura) e pelas rotas.
-3. Rotas das telas: `GET /conversas?dias=7&so=paradas|sem_resposta` (quem escreveu: número
-   mascarado, cadastro, última mensagem, mensagens, situação da última conversa, dentro da janela,
-   resposta pendente ou enviada), `GET /conversas/{wa_id}` (a conversa em ordem, com número inteiro,
-   e a janela), `POST /conversas/{wa_id}/responder` (`texto`; 409 fora da janela ou com resposta
-   ainda não enviada; grava com o autor do login).
-4. Recepcionista: `respostas.enviar(con, saida, agora)` no laço de 1 s: para cada resposta sem
-   `enviada_em` e sem `erro`, confere a janela, `saida.texto`, grava `enviada_em` + `wamid` e a linha
-   em `enviadas` (`tipo texto`, `resumo "resposta de <nome>: <texto>"`, `conversa_id` da conversa
-   aberta se houver); falha da Meta vai a `erro` e não se repete sozinha (a tela mostra e deixa
-   mandar de novo).
-5. Tela `Conversas.jsx` (aba nova, entre Recepção e Envios): lista à esquerda (filtros: período, "só
-   paradas no meio", "só sem resposta de pessoa"), conversa à direita com `→` o que chegou e `←` o que
-   saiu (status), as linhas do campo, a caixa de resposta com contador e o botão Responder;
-   fora da janela a caixa fica fechada e diz desde quando; resposta enviada aparece na hora com
-   "você" e o status; atualização a cada 15 s.
-6. Manual `docs/manuais/conversas.md`, a linha no `INDICE.md`, uma frase na `recepcao.md`.
+1. Migração 016: `conversas.retomada_em timestamptz` (e `retomada_chave text`, o que foi proposto,
+   para a medição).
+2. `motor.retomar_paradas(con, saida, ia, agora)` no laço de 1 min, depois de `marcar_paradas`:
+   para cada conversa `parou_no_meio` sem `retomada_em`, com a última mensagem da pessoa há menos
+   de 24 h e com IA: junta o que ela escreveu e tocou nessa conversa (de `eventos_meta`), chama
+   `ia.classificar` contra a árvore; com um nó que não é a raiz nem encerrar, manda os botões
+   "Pelo que entendi da nossa conversa, você quer: X. É isso?" (`ia:sim:<chave>` / `ia:menu`),
+   grava `ia_proposta_id`, `retomada_em`, `retomada_chave`, volta a conversa a `em_curso` com o
+   toque de agora, e registra em `enviadas` ("ia retomou <chave>"). Sem nó (ou IA fora), grava só
+   `retomada_em` e fica em silêncio: uma tentativa, nunca duas. Erro da Meta não derruba o laço.
+   O texto da retomada é um ajuste (`atendimento.ajustes`, chave `retomada`), como as outras frases.
+3. O toque depois da retomada é o de hoje: `ia:sim` manda o link; `ia:menu` mostra o menu.
+4. Manual: `recepcao.md` ganha "A retomada pela OlivIA" (o que é, quando sai, o que a Recepção
+   mostra); `leitura-da-sessao.md` ganha a linha `←` da retomada.
 
 **Fora**
-- A proposta de resposta por IA ou pela sessão (etapa seguinte, mesmo chamado ou outro).
-- Direito por login (um login só hoje).
-- Mensagem fora das 24 h (modelo pago: exige modelo aprovado na Meta; chamado próprio se um dia).
-- Anexos na resposta (foto, documento); só texto.
-- Marcar a conversa como resolvida ou mudar o nó do menu.
+- Tela de conversas e resposta de pessoa (recusada pelo dono em 13/10).
+- Texto livre pela IA (caminho C).
+- Retomar conversa que parou há mais de 24 h, ou mais de uma vez.
+- Mudar o menu.
 
 ## Impacto em produção
 
-Migração 016 aplicada pelos dois serviços ao subir. Reinício do `axiaatende-backend` (rotas e tela) e
-do `axiaatende-recepcionista` (o envio da fila): mão do dono. `npm run build` antes. Nenhum segredo
-novo. A primeira resposta é a prova: uma pessoa da casa escreve a um número que falou hoje.
+Migração 016 aplicada ao subir. Reinício do `axiaatende-recepcionista` (o laço) e do
+`axiaatende-backend` (a migração chega pelos dois): mão do dono. Custo: uma chamada da IA de texto
+por conversa parada (Haiku, centavos).
 
 ## ROLLBACK_PLAN
 
-1. `016_respostas_VOLTA.sql` (apaga a tabela; o que foi enviado fica em `enviadas`).
-2. Reverter os commits (a aba some; o recepcionista deixa de olhar a fila).
-3. Reiniciar os dois serviços. Nenhuma conversa é tocada.
+1. `016_retomada_VOLTA.sql` (tira as duas colunas).
+2. Reverter o commit (o laço deixa de retomar). Reiniciar o recepcionista.
+3. As conversas retomadas ficam como estão; nada se apaga.
 
 ## Manual de uso
 
-**Para que serve.** Ver uma conversa do WhatsApp da Renascer inteira e responder a quem a OlivIA não
-resolveu, sem aplicativo nem celular: a resposta sai pelo mesmo número.
+**Para que serve.** Quem parou no meio do atendimento (não achou a opção, escreveu o que o menu não
+entendeu) recebe, meia hora depois, a opção que a OlivIA entendeu que a pessoa queria, para
+confirmar com um toque e receber o contato certo, sem ninguém da casa no meio.
 
-**Quem usa e quando.** Quem entra nas telas do AxiaAtende, quando a Recepção mostra "parou no meio"
-ou "disse que não foi atendido", ou quando alguém pediu algo que o menu não tem. Só vale nas 24 horas
-depois da última mensagem da pessoa: depois disso a caixa fecha (mensagem fora da janela é paga e
-exige modelo aprovado).
+**Quem usa e quando.** Ninguém aciona: é automático, uma vez por conversa parada, só dentro das 24
+horas da última mensagem da pessoa, com a IA ligada.
 
 **O caminho comum.**
-1. Abra **Conversas**. À esquerda, quem escreveu, do mais recente; marque "só paradas no meio" para
-   ver quem ficou sem solução.
-2. Toque num nome: à direita, a conversa inteira, o que a pessoa mandou (`→`) e o que a OlivIA
-   respondeu (`←`), com hora e status.
-3. Escreva na caixa e toque **Responder**. A mensagem aparece na conversa com "você" e o status
-   muda para entregue e lida conforme a Meta avisa.
-4. Se a Meta recusar, a linha fica em vermelho com o motivo, e dá para mandar de novo.
+1. A pessoa chama, não chega a um contato e para. Trinta minutos depois a Recepção a mostra como
+   "parou no meio".
+2. No minuto seguinte a OlivIA relê tudo o que a pessoa escreveu e tocou, e manda: *"Pelo que
+   entendi da nossa conversa, você quer: SC (Comercial › Revendedor). É isso?"* com **Sim** e **Ver
+   opções**.
+3. **Sim** manda o contato certo, como se a pessoa tivesse tocado no menu; **Ver opções** mostra o
+   menu. Sem resposta, nada mais é mandado.
 
-**O que significa cada sinal.** `→` chegou da pessoa; `←` saiu do número da Renascer (OlivIA ou
-você, com o nome de quem respondeu); "parou no meio" é da Recepção; "sem resposta de pessoa" é que
-ninguém da casa respondeu ainda; "janela fechada desde …" é que a pessoa não escreve há mais de 24 h
-e a resposta não pode sair; "respondida por …" é a sua ou de outro login.
+**O que significa cada sinal.** Na Recepção, a conversa retomada volta a "escolhendo agora"; com o
+Sim vira "recebeu o link" e conta em "IA acertou"; sem resposta volta a "parou no meio" em 30 min, e
+não há segunda retomada. Na leitura da sessão a retomada aparece como `←` com "ia retomou". "Nada
+foi mandado" tem três motivos: a pessoa escreveu há mais de 24 h, a IA não achou opção que
+servisse, ou a IA estava fora.
 
-**O que NÃO faz.** Não manda foto nem documento; não manda fora das 24 h; não muda o menu nem o
-destino; não encerra a conversa; não responde sozinha (a proposta por IA é a etapa seguinte).
+**O que NÃO faz.** Não escreve texto livre; não manda nada fora das 24 h; não retoma duas vezes;
+não responde o que o menu não tem (isso fica para a pessoa pedir de novo, ou para a etapa C).
 
 ## Próximo passo
 
