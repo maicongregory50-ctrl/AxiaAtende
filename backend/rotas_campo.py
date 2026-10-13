@@ -110,7 +110,7 @@ def rotas(cfg) -> APIRouter:
         """O que chegou e ainda nao tem palpite: o marketing olha a foto antes da rodada de perguntas."""
         conferir(x_axiaatende_chave)
         with conexao(cfg) as con:
-            return {"ligado": campo.ligado(con), "itens": campo.novos(con)}
+            return {"ligado": campo.ligado(con), "itens": campo.novos(con, agora())}
 
     @r.post("/campo/{item_id}/palpite")
     def palpite(item_id: int, dados: Palpite, x_axiaatende_chave: str | None = Header(default=None)):
