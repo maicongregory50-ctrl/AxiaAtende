@@ -347,9 +347,11 @@ def test_as_rotas_do_marketing_so_com_a_chave(canal):
     assert api.get("/campo/pendentes").status_code == 403
     assert api.get("/campo/pendentes", headers={"X-Axiaatende-Chave": "errada"}).status_code == 403
     assert api.post("/campo/portfolio", json={"produtos": PRODUTOS + ["GUANDU"]}, headers=chave).json() == {"produtos": 5}
-    novos = api.get("/campo/novos", headers=chave).json()
-    assert novos["ligado"] is True and len(novos["itens"]) == 1 and novos["itens"][0]["palpite"] is None
-    item = novos["itens"][0]
+    assert api.get("/campo/novos", headers=chave).json()["ligado"] is True   # a rota (a janela de 1 dia e do relogio real)
+    with conexao(canal) as con:
+        novos = campo.novos(con, AGORA + MIN)
+    assert len(novos) == 1 and novos[0]["palpite"] is None
+    item = novos[0]
     assert api.post("/campo/%d/palpite" % item["id"], json={"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": "pre-colheita"}, headers=chave).status_code == 200
     assert api.get("/campo/pendentes", headers=chave).json() == {"ligado": True, "itens": []}   # a conversa ainda nao fechou
     minuto(canal, s, AGORA + MIN, ia=ia)
@@ -394,6 +396,9 @@ def test_os_avisos_saem_so_dentro_da_janela_e_uma_vez_por_grupo(canal):
     assert all(m["aviso_catalogo"] == "enviado" for m in material(canal))
     with conexao(canal) as con:
         campo.foi_ao_ar(con, ids[0], "ao-vivo-x", AGORA + 40 * H)
+        # a janela conta da ultima mensagem DELA (eventos_meta.recebido_em, que o banco carimba com o
+        # relogio real): fixa em AGORA para o teste nao depender do dia em que roda
+        con.execute("UPDATE atendimento.eventos_meta SET recebido_em = %s", (AGORA,))
     n = len(s2.enviadas)
     minuto(canal, s2, AGORA + 40 * H + MIN)
     assert len(s2.enviadas) == n and material(canal)[0]["aviso_ar"] == "fora_da_janela"

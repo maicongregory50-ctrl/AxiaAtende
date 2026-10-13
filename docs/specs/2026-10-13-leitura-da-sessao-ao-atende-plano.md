@@ -3,7 +3,7 @@
 **Chamado:** #981
 **Spec de origem:** `C:\AxiaAtende\docs\specs\2026-10-13-leitura-da-sessao-ao-atende.md` (APROVADA, 13/10/2026, caminho B)
 **Status:** APROVADO (dono, 13/10/2026)
-**Executável pelo agente:** sim
+**Executavel pelo agente:** sim
 
 ## Contexto
 

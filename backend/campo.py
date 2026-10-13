@@ -658,11 +658,13 @@ def palpite(con, item_id: int, bastidor: str | None, produto: str | None, agora:
     return {"id": item_id, "bastidor": bastidor, "produto": produto, "fase": fase} if n else None
 
 
-def novos(con) -> list[dict]:
-    """O que chegou com arquivo e ainda nao teve palpite nem pergunta: o marketing olha a foto."""
+def novos(con, agora: datetime | None = None) -> list[dict]:
+    """O que chegou com arquivo e ainda nao teve palpite nem pergunta: o marketing olha a foto. So
+    o do ultimo dia: palpite para foto velha nao molda pergunta nenhuma."""
+    agora = agora or datetime.now(FUSO)
     return [descrever(l) for l in con.execute("""SELECT * FROM atendimento.material_de_campo
                 WHERE palpite_em IS NULL AND perguntas_em IS NULL AND arquivo IS NOT NULL
-                  AND recebido_em > now() - interval '1 day' ORDER BY id""").fetchall()]
+                  AND recebido_em > %s ORDER BY id""", (agora - timedelta(days=1),)).fetchall()]
 
 
 def catalogado(con, item_id: int, atv: str, agora: datetime) -> dict | None:
