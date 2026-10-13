@@ -146,3 +146,14 @@ não responde o que o menu não tem (isso fica para a pessoa pedir de novo, ou p
 ## Próximo passo
 
 `/writing-plans`.
+
+## Emenda da execução (13/10/2026)
+
+- **"Ver opções" mostra a pergunta do ponto onde a opção proposta mora** (o pai dela: "Em qual
+  estado você atua?" para SC), e não o "nó atual" da conversa: o texto não entendido já tinha levado
+  a conversa à raiz antes de parar, então o nó atual não serve de guia. Sem proposta, a pergunta do
+  nó atual; sem nó, o menu.
+- **A IA fora não gasta a tentativa**: a conversa espera o minuto em que a IA voltar (dentro das
+  24 h). "Sem texto", "sem opção" e "fora da janela" gastam, como escrito.
+- **O Sim ou o Ver opções que chegam depois de a conversa retomada voltar a "parou no meio"** (mais
+  de 30 min sem resposta) caem na própria conversa retomada, reaberta, e não numa conversa nova.

@@ -384,3 +384,74 @@ def test_toque_em_lista_antiga_repete_a_pergunta_atual_com_a_linha(ligado):
     R.processar_pendentes(ligado, s, None, agora=QUINTA_14H)
     assert s.enviadas[-2][2] == R.motor.LISTA_ANTIGA and s.ultima[0] == "lista" and s.ultima[3][0][0] == "menu:comercial"
     assert s.ultima[1] == "5549999990001"
+
+
+# ── #989 (13/10/2026): a retomada pela OlivIA de quem parou no meio ──────────────────────────
+
+def _parou_pedindo_sc(cfg, s):
+    """O caso do Vinicius: Comercial > Revendedor, escreveu o que o menu nao entendeu, e parou."""
+    passo(cfg, s, texto("wamid.1", "oi"))
+    passo(cfg, s, toque("wamid.2", "menu:comercial", lista=True))
+    passo(cfg, s, toque("wamid.3", "menu:comercial.revenda"))
+    passo(cfg, s, texto("wamid.4", "consegue me passar os de santa catarina?"))   # sem IA: menu principal
+    R.rotina_do_minuto(cfg, s, agora=QUINTA_14H + timedelta(minutes=31))
+    assert _conversa(cfg)["situacao"] == "parou_no_meio"
+
+
+def test_a_retomada_propoe_a_opcao_do_menu_uma_vez_e_o_sim_manda_o_link(ligado):
+    s = SaidaFalsa()
+    _parou_pedindo_sc(ligado, s)
+    ia = IAFalsa(resposta="comercial.revenda.sc")
+    n = len(s.enviadas)
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=ia)
+    tipo, para, corpo, opcoes = s.ultima
+    assert len(s.enviadas) == n + 1 and tipo == "botoes" and para == "5549999990000"
+    assert corpo == "Pelo que entendi da nossa conversa, você quer: SC (🛒 Comercial › Revendedor). É isso?"
+    assert opcoes == [("ia:sim:comercial.revenda.sc", "Sim"), ("ia:volta", "Ver opções")]
+    assert ia.perguntas[-1] == "oi / x / x / consegue me passar os de santa catarina?"   # "x": o titulo dos toques de teste
+    assert [k for k in ia.opcoes[-1] if k.startswith("comercial.revenda.")]   # a arvore inteira
+    c = _conversa(ligado)
+    assert c["situacao"] == "em_curso" and c["retomada_em"] is not None and c["retomada_chave"] == "comercial.revenda.sc"
+    with conexao(ligado) as con:
+        assert con.execute("SELECT resumo FROM atendimento.enviadas ORDER BY id DESC LIMIT 1").fetchone()["resumo"] == "ia retomou comercial.revenda.sc"
+    # de novo: nada (uma retomada so), mesmo depois de voltar a parar
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=70), ia=ia)
+    assert len(s.enviadas) == n + 1 and _conversa(ligado)["situacao"] == "parou_no_meio"
+    # o Sim cai NA conversa retomada e manda o link
+    passo(ligado, s, toque("wamid.5", "ia:sim:comercial.revenda.sc"), agora=QUINTA_14H + timedelta(minutes=80))
+    corpo, nome, _ = _link(s)
+    assert nome == "Maicon Gregory"
+    c = _conversa(ligado)
+    assert c["situacao"] == "com_link" and c["ia_confirmou"] is True and c["caminho"][-1] == "SC"
+    with conexao(ligado) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 1
+
+
+def test_ver_opcoes_da_retomada_repete_a_pergunta_do_ponto_onde_parou(ligado):
+    s = SaidaFalsa()
+    _parou_pedindo_sc(ligado, s)
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=IAFalsa(resposta="comercial.revenda.sc"))
+    tipo, _, corpo, opcoes = passo(ligado, s, toque("wamid.5", "ia:volta"), agora=QUINTA_14H + timedelta(minutes=33))
+    # a pessoa parou na pergunta do estado: e ela que volta, com os estados -- nao o menu principal
+    assert tipo == "lista" and corpo == "Em qual estado você atua?" and len(opcoes) == 5
+    assert _conversa(ligado)["ia_confirmou"] is False
+
+
+def test_fora_das_24h_ou_sem_ia_a_retomada_nao_manda_nada_e_nao_tenta_de_novo(ligado):
+    s = SaidaFalsa()
+    _parou_pedindo_sc(ligado, s)
+    n = len(s.enviadas)
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=None)   # sem IA: espera, nao gasta
+    c = _conversa(ligado)
+    assert len(s.enviadas) == n and c["situacao"] == "parou_no_meio" and c["retomada_em"] is None
+    with conexao(ligado) as con:   # empurra a ultima mensagem para fora da janela
+        con.execute("UPDATE atendimento.eventos_meta SET recebido_em = %s", (QUINTA_14H - timedelta(hours=25),))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=IAFalsa(resposta="comercial.revenda.sc"))
+    c = _conversa(ligado)
+    assert len(s.enviadas) == n and c["retomada_chave"] == "fora da janela" and c["retomada_em"] is not None
+    with conexao(ligado) as con:   # a IA sem opcao que sirva: silencio, gravado
+        con.execute("UPDATE atendimento.conversas SET retomada_em = NULL, retomada_chave = NULL")
+        con.execute("UPDATE atendimento.eventos_meta SET recebido_em = %s", (QUINTA_14H,))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=IAFalsa(resposta=None))
+    c = _conversa(ligado)
+    assert len(s.enviadas) == n and c["retomada_chave"] == "sem opcao"

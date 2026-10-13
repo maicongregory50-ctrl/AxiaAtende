@@ -55,4 +55,4 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                             "008_nota_em_tres_botoes.sql", "009_vigia_do_endereco.sql",
                             "010_canal_de_campo.sql", "011_frase_do_campo.sql", "012_palpite_fase.sql",
                             "013_atendente_de_campo.sql", "014_perguntas_feitas.sql",
-                            "015_grupo_da_conversa.sql"]
+                            "015_grupo_da_conversa.sql", "016_retomada.sql"]

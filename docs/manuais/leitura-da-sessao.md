@@ -39,6 +39,7 @@ banco e o arquivo de senha da sessão, e prova que o banco recusa escrever.
 | `← [tipo, status]` | o que a OlivIA mandou: `texto`, `botoes`, `lista`, `imagem`, `modelo`; o status é o último que a Meta contou (`aceita`, `enviada`, `entregue`, `lida`, `falhou`) |
 | `!!` no fim da linha | erro gravado naquele evento ou envio |
 | `[atendimento] abriu ...; caminho:` | a conversa de atendimento e os rótulos tocados no menu |
+| `← [botoes, ...] ia retomou <opção>` | a retomada pela OlivIA (#989): 30 min depois de a pessoa parar, a opção do menu que ela propôs com Sim / Ver opções |
 | `[campo] foto #id (grupo N)` | a foto no canal de campo: legenda, perguntas feitas, classe (ou "a classificar"), data (e se foi presumida), `aberto` / `fechado` / `desistiu`, o ATV quando entrou |
 | `[campo] frase guardada` | o texto que a pessoa escreveu antes da foto; "(usada)" quando virou legenda |
 | "nenhuma mensagem no período" | o número existe, mas nada no recorte pedido: é zero |

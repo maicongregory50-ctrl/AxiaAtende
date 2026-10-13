@@ -146,6 +146,11 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
     with conexao(cfg) as con:
         motor.fazer_perguntas_vencidas(con, saida, momento)
         motor.marcar_paradas(con, momento)
+    try:   # #989: a retomada pela OlivIA de quem parou no meio; nunca segura o resto da rotina
+        with conexao(cfg) as con:
+            motor.retomar_paradas(con, saida, ia, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("retomada: %s: %s" % (type(falha).__name__, falha), flush=True)
     if perguntar is not None:
         try:
             vigiar_o_endereco(cfg, perguntar, momento)

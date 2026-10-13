@@ -67,3 +67,19 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 - **Não reconhece de novo conversas antigas:** cada conversa guarda quem era no momento em que chegou.
 - **Não mostra valor, crédito nem documento** de ninguém.
 - **Não mostra a foto do campo:** ela vai para a Caixa do marketing (manual `caixa.md` do AxiaMarketing); aqui só a contagem. O que a equipe deve mandar está no `campo-equipe.md`.
+
+## A retomada pela OlivIA (#989, 13/10/2026)
+
+Quem **parou no meio** (não achou a opção, escreveu o que o menu não entendeu) não fica sem nada:
+trinta minutos depois de parar, a OlivIA relê tudo o que a pessoa escreveu e tocou naquela conversa,
+acha a opção do menu que resolve e manda *"Pelo que entendi da nossa conversa, você quer: SC
+(Comercial › Revendedor). É isso?"*, com **Sim** e **Ver opções**. O **Sim** manda o contato, como
+se ela tivesse tocado certo; **Ver opções** repete a pergunta do ponto onde ela parou, com as opções
+daquele ponto (o menu principal só se parou no começo). É automático, uma vez por conversa, só nas
+24 horas da última mensagem da pessoa, e nunca escreve texto livre: só o que o menu já daria.
+
+Na Recepção, a conversa retomada volta a "escolhendo agora"; com o Sim vira "recebeu o link" e conta
+em "IA acertou"; sem resposta volta a "parou no meio" em 30 minutos, e não há segunda retomada. Nada
+é mandado quando a pessoa escreveu há mais de 24 horas, quando a IA não achou opção que servisse, ou
+quando a IA estava fora; nos três casos a conversa fica "parou no meio" como antes. A frase da
+retomada é o ajuste `retomada` (a sessão troca pela porta, se um dia for preciso).

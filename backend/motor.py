@@ -202,6 +202,17 @@ def _ultima_pergunta(con, pessoa: Pessoa):
                            ORDER BY pergunta_feita_em DESC, id DESC LIMIT 1""", (pessoa.bsuid,)).fetchone()
 
 
+def _conversa_retomada(con, pessoa: Pessoa, agora: datetime):
+    """A ultima conversa desta pessoa que a OlivIA retomou e que voltou a parar (ate 24 h): reaberta."""
+    c = con.execute("""SELECT * FROM atendimento.conversas
+                        WHERE bsuid = %s AND situacao = 'parou_no_meio' AND retomada_em IS NOT NULL
+                          AND retomada_em > %s ORDER BY id DESC LIMIT 1""",
+                    (pessoa.bsuid, agora - timedelta(hours=24))).fetchone()
+    if c:
+        con.execute("UPDATE atendimento.conversas SET situacao = 'em_curso' WHERE id = %s", (c["id"],))
+    return c
+
+
 def _chegou(con, pessoa: Pessoa, conversa, agora: datetime) -> None:
     """Toda mensagem conta como a ultima interacao, e a pergunta ainda nao feita anda junto."""
     con.execute("UPDATE atendimento.conversas SET ultimo_toque_em = %s WHERE id = %s", (agora, conversa["id"]))
@@ -318,14 +329,15 @@ def casar_opcao(con, ia, no, texto: str):
 
 
 def reperguntar(con, saida: Saida, pessoa: Pessoa, conversa, aviso: str) -> None:
-    """A pergunta do no atual de novo, com uma linha antes; sem no, o menu com a linha."""
+    """A pergunta do no atual de novo, com uma linha antes (se houver); sem no, o menu (com a linha)."""
     no = _no_atual(con, conversa)
     if no and no["chave"] != "raiz" and _filhos(con, no["id"]):
         w = perguntar(con, saida, pessoa, no, aviso)
-        _registrar(con, conversa["id"], pessoa.para, "botoes", "lista antiga: %s" % no["chave"], w)
+        _registrar(con, conversa["id"], pessoa.para, "botoes", "de novo: %s" % no["chave"], w)
         return
-    w = saida.texto(pessoa.para, aviso)
-    _registrar(con, conversa["id"], pessoa.para, "texto", "lista antiga", w)
+    if aviso:
+        w = saida.texto(pessoa.para, aviso)
+        _registrar(con, conversa["id"], pessoa.para, "texto", "lista antiga", w)
     mostrar_menu(con, saida, pessoa, conversa, False)
 
 
@@ -394,6 +406,10 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         return
 
     conversa = _conversa_aberta(con, p)
+    if conversa is None and e.toque and (e.toque.startswith("ia:sim:") or e.toque == "ia:volta"):
+        # a resposta a RETOMADA (#989) que chegou depois de a conversa voltar a "parou no meio":
+        # cai na conversa retomada, nao numa nova (o Sim manda o link dela)
+        conversa = _conversa_retomada(con, p, agora)
     nova = conversa is None
     if nova:
         conversa = _nova_conversa(con, p, agora)
@@ -415,6 +431,23 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     elif e.toque == "ia:menu":
         con.execute("UPDATE atendimento.conversas SET ia_confirmou = false WHERE id = %s", (conversa["id"],))
         mostrar_menu(con, saida, p, conversa, False)
+    elif e.toque == "ia:volta":
+        # "Ver opcoes" da RETOMADA (#989, dono 13/10/2026): a pergunta do ponto onde a opcao proposta
+        # mora (o pai dela: "Em qual estado voce atua?" para SC), com as opcoes daquele ponto -- nao o
+        # menu principal. O no atual da conversa nao serve de guia: o texto nao entendido ja a tinha
+        # levado a raiz. Sem proposta (ou proposta na raiz), a pergunta do no atual; sem no, o menu.
+        con.execute("UPDATE atendimento.conversas SET ia_confirmou = false WHERE id = %s", (conversa["id"],))
+        pai = None
+        if conversa["ia_proposta_id"]:
+            pai = con.execute("""SELECT pai.* FROM atendimento.menu pai JOIN atendimento.menu filho ON filho.pai_id = pai.id
+                                  WHERE filho.id = %s AND pai.ativo AND pai.chave <> 'raiz'""",
+                              (conversa["ia_proposta_id"],)).fetchone()
+        if pai:
+            con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (pai["id"], conversa["id"]))
+            w = perguntar(con, saida, p, pai)
+            _registrar(con, conversa["id"], p.para, "botoes", "de novo: %s" % pai["chave"], w)
+        else:
+            reperguntar(con, saida, p, conversa, "")
     elif e.toque:
         # Toque que o menu de hoje nao conhece (#988, 13/10/2026: a Giovana tocou uma lista antiga,
         # ids 4 e 1, e recebeu o menu principal em silencio, duas vezes). Se o id e o de um no ativo
@@ -558,3 +591,88 @@ def marcar_paradas(con, agora: datetime, minutos: int = 30) -> int:
     return con.execute("""UPDATE atendimento.conversas SET situacao = 'parou_no_meio'
                            WHERE situacao = 'em_curso' AND ultimo_toque_em < %s""",
                        (agora - timedelta(minutes=minutos),)).rowcount
+
+
+# ── a retomada pela OlivIA (#989, dono 13/10/2026) ───────────────────────────
+
+RETOMADA_PADRAO = "Pelo que entendi da nossa conversa, você quer: {opcao}. É isso?"
+JANELA_DA_META = timedelta(hours=24)
+
+
+def _o_que_a_pessoa_disse(con, conversa) -> str:
+    """Os textos e os titulos dos toques da pessoa nesta conversa, juntos: e o que a IA rele."""
+    partes = []
+    for e in con.execute("""SELECT corpo FROM atendimento.eventos_meta
+                             WHERE tipo = 'mensagem' AND recebido_em >= %s
+                               AND (bsuid = %s OR corpo->'msg'->>'from' = %s) ORDER BY id""",
+                         (conversa["iniciada_em"], conversa["bsuid"], conversa["wa_id"] or "")).fetchall():
+        msg = (e["corpo"] or {}).get("msg") or {}
+        if msg.get("type") == "text":
+            partes.append((msg.get("text") or {}).get("body", ""))
+        elif msg.get("type") == "interactive":
+            i = msg.get("interactive") or {}
+            partes.append((i.get("button_reply") or i.get("list_reply") or {}).get("title", ""))
+    return " / ".join(p.strip() for p in partes if p and p.strip())[:1000]
+
+
+def retomar_paradas(con, saida: Saida, ia, agora: datetime) -> int:
+    """Para cada conversa que parou no meio e ainda nao foi retomada: dentro das 24 h da ultima
+    mensagem da pessoa, a IA rele o que ela disse e propoe a opcao do menu que resolve, com Sim e
+    Ver opcoes. UMA tentativa por conversa, com ou sem mensagem: `retomada_em` e a marca. Nunca
+    texto livre: so o que o menu ja daria. Devolve quantas mensagens sairam."""
+    from .campo import ultima_mensagem_de   # o mesmo relogio da janela do canal de campo
+    mandadas = 0
+    paradas = con.execute("""SELECT * FROM atendimento.conversas
+                              WHERE situacao = 'parou_no_meio' AND retomada_em IS NULL AND iniciada_em > %s
+                              ORDER BY id LIMIT 20""", (agora - timedelta(days=2),)).fetchall()
+    if ia is None:
+        return 0   # a IA fora nao gasta a tentativa: a conversa espera o minuto em que ela voltar
+    for c in paradas:
+        motivo = None
+        ultima = ultima_mensagem_de(con, c["wa_id"])
+        if ultima is None or agora - ultima >= JANELA_DA_META:
+            motivo = "fora da janela"
+        texto = "" if motivo else _o_que_a_pessoa_disse(con, c)
+        if not motivo and not texto:
+            motivo = "sem texto"
+        no = None
+        if not motivo:
+            try:
+                chave = ia.classificar(texto, folhas_e_menus(con))
+            except Exception:   # noqa: BLE001 -- a IA nunca derruba o laco
+                chave = None
+            no = _no(con, chave) if chave else None
+            if not no or no["chave"] == "raiz" or no["acao"] == "encerrar":
+                no, motivo = None, "sem opcao"
+        if no is None:
+            con.execute("UPDATE atendimento.conversas SET retomada_em = %s, retomada_chave = %s WHERE id = %s",
+                        (agora, motivo, c["id"]))
+            continue
+        caminho = [r["rotulo"] for r in _caminho_ate(con, no)]
+        opcao = no["rotulo"] + ((" (%s)" % " › ".join(caminho[:-1])) if len(caminho) > 1 else "")
+        frase = str(_ajuste(con, "retomada", RETOMADA_PADRAO) or RETOMADA_PADRAO).replace("{opcao}", opcao)
+        para = c["wa_id"] or c["bsuid"]
+        try:
+            w = saida.botoes(para, frase, [Opcao("ia:sim:%s" % no["chave"], "Sim"), Opcao("ia:volta", "Ver opções")])
+        except Exception as falha:   # noqa: BLE001 -- a Meta recusou: uma tentativa, fica dito
+            con.execute("UPDATE atendimento.conversas SET retomada_em = %s, retomada_chave = %s WHERE id = %s",
+                        (agora, ("erro: %s" % falha)[:200], c["id"]))
+            continue
+        # a conversa volta a `em_curso` com o toque de agora: o Sim cai NELA (escolher manda o link),
+        # e sem resposta `marcar_paradas` a marca de novo em 30 min -- sem segunda retomada
+        con.execute("""UPDATE atendimento.conversas
+                          SET situacao = 'em_curso', ultimo_toque_em = %s, ia_proposta_id = %s,
+                              retomada_em = %s, retomada_chave = %s
+                        WHERE id = %s""", (agora, no["id"], agora, no["chave"], c["id"]))
+        _registrar(con, c["id"], para, "botoes", "ia retomou %s" % no["chave"], w)
+        mandadas += 1
+    return mandadas
+
+
+def _caminho_ate(con, no) -> list:
+    """Os nos da raiz ate `no` (sem a raiz)."""
+    caminho, atual = [], no
+    while atual and atual["pai_id"]:
+        caminho.append(atual)
+        atual = con.execute("SELECT * FROM atendimento.menu WHERE id = %s", (atual["pai_id"],)).fetchone()
+    return list(reversed(caminho))
