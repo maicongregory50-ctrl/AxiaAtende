@@ -22,7 +22,8 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 2. A OlivIA responde **"Recebi."** Ela lê a sua frase e, um ou dois minutos depois, pergunta **só o
    que faltou**, uma coisa por vez, em conversa: o que a foto mostra, de que produto é (o nome como
    está na embalagem), em que fase está a lavoura, e **"É de hoje?"** (toque **Sim**, ou **Outra
-   data** e diga o dia, *09/10*). Responda escrevendo, com as suas palavras; ela encaixa. Com a
+   data** e diga o dia, *09/10*; se não souber o dia, escreva a **safra**, *safra 2025*: a safra vai
+   de 1º de julho a 30 de junho, e a foto entra sem dia, com a safra). Responda escrevendo, com as suas palavras; ela encaixa. Com a
    frase completa, ela só pergunta a data.
 3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida, são **uma
    conversa só**: as respostas valem para todas. Enquanto uma pergunta estiver sem resposta, a foto
@@ -43,7 +44,7 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 | **"Parece entrega. É isso?"** | o palpite do sistema pela imagem, quando você não escreveu nada; toque **Sim** ou **Outra coisa** (e aí ela pergunta o que é) |
 | **"De que produto é?"** | a foto é de campo ou de colheita e faltou o produto: escreva o nome da embalagem |
 | **"Em que fase está a lavoura?"** | só para foto de campo de sementes: recém-nascida, verde, florindo, madura ou já em semente, com as suas palavras |
-| **"É de hoje?"** | a data da foto; sem resposta, vale o dia do envio |
+| **"É de hoje?"** | a data da foto; sem resposta, vale o dia do envio. "safra 2025" vale como resposta: a foto entra sem dia, com a safra (1º de julho a 30 de junho) |
 | **"Ainda sobre a foto de há pouco: ..."** | a lembrança, duas horas depois; é a última vez que ela pergunta |
 | **"Anotado. Obrigado!"** | fechou |
 | **"Não achei esse produto na lista"** | o nome não bateu com o portfólio; o marketing confere |

@@ -190,20 +190,21 @@ class Campo:
                 legenda = frase["texto"]
                 con.execute("UPDATE atendimento.campo_frases SET usada_em = %s WHERE id = %s", (agora, frase["id"]))
         herda = {k: (lider[k] if lider else None) for k in
-                 ("classe_bastidor", "classe_produto", "classe_fase", "data_dita", "lida_em", "perguntas_em", "fechado_em")}
+                 ("classe_bastidor", "classe_produto", "classe_fase", "data_dita", "lida_em", "perguntas_em", "fechado_em",
+                  "safra_dita")}
         # a foto que chega ao grupo ja fechado entra com ele (fechado_em herdado); a que chega ao
         # grupo aberto espera a conversa, como as outras
         linha = con.execute("""INSERT INTO atendimento.material_de_campo
                    (bsuid, wa_id, erp_codigo, erp_papel, erp_nome, wamid, tipo, mime, arquivo, legenda, recebido_em, erro,
                     classe_bastidor, classe_produto, classe_fase, data_dita, data_presumida, lida_em, perguntas_em, fechado_em,
-                    grupo_id)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    grupo_id, safra_dita)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    ON CONFLICT (wamid) DO NOTHING RETURNING id""",
                             (e.pessoa.bsuid, e.pessoa.wa_id, quem["codigo"], quem["papel"], quem["nome"],
                              e.wamid, m.tipo, m.mime or "", arquivo, legenda, agora, erro,
                              herda["classe_bastidor"], herda["classe_produto"], herda["classe_fase"], herda["data_dita"],
                              bool(lider and lider["data_presumida"]), herda["lida_em"], herda["perguntas_em"],
-                             herda["fechado_em"], lider["grupo_id"] if lider else 0)).fetchone()
+                             herda["fechado_em"], lider["grupo_id"] if lider else 0, herda["safra_dita"])).fetchone()
         if not linha:
             return True   # o mesmo aviso de novo: ja esta aqui
         if not lider:   # a primeira do grupo: o grupo e ela
@@ -322,7 +323,7 @@ class Campo:
         if r["classe_bastidor"] == "campo-de-sementes" and r["classe_produto"] and r["classe_fase"] is None \
                 and "fase" not in feitas:
             return "fase"
-        if r["data_dita"] is None and "data" not in feitas:
+        if r["data_dita"] is None and r["safra_dita"] is None and "data" not in feitas:
             return "data"
         return None
 
@@ -376,10 +377,11 @@ class Campo:
     def _fechar(self, con, r, agora: datetime) -> None:
         """O grupo fecha com o que tem: a classe e a data valem para todas as fotos dele."""
         ids = self._grupo_de(con, r)
+        # o dia so e presumido quando nao ha dia dito NEM safra dita (#982: com a safra, a foto entra sem dia)
         con.execute("""UPDATE atendimento.material_de_campo
                           SET classe_bastidor = %s, classe_produto = %s, classe_fase = %s,
-                              data_presumida = CASE WHEN data_dita IS NULL THEN true ELSE data_presumida END,
-                              data_dita = coalesce(data_dita, %s),
+                              data_presumida = CASE WHEN data_dita IS NULL AND safra_dita IS NULL THEN true ELSE data_presumida END,
+                              data_dita = CASE WHEN data_dita IS NULL AND safra_dita IS NULL THEN %s ELSE data_dita END,
                               fechado_em = %s, pergunta_pendente = NULL, retomar_em = NULL
                         WHERE id = ANY(%s)""",
                     (r["classe_bastidor"], r["classe_produto"], r["classe_fase"], _dia(r["recebido_em"]), agora, ids))
@@ -501,11 +503,11 @@ class Campo:
                                   SET legenda = CASE WHEN legenda = '' THEN %s ELSE legenda || ' · ' || %s END
                                 WHERE id = ANY(%s)""", (texto[:500], texto[:300], self._grupo_de(con, r)))
                 self._ler(con, r["id"], texto, agora)
-                if e_safra(texto):
-                    # "safra 2025", "2023", "inverno 2026": e a resposta da pessoa a data, sem dia. Vale
-                    # como respondida (13/10/2026, 13:11: o dono escreveu "safara 2025" e ficou esperando);
-                    # o dia fica presumido e a safra fica no texto da foto, ate o #982 dar campo a ela.
-                    r = self._gravar(con, r, data_dita=_dia(r["recebido_em"]), data_presumida=True)
+                safra = ler_safra(texto)
+                if safra:
+                    # "safra 2025", "2023", "24/25": e a resposta da pessoa a data, SEM dia (#982, 13/10/2026):
+                    # a safra dita vai ao catalogo e o dia NAO e presumido (a foto entra sem dia)
+                    r = self._gravar(con, r, safra_dita=safra, data_presumida=False)
                     self._texto(con, saida, e.pessoa.para, ANOTADO)
                     self._perguntar_proxima(con, saida, r, agora)
                     return True
@@ -592,10 +594,30 @@ def ultima_mensagem_de(con, wa_id: str | None) -> datetime | None:
     return r["em"] if r else None
 
 
-def e_safra(texto: str) -> bool:
-    """"safra 2025", "safara 2025", "2023", "inverno 2026", "verao 25/26": uma data sem dia."""
+def ler_safra(texto: str) -> int | None:
+    """#982: "safra 2025", "safara 2025", "2025", "safra 25", "24/25", "2024/25" -> 2025 (o ano em que a
+    safra termina: a safra N vai de 01/07/N-1 a 30/06/N, padrao da casa). None quando nao e safra.
+    "inverno 2026" e "verao 25/26" tambem caem no ano (o ciclo nao e a safra)."""
     t = _sem_acento(texto)
-    return bool(re.search(r"\bsaf[a-z]*ra\b|\binverno\b|\bverao\b|\b(19|20)\d{2}\b", t))
+    if not t or ler_data(texto, datetime(2000, 1, 1, tzinfo=FUSO)) is not None and "/" in t and not re.search(r"\bsaf", t):
+        return None   # "09/10" e dia, nao safra
+    m = re.search(r"(\d{2,4})\s*/\s*(\d{2,4})\s*$", t)
+    if m and (len(m.group(1)) == 4 or len(m.group(2)) == 2 and re.search(r"\bsaf|\bverao|\binverno", t)):
+        fim = m.group(2)
+        ano = int(fim) if len(fim) == 4 else 2000 + int(fim[-2:])
+        return ano if 2000 <= ano <= 2100 else None
+    m = re.search(r"(?<![\d/])(\d{4})(?![\d/])", t)
+    if m:
+        ano = int(m.group(1))
+        return ano if 2000 <= ano <= 2100 else None
+    m = re.search(r"\b(?:saf[a-z]*ra|verao|inverno)\s*(\d{2})\b", t)
+    if m:
+        return 2000 + int(m.group(1))
+    return None
+
+
+def e_safra(texto: str) -> bool:
+    return ler_safra(texto) is not None
 
 
 def ler_data(texto: str, agora: datetime) -> date | None:
@@ -655,11 +677,13 @@ def classe_aplicada(con, item_id: int, agora: datetime) -> dict | None:
 
 
 def descrever(r) -> dict:
-    data = r["data_dita"] or _dia(r["recebido_em"])
+    # #982: com a safra dita e sem dia, a data vai VAZIA (o marketing nao presume o dia)
+    com_safra = r["safra_dita"] is not None and r["data_dita"] is None
+    data = None if com_safra else (r["data_dita"] or _dia(r["recebido_em"]))
     falta = []
     if not (r["legenda"] or "").strip():
         falta.append("legenda")
-    if r["data_dita"] is None or r["data_presumida"]:
+    if (r["data_dita"] is None or r["data_presumida"]) and not com_safra:
         falta.append("data")
     if r["classe_bastidor"] is None:
         falta.append("bastidor")
@@ -669,8 +693,9 @@ def descrever(r) -> dict:
             "palpite": ({"bastidor": r["palpite_bastidor"], "produto": r["palpite_produto"], "fase": r["palpite_fase"]}
                         if r["palpite_em"] else None),
             "classe": classe, "fechado": r["fechado_em"] is not None, "desistiu": r["desistiu_em"] is not None,
-            "perguntado": r["perguntas_em"] is not None,
-            "data": data.isoformat(), "data_presumida": r["data_dita"] is None or r["data_presumida"],
+            "perguntado": r["perguntas_em"] is not None, "safra": r["safra_dita"],
+            "data": data.isoformat() if data else None,
+            "data_presumida": (r["data_dita"] is None or r["data_presumida"]) and not com_safra,
             "recebido_em": r["recebido_em"].isoformat(), "falta": falta,
             "lote": r["lote"], "atv": r["atv"], "buscado_em": r["buscado_em"].isoformat() if r["buscado_em"] else None}
 

@@ -336,8 +336,9 @@ def test_casar_produto_e_ler_data():
     assert campo.ler_data("2026-10-08", AGORA) == date(2026, 10, 8)
     assert campo.ler_data("30/12", AGORA) == date(2025, 12, 30)
     assert campo.ler_data("nao sei", AGORA) is None and campo.ler_data("31/02", AGORA) is None
-    assert campo.e_safra("safara 2025") and campo.e_safra("Safra 24/25") and campo.e_safra("2023") and campo.e_safra("inverno 2026")
-    assert not campo.e_safra("Foto do Jair") and not campo.e_safra("09/10")
+    assert campo.ler_safra("safara 2025") == 2025 and campo.ler_safra("Safra 24/25") == 2025 and campo.ler_safra("2023") == 2023
+    assert campo.ler_safra("inverno 2026") == 2026 and campo.ler_safra("safra 25") == 2025 and campo.ler_safra("2024/2025") == 2025
+    assert campo.ler_safra("Foto do Jair") is None and campo.ler_safra("09/10") is None and campo.ler_safra("01/04/2023") is None
 
 
 def test_a_safra_ou_o_ano_respondem_a_data_sem_dia(canal):
@@ -352,7 +353,12 @@ def test_a_safra_ou_o_ano_respondem_a_data_sem_dia(canal):
     passo(canal, s, texto("wamid.t1", "safara 2025", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
     m = material(canal)[0]
     assert s.ultima[2] == campo.ANOTADO and m["fechado_em"] is not None
-    assert m["data_dita"] == date(2026, 10, 12) and m["data_presumida"] is True and m["legenda"] == "carga saindo · safara 2025"
+    # #982: a safra dita vai ao catalogo e o dia NAO e presumido: a foto entra sem dia
+    assert m["safra_dita"] == 2025 and m["data_dita"] is None and m["data_presumida"] is False
+    assert m["legenda"] == "carga saindo · safara 2025"
+    with conexao(canal) as con:
+        p = campo.pendentes(con, AGORA + 5 * MIN)[0]
+    assert p["safra"] == 2025 and p["data"] is None and p["data_presumida"] is False and "data" not in p["falta"]
 
 
 def _api(cfg):
