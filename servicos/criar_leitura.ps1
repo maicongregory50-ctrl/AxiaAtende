@@ -147,14 +147,31 @@ if (-not $SoPgpass) {
             Psql 'postgres' "ALTER SYSTEM SET log_truncate_on_rotation = off;" | Out-Null
             Psql 'postgres' "ALTER SYSTEM SET log_line_prefix = '%m [%p] %u@%d ';" | Out-Null
             Ok "coletor de log configurado para $LOGPG (ALTER SYSTEM); reiniciando o axiaatende-postgres"
-            Restart-Service axiaatende-postgres
+            # As telas e o recepcionista DEPENDEM do servico do banco (WinSW): sem parar os dois antes,
+            # o Restart-Service recusa ("possui servicos dependentes", 13/10/2026). Para os que estao
+            # rodando, reinicia o banco, e sobe os mesmos de volta -- segundos, e so os que estavam de pe.
+            $dependentes = @((Get-Service axiaatende-postgres).DependentServices | Where-Object { $_.Status -eq 'Running' } | ForEach-Object { $_.Name })
+            foreach ($d in $dependentes) { Stop-Service $d -ErrorAction Stop }
+            Restart-Service axiaatende-postgres -ErrorAction Stop
             $pronto = $false
             for ($i = 0; $i -lt 30 -and -not $pronto; $i++) {
                 & "$PG\pg_isready.exe" -h 127.0.0.1 -p $PORTA -t 2 | Out-Null
                 if ($LASTEXITCODE -eq 0) { $pronto = $true } else { Start-Sleep -Seconds 1 }
             }
-            if (-not $pronto) { Falha "o axiaatende-postgres nao voltou na $PORTA. Volte: ALTER SYSTEM RESET logging_collector (ou apague a linha em $env:ProgramData\..\pgdata\postgresql.auto.conf) e Start-Service axiaatende-postgres" }
+            if (-not $pronto) { Falha "o axiaatende-postgres nao voltou na $PORTA. Volte: ALTER SYSTEM RESET logging_collector (ou apague a linha em C:\Dados\AxiaAtende\pgdata\postgresql.auto.conf), Start-Service axiaatende-postgres e depois $($dependentes -join ', ')" }
             Ok 'axiaatende-postgres de pe'
+            foreach ($d in ($dependentes | Sort-Object)) {   # axiaatende-backend antes de axiaatende-recepcionista
+                Start-Service $d -ErrorAction Stop
+                $porta = if ($d -eq 'axiaatende-backend') { 8009 } elseif ($d -eq 'axiaatende-recepcionista') { 8008 } else { 0 }
+                if ($porta) {
+                    $saude = $null
+                    for ($i = 0; $i -lt 30 -and -not $saude; $i++) {
+                        try { $saude = Invoke-RestMethod "http://127.0.0.1:$porta/saude" -TimeoutSec 2 } catch { Start-Sleep -Seconds 1 }
+                    }
+                    if (-not $saude) { Falha "$d nao respondeu em /saude depois do reinicio do banco; veja C:\Logs\AxiaAtende" }
+                }
+                Ok "$d de volta"
+            }
         }
     } finally {
         Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
