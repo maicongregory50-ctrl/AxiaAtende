@@ -1,7 +1,7 @@
 # A retomada pela OlivIA: a conversa que parou no meio recebe a opção que resolve
 **Data:** 2026-10-13
 **Chamado:** #989
-**Status:** PROPOSTO
+**Status:** APROVADO (dono, 13/10/2026)
 
 > O arquivo nasceu como "a tela de Conversas e a resposta de pessoa" e foi refeito no mesmo dia: o
 > dono recusou a tela ("precisa muita coisa, não penso em rodar agora; só leitura agora e a resposta
@@ -88,7 +88,12 @@ Caminho B, escolhido pelo dono em 13/10/2026 ("retomada pelo menu"):
    toque de agora, e registra em `enviadas` ("ia retomou <chave>"). Sem nó (ou IA fora), grava só
    `retomada_em` e fica em silêncio: uma tentativa, nunca duas. Erro da Meta não derruba o laço.
    O texto da retomada é um ajuste (`atendimento.ajustes`, chave `retomada`), como as outras frases.
-3. O toque depois da retomada é o de hoje: `ia:sim` manda o link; `ia:menu` mostra o menu.
+3. O toque depois da retomada: `ia:sim` manda o link, como hoje. **"Ver opções" na retomada mostra
+   a pergunta do nó onde a pessoa parou, com as opções daquele ponto** (o Vinicius: "Em qual estado
+   você atua?" com os estados), e só o menu principal se ela parou na raiz (dono, 13/10/2026: "sim,
+   anotar assim"). É o `reperguntar` do #988, sem a linha da lista antiga; o botão da retomada leva
+   um id próprio (`ia:volta`) para o motor distinguir do `ia:menu` da confirmação comum, que
+   continua mostrando o menu principal.
 4. Manual: `recepcao.md` ganha "A retomada pela OlivIA" (o que é, quando sai, o que a Recepção
    mostra); `leitura-da-sessao.md` ganha a linha `←` da retomada.
 
@@ -125,8 +130,9 @@ horas da última mensagem da pessoa, com a IA ligada.
 2. No minuto seguinte a OlivIA relê tudo o que a pessoa escreveu e tocou, e manda: *"Pelo que
    entendi da nossa conversa, você quer: SC (Comercial › Revendedor). É isso?"* com **Sim** e **Ver
    opções**.
-3. **Sim** manda o contato certo, como se a pessoa tivesse tocado no menu; **Ver opções** mostra o
-   menu. Sem resposta, nada mais é mandado.
+3. **Sim** manda o contato certo, como se a pessoa tivesse tocado no menu; **Ver opções** mostra de
+   novo a pergunta do ponto onde ela parou, com as opções daquele ponto (o menu principal só se
+   parou no começo). Sem resposta, nada mais é mandado.
 
 **O que significa cada sinal.** Na Recepção, a conversa retomada volta a "escolhendo agora"; com o
 Sim vira "recebeu o link" e conta em "IA acertou"; sem resposta volta a "parou no meio" em 30 min, e
