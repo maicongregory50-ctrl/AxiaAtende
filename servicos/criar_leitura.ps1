@@ -204,7 +204,9 @@ try {
     Ok "entra como $RO sem digitar senha"
 
     $escrita = & "$PG\psql.exe" -h 127.0.0.1 -p $PORTA -U $RO -d $BANCO -w -Atc 'update atendimento.ajustes set valor = valor where false' 2>&1
-    if (($escrita | Out-String) -notmatch 'read-only|somente leitura|permission denied|permiss') {
+    # O Postgres desta instancia fala portugues ("transacao de leitura-apenas", "permissao negada"),
+    # e o console pode estragar os acentos: a regua casa os dois idiomas pelo pedaco sem acento.
+    if (($escrita | Out-String) -notmatch 'read-only|read only|leitura-apenas|leitura apenas|somente leitura|permission denied|permiss') {
         Falha "o banco NAO recusou a escrita do ${RO}: $escrita -- apague $PGPASS e avise"
     }
     Ok "o banco recusa escrever ($(($escrita | Out-String).Trim().Split([Environment]::NewLine)[0]))"
@@ -216,7 +218,7 @@ try {
     Ok 'casa.usuarios recusada'
 
     $su = & "$PG\psql.exe" -h 127.0.0.1 -p $PORTA -U $SUPER -d $BANCO -w -Atc 'select 1' 2>&1
-    if (($su | Out-String) -notmatch 'no password|senha|password') {
+    if (($su | Out-String) -notmatch 'no password|senha|password|autentica|authentication') {
         Falha "com este PGPASSFILE o $SUPER ainda entrou -- o arquivo nao esta isolando: $su"
     }
     Ok "o superusuario nao entra por este arquivo"
