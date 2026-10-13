@@ -162,11 +162,13 @@ if (-not $SoPgpass) {
             Ok 'axiaatende-postgres de pe'
             foreach ($d in ($dependentes | Sort-Object)) {   # axiaatende-backend antes de axiaatende-recepcionista
                 Start-Service $d -ErrorAction Stop
-                $porta = if ($d -eq 'axiaatende-backend') { 8009 } elseif ($d -eq 'axiaatende-recepcionista') { 8008 } else { 0 }
-                if ($porta) {
+                # NAO chamar de $porta: no PowerShell o nome nao distingue maiusculas e isto sobrescreveria
+                # a $PORTA do banco (aconteceu em 13/10/2026: o pgpass saiu com a 8008).
+                $portaSaude = if ($d -eq 'axiaatende-backend') { 8009 } elseif ($d -eq 'axiaatende-recepcionista') { 8008 } else { 0 }
+                if ($portaSaude) {
                     $saude = $null
                     for ($i = 0; $i -lt 30 -and -not $saude; $i++) {
-                        try { $saude = Invoke-RestMethod "http://127.0.0.1:$porta/saude" -TimeoutSec 2 } catch { Start-Sleep -Seconds 1 }
+                        try { $saude = Invoke-RestMethod "http://127.0.0.1:$portaSaude/saude" -TimeoutSec 2 } catch { Start-Sleep -Seconds 1 }
                     }
                     if (-not $saude) { Falha "$d nao respondeu em /saude depois do reinicio do banco; veja C:\Logs\AxiaAtende" }
                 }
