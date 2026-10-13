@@ -9,3 +9,4 @@
 [2026-10-13][AXIAATENDE-END] #981 entregue (5.2) com a devolucao; primeira leitura feita; achado: o canal de campo nao registrava as falas da OlivIA em enviadas (corrigido, pede Restart-Service axiaatende-recepcionista)
 [2026-10-13][AXIAATENDE-END] #988 texto nas opcoes do no e lista antiga (motor) no master; #989 aberto (segunda linha); falta Restart-Service axiaatende-recepcionista (dono)
 [2026-10-13][AXIAATENDE-END] #989 retomada pela OlivIA no master; falta Restart-Service dos dois servicos (dono) e a prova com uma conversa parada
+[2026-10-13][AXIAATENDE-END] #982 safra como resposta a data (migracao 017, dd4344b); falta Restart-Service axiaatende-backend e recepcionista (dono)
