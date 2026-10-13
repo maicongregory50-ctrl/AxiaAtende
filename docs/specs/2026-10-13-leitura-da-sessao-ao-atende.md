@@ -1,7 +1,7 @@
 # A leitura da sessão ao AxiaAtende em produção
 **Data:** 2026-10-13
 **Chamado:** #981
-**Status:** PROPOSTO
+**Status:** APROVADO
 
 ## Contexto
 
@@ -72,7 +72,7 @@ instrução e regra, aqui dentro. Isto entra como item da `politica-uso-ia.md` (
 
 ## Decisão
 
-Três caminhos foram postos; o dono escolheu o B em 13/10/2026 (três respostas: todo o atendimento;
+Três caminhos foram postos; o dono escolheu o B em 13/10/2026 ("b"; antes, três respostas: todo o atendimento;
 leitor + Postgres; script na mão da sessão).
 
 - **A — conservador:** só o canal de campo (`material_de_campo`, `campo_frases` e as mensagens com
