@@ -138,6 +138,30 @@ class Campo:
         self.pasta = Path(pasta)
         self.ia = ia
 
+    # ── o que a OlivIA manda fica em `enviadas` (#981, 13/10/2026) ────────────
+    # A primeira leitura da sessao mostrou a conversa SEM as falas dela: o motor registra o que
+    # manda (motor._registrar), o canal de campo nao registrava. Sem isto o leitor nao reconstroi
+    # o dialogo, e o status da Meta (entregue, lida) nao tem onde pousar.
+
+    def _registrar(self, con, para, tipo: str, resumo: str, wamid) -> None:
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, %s, %s)
+                       ON CONFLICT (wamid) DO NOTHING""", (wamid, para, tipo, (resumo or "")[:200]))
+
+    def _texto(self, con, saida, para, texto: str):
+        w = saida.texto(para, texto)
+        self._registrar(con, para, "texto", texto, w)
+        return w
+
+    def _botoes(self, con, saida, para, texto: str, opcoes):
+        w = saida.botoes(para, texto, opcoes)
+        self._registrar(con, para, "botoes", texto, w)
+        return w
+
+    def _lista(self, con, saida, para, texto: str, botao: str, opcoes):
+        w = saida.lista(para, texto, botao, opcoes)
+        self._registrar(con, para, "lista", texto, w)
+        return w
+
     # ── a chegada ────────────────────────────────────────────────────────────
 
     def receber(self, con, saida, e, agora: datetime) -> bool:
@@ -192,7 +216,7 @@ class Campo:
                             (legenda, self._grupo_de(con, lider)))
                 self._ler(con, lider["id"], legenda, agora)
             return True
-        saida.texto(e.pessoa.para, RECEBI)
+        self._texto(con, saida, e.pessoa.para, RECEBI)
         if legenda:
             self._ler(con, linha["id"], legenda, agora)
         # a primeira pergunta sai no laco do minuto (`fazer_perguntas`): da tempo de o palpite de
@@ -317,21 +341,21 @@ class Campo:
         para = r["wa_id"] or r["bsuid"]
         prefixo = RETOMANDO if retomando else ""
         if qual == "legenda":
-            saida.texto(para, prefixo + PERGUNTA_LEGENDA)
+            self._texto(con, saida, para, prefixo + PERGUNTA_LEGENDA)
         elif qual == "bastidor":
             if r["palpite_bastidor"] in BASTIDORES and not (r["legenda"] or "").strip() and not retomando and not r["retomada"]:
-                saida.botoes(para, PERGUNTA_PALPITE % BASTIDORES[r["palpite_bastidor"]].lower(),
+                self._botoes(con, saida, para, PERGUNTA_PALPITE % BASTIDORES[r["palpite_bastidor"]].lower(),
                              [Opcao("campo:bastidor:" + r["palpite_bastidor"], "Sim"), Opcao("campo:bastidor:outra", "Outra coisa")])
             else:
-                saida.texto(para, prefixo + PERGUNTA_BASTIDOR)
+                self._texto(con, saida, para, prefixo + PERGUNTA_BASTIDOR)
         elif qual == "produto":
-            saida.texto(para, prefixo + PERGUNTA_PRODUTO)
+            self._texto(con, saida, para, prefixo + PERGUNTA_PRODUTO)
         elif qual == "fase":
-            saida.texto(para, prefixo + PERGUNTA_FASE)
+            self._texto(con, saida, para, prefixo + PERGUNTA_FASE)
         elif qual == "data":
-            saida.botoes(para, prefixo + PERGUNTA_DATA, [Opcao("campo:hoje:sim", "Sim"), Opcao("campo:hoje:outra", "Outra data")])
+            self._botoes(con, saida, para, prefixo + PERGUNTA_DATA, [Opcao("campo:hoje:sim", "Sim"), Opcao("campo:hoje:outra", "Outra data")])
         elif qual == "qual_dia":
-            saida.texto(para, prefixo + PERGUNTA_QUAL_DIA)
+            self._texto(con, saida, para, prefixo + PERGUNTA_QUAL_DIA)
         n = r["pergunta_n"] + (0 if retomando or qual in ("data", "qual_dia") else 1)
         con.execute("""UPDATE atendimento.material_de_campo
                           SET pergunta_pendente = %s, perguntas_em = coalesce(perguntas_em, %s), pergunta_n = %s,
@@ -437,7 +461,7 @@ class Campo:
                 except Exception:  # noqa: BLE001
                     p = None
             if not p:
-                saida.texto(e.pessoa.para, NAO_ACHEI_PRODUTO)
+                self._texto(con, saida, e.pessoa.para, NAO_ACHEI_PRODUTO)
             r = self._gravar(con, r, classe_produto=p)
             self._perguntar_proxima(con, saida, r, agora)
             return True
@@ -460,7 +484,7 @@ class Campo:
         if q == "data":
             if toque == "campo:hoje:sim":
                 r = self._gravar(con, r, data_dita=_dia(r["recebido_em"]), data_presumida=False)
-                saida.texto(e.pessoa.para, ANOTADO)
+                self._texto(con, saida, e.pessoa.para, ANOTADO)
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
             if toque == "campo:hoje:outra":
@@ -469,7 +493,7 @@ class Campo:
             dia = ler_data(texto, agora) if texto else None
             if dia:
                 r = self._gravar(con, r, data_dita=dia, data_presumida=False)
-                saida.texto(e.pessoa.para, ANOTADO)
+                self._texto(con, saida, e.pessoa.para, ANOTADO)
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
             if texto:   # "Foto da safra 2025" com a data em aberto: complementa a legenda, em silencio
@@ -483,10 +507,10 @@ class Campo:
             dia = ler_data(texto, agora) if texto else None
             if dia:
                 r = self._gravar(con, r, data_dita=dia, data_presumida=False)
-                saida.texto(e.pessoa.para, ANOTADO)
+                self._texto(con, saida, e.pessoa.para, ANOTADO)
             else:
                 r = self._gravar(con, r, data_dita=_dia(r["recebido_em"]), data_presumida=True)
-                saida.texto(e.pessoa.para, NAO_ENTENDI_DATA)
+                self._texto(con, saida, e.pessoa.para, NAO_ENTENDI_DATA)
             self._perguntar_proxima(con, saida, r, agora)
             return True
         return False
@@ -514,7 +538,7 @@ class Campo:
         con.execute("""INSERT INTO atendimento.campo_frases (wa_id, texto, recebido_em, avisado)
                        VALUES (%s, %s, %s, %s)""", (e.pessoa.wa_id, texto[:500], agora, not avisado))
         if not avisado:
-            saida.texto(e.pessoa.para, ANOTADO_FRASE)
+            self._texto(con, saida, e.pessoa.para, ANOTADO_FRASE)
         return True
 
     # ── os avisos dentro da janela ───────────────────────────────────────────
@@ -539,7 +563,7 @@ class Campo:
                     estado = "enviado"   # o grupo ja foi avisado: esta so herda a marca
                 elif dentro:
                     try:
-                        saida.texto(r["wa_id"] or r["bsuid"], mensagem)
+                        self._texto(con, saida, r["wa_id"] or r["bsuid"], mensagem)
                         estado = "enviado"
                         feitos += 1
                     except Exception as falha:  # noqa: BLE001

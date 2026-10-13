@@ -114,6 +114,10 @@ def test_a_frase_lida_pela_ia_fecha_tudo_e_so_a_data_e_perguntada(canal):
     m = material(canal)[0]
     assert m["data_dita"] == date(2026, 10, 12) and m["fechado_em"] is not None and s.ultima[2] == campo.ANOTADO
     with conexao(canal) as con:
+        # o que a OlivIA mandou fica em `enviadas`, como no motor (#981: a leitura da sessao reconstroi o dialogo)
+        enviadas = [(x["tipo"], x["resumo"]) for x in con.execute(
+            "SELECT tipo, resumo FROM atendimento.enviadas WHERE para = %s ORDER BY id", (EQUIPE,)).fetchall()]
+        assert enviadas == [("texto", campo.RECEBI), ("botoes", campo.PERGUNTA_DATA), ("texto", campo.ANOTADO)]
         p = campo.pendentes(con, AGORA + 4 * MIN)
         assert [x["id"] for x in p] == [m["id"]] and p[0]["fechado"] is True   # agora sim
         assert p[0]["classe"] == {"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None}
