@@ -7,3 +7,4 @@
 [2026-10-12][AXIAATENDE-END] #970 emenda (c) da decisao 15: uma conversa aberta por pessoa (grupo_id, migracao 015), texto a mais na legenda; fe28042 enviado; aberto #981 (acesso de leitura da sessao ao banco de producao, molde do ERP); falta Restart-Service dos dois servicos (dono)
 [2026-10-13][AXIAATENDE-END] #981 blocos 1 e 2 no master (83d94ad; AxiaSecurity 4cccb3b): papel so-leitura, pgpass, ler_conversa.py, governanca; falta o dono rodar servicos\criar_leitura.ps1 -ComLog e a primeira leitura
 [2026-10-13][AXIAATENDE-END] #981 entregue (5.2) com a devolucao; primeira leitura feita; achado: o canal de campo nao registrava as falas da OlivIA em enviadas (corrigido, pede Restart-Service axiaatende-recepcionista)
+[2026-10-13][AXIAATENDE-END] #988 texto nas opcoes do no e lista antiga (motor) no master; #989 aberto (segunda linha); falta Restart-Service axiaatende-recepcionista (dono)
