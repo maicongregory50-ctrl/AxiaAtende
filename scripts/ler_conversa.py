@@ -32,6 +32,8 @@ import psycopg
 from psycopg.rows import dict_row
 
 RAIZ = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(RAIZ))
+from backend import agenda  # noqa: E402 -- o reconhecimento do numero, o mesmo do atendimento
 PGPASS = RAIZ / ".pgpass_leitura"
 LOG = Path(r"C:\Logs\AxiaAtende\leituras.jsonl")
 DSN = "host=127.0.0.1 port=5436 dbname=axiaatende user=axiaatende_ro"
@@ -184,9 +186,10 @@ def ultimas(con, n: int = 20) -> list[str]:
                                    max(corpo->'contacts'->0->'profile'->>'name') AS nome
                               FROM atendimento.eventos_meta WHERE tipo = 'mensagem'
                              GROUP BY 1 ORDER BY ultima DESC LIMIT %s""", (n,)).fetchall():
-        a = con.execute("""SELECT codigo, nome, papeis FROM atendimento.agenda WHERE numero = %s ORDER BY codigo LIMIT 1""",
-                        (r["wa_id"],)).fetchone()
-        quem = ("%s (%s, cadastro %s)" % (a["nome"], "/".join(a["papeis"] or []), a["codigo"])) if a else (r["nome"] or "sem cadastro")
+        # o mesmo reconhecimento do atendimento (a Meta manda o numero sem o nono digito; a agenda o tem)
+        q = agenda.reconhecer(con, r["wa_id"]) or {}
+        quem = ("%s (%s, cadastro %s)" % (q.get("erp_nome") or "?", "/".join(q.get("erp_papeis") or []), q.get("erp_codigo"))
+                if q.get("erp_codigo") else (r["nome"] or "sem cadastro"))
         linhas.append("%s %s  %s  %d mensagem(ns)" % (_hora(r["ultima"]), r["wa_id"], quem, r["n"]))
     return linhas
 
