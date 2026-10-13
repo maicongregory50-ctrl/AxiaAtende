@@ -23,6 +23,7 @@ O QUE VOLTA NO TOQUE (o `id` do botao ou da linha), e a unica coisa que o motor 
     nota:<bom|normal|ruim>  a nota da pesquisa (1..5 = a lista antiga)
     envio:...         resposta a um convite da carteira (tratada pelo modulo de envio, Fase E)
 """
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -268,15 +269,76 @@ NAO_ENTENDO = ("Recebi, mas por aqui eu entendo texto e os botões. Me conta em 
                "precisa.")
 
 
-def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas_vindas: bool) -> None:
-    """Quem escreveu: a IA propoe; sem proposta (ou sem IA), o menu."""
+LISTA_ANTIGA = "Essa lista é antiga; escolha de novo aqui:"
+
+
+def _no_atual(con, conversa):
+    """O no cujas opcoes estao na tela da pessoa (o ultimo escolhido, ou a raiz); None sem nenhum."""
+    if not conversa or not conversa["no_atual_id"]:
+        return None
+    return con.execute("SELECT * FROM atendimento.menu WHERE id = %s AND ativo", (conversa["no_atual_id"],)).fetchone()
+
+
+def _no_por_id(con, toque: str):
+    """O toque numerico de uma lista antiga: quando e o id de um no ativo, e esse no."""
+    if not (toque or "").strip().isdigit():
+        return None
+    return con.execute("SELECT * FROM atendimento.menu WHERE id = %s AND ativo AND chave <> 'raiz'",
+                       (int(toque),)).fetchone()
+
+
+def _sem_acento(t: str) -> str:
+    return unicodedata.normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower().strip()
+
+
+def casar_opcao(con, ia, no, texto: str):
+    """O texto escrito contra as opcoes do no onde a pessoa esta. Devolve (certo, parecido): `certo`
+    e o UNICO filho cujo rotulo (ou o fim da chave) e o texto, sem acento nem maiuscula ("Sc" = SC,
+    "revenda" = Revendedor); `parecido` e o que a IA, restrita a esses filhos, propoe quando nao ha
+    casamento exato. Os dois None: nada aqui, segue o caminho de antes."""
+    t = _sem_acento(texto)
+    if not no or not t or len(t) > 80:
+        return None, None
+    filhos = [f for f in _filhos(con, no["id"]) if f["acao"] != "encerrar"]
+    if not filhos:
+        return None, None
+    exatos = [f for f in filhos if _sem_acento(f["rotulo"]) == t or f["chave"].rsplit(".", 1)[-1] == t
+              or _sem_acento(f["rotulo"]).split()[0] == t]
+    if len(exatos) == 1:
+        return exatos[0], None
+    if ia is None:
+        return None, None
+    try:
+        chave = ia.classificar(texto, [{"chave": f["chave"], "rotulo": f["rotulo"], "descricao": f["descricao"],
+                                        "acao": f["acao"], "caminho": []} for f in filhos])
+    except Exception:   # noqa: BLE001 -- a IA nunca derruba o atendimento
+        chave = None
+    parecido = next((f for f in filhos if chave and f["chave"] == chave), None)
+    return None, parecido
+
+
+def reperguntar(con, saida: Saida, pessoa: Pessoa, conversa, aviso: str) -> None:
+    """A pergunta do no atual de novo, com uma linha antes; sem no, o menu com a linha."""
+    no = _no_atual(con, conversa)
+    if no and no["chave"] != "raiz" and _filhos(con, no["id"]):
+        w = perguntar(con, saida, pessoa, no, aviso)
+        _registrar(con, conversa["id"], pessoa.para, "botoes", "lista antiga: %s" % no["chave"], w)
+        return
+    w = saida.texto(pessoa.para, aviso)
+    _registrar(con, conversa["id"], pessoa.para, "texto", "lista antiga", w)
+    mostrar_menu(con, saida, pessoa, conversa, False)
+
+
+def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas_vindas: bool, no=None) -> None:
+    """Quem escreveu: a IA propoe; sem proposta (ou sem IA), o menu. `no` ja proposto (pelas opcoes
+    do no atual, #988) pula a IA sobre a arvore inteira."""
     chave = None
-    if ia is not None and texto.strip():
+    if no is None and ia is not None and texto.strip():
         try:
             chave = ia.classificar(texto, folhas_e_menus(con))
         except Exception:   # noqa: BLE001 -- a IA nunca derruba o atendimento
             chave = None
-    no = _no(con, chave) if chave else None
+    no = no if no is not None else (_no(con, chave) if chave else None)
     if not no or no["chave"] == "raiz" or no["acao"] == "encerrar":
         mostrar_menu(con, saida, pessoa, conversa, com_boas_vindas)
         return
@@ -353,12 +415,31 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     elif e.toque == "ia:menu":
         con.execute("UPDATE atendimento.conversas SET ia_confirmou = false WHERE id = %s", (conversa["id"],))
         mostrar_menu(con, saida, p, conversa, False)
+    elif e.toque:
+        # Toque que o menu de hoje nao conhece (#988, 13/10/2026: a Giovana tocou uma lista antiga,
+        # ids 4 e 1, e recebeu o menu principal em silencio, duas vezes). Se o id e o de um no ativo
+        # do menu, e esse no; senao, uma linha dizendo que a lista mudou e a pergunta de agora.
+        no = _no_por_id(con, e.toque)
+        if no:
+            escolher(con, saida, p, conversa, no, agora)
+        else:
+            reperguntar(con, saida, p, conversa, LISTA_ANTIGA)
     else:
         # Quem foi convidado e escreveu: o texto fica tambem na linha dele na tela Envios.
         if envio is not None and e.texto:
             envio.tratar_texto_de_convidado(con, e, agora)
-        # Texto, audio, foto, toque antigo: a IA le o que der; o resto vai para o menu.
-        propor(con, saida, ia, p, conversa, e.texto or "", nova)
+        # Texto numa pergunta de botoes ou lista (#988: o Vinicius escreveu "Sc" no "em qual estado?"
+        # e voltou ao menu principal tres vezes): primeiro as opcoes do no onde a pessoa esta --
+        # o casamento exato escolhe na hora; a IA restrita as opcoes propoe com a confirmacao de
+        # sempre. So depois o caminho de antes: a IA sobre a arvore inteira, e o menu.
+        no_atual = _no_atual(con, conversa)
+        certo, parecido = casar_opcao(con, ia, no_atual, e.texto or "")
+        if certo:
+            escolher(con, saida, p, conversa, certo, agora)
+        elif parecido:
+            propor(con, saida, ia, p, conversa, e.texto or "", nova, no=parecido)
+        else:
+            propor(con, saida, ia, p, conversa, e.texto or "", nova)
 
 
 # ── depois do link: a pergunta das 4h30 ─────────────────────────────────────

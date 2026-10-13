@@ -71,6 +71,7 @@ class IAFalsa:
 
     def classificar(self, texto, opcoes):
         self.perguntas.append(texto)
+        self.opcoes = getattr(self, "opcoes", []) + [[o["chave"] for o in opcoes]]   # #988: o que ela viu
         if self.falha:
             raise TimeoutError("a IA demorou")
         return self.resposta

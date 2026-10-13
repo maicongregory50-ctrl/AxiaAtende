@@ -325,3 +325,62 @@ def test_reacao_nao_responde_e_figurinha_recebe_uma_linha_sem_menu(ligado):
     assert _conversa(ligado) is None   # nada de conversa aberta: ela nasce quando a pessoa escrever
     passo(ligado, s, texto("wamid.t1", "preciso de semente"))
     assert _conversa(ligado) is not None and len(s.enviadas) > 1
+
+
+# ── #988 (13/10/2026): texto numa pergunta de botoes, e toque em lista antiga ────────────────
+
+def _ate_o_estado(cfg, s):
+    passo(cfg, s, texto("wamid.1", "oi"))
+    passo(cfg, s, toque("wamid.2", "menu:comercial", lista=True))
+    _, _, corpo, _ = passo(cfg, s, toque("wamid.3", "menu:comercial.revenda"))
+    assert corpo == "Em qual estado você atua?"
+
+
+def test_texto_escrito_na_pergunta_de_botoes_escolhe_a_opcao_igual(ligado):
+    """O Vinicius escreveu "Sc" no "em qual estado?" e voltou ao menu principal tres vezes."""
+    s = SaidaFalsa()
+    _ate_o_estado(ligado, s)
+    n = len(s.enviadas)
+    passo(ligado, s, texto("wamid.4", "Sc"))
+    corpo, nome, _ = _link(s)
+    assert "Maicon" in corpo and nome == "Maicon Gregory"
+    assert "menu principal" not in [x[2] for x in s.enviadas[n:]]
+    c = _conversa(ligado)
+    assert c["situacao"] == "com_link" and c["caminho"][-1] == "SC"
+
+
+def test_texto_que_nao_casa_vai_a_ia_restrita_as_opcoes_do_no_e_pede_confirmacao(ligado):
+    s = SaidaFalsa()
+    _ate_o_estado(ligado, s)
+    ia = IAFalsa(resposta="comercial.revenda.sc")
+    tipo, _, corpo, opcoes = passo(ligado, s, texto("wamid.4", "consegue me passar os de santa catarina?"), ia=ia)
+    assert tipo == "botoes" and corpo.startswith("Entendi que você quer: SC") and opcoes[0][0] == "ia:sim:comercial.revenda.sc"
+    assert all(k.startswith("comercial.revenda.") for k in ia.opcoes[-1]) and len(ia.opcoes[-1]) == 5
+    passo(ligado, s, toque("wamid.5", "ia:sim:comercial.revenda.sc"))
+    assert _conversa(ligado)["situacao"] == "com_link"
+
+
+def test_texto_sem_casamento_e_sem_ia_segue_o_caminho_de_antes(ligado):
+    s = SaidaFalsa()
+    _ate_o_estado(ligado, s)
+    tipo, _, _, opcoes = passo(ligado, s, texto("wamid.4", "quero falar com alguem"))
+    assert tipo == "lista" and opcoes[0][0] == "menu:comercial"   # o menu principal, como antes
+
+
+def test_toque_em_lista_antiga_repete_a_pergunta_atual_com_a_linha(ligado):
+    """A Giovana tocou os ids 4 e 1 de um menu antigo e recebeu o menu principal em silencio."""
+    s = SaidaFalsa()
+    _ate_o_estado(ligado, s)
+    tipo, _, corpo, opcoes = passo(ligado, s, toque("wamid.4", "999", lista=True))
+    assert tipo == "lista" and corpo.startswith(R.motor.LISTA_ANTIGA) and corpo.endswith("Em qual estado você atua?")
+    assert len(opcoes) == 5 and _conversa(ligado)["situacao"] != "com_link"
+    # o id numerico que e de um no ativo do menu: e esse no
+    with conexao(ligado) as con:
+        fid = con.execute("SELECT id FROM atendimento.menu WHERE chave = 'fornecedores'").fetchone()["id"]
+    _, _, corpo, _ = passo(ligado, s, toque("wamid.5", str(fid), lista=True))
+    assert corpo == "Você já é nosso fornecedor?"
+    # conversa nova (outro numero), sem no: a linha e o menu
+    R.gravar(ligado, aviso([toque("wamid.9", "7777", lista=True, numero="5549999990001")], numero="5549999990001", bsuid="BR.outro"))
+    R.processar_pendentes(ligado, s, None, agora=QUINTA_14H)
+    assert s.enviadas[-2][2] == R.motor.LISTA_ANTIGA and s.ultima[0] == "lista" and s.ultima[3][0][0] == "menu:comercial"
+    assert s.ultima[1] == "5549999990001"
