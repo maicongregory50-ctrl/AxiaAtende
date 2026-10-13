@@ -107,8 +107,8 @@ def test_a_frase_lida_pela_ia_fecha_tudo_e_so_a_data_e_perguntada(canal):
     assert [(x[0], x[2]) for x in s.enviadas[1:]] == [("botoes", campo.PERGUNTA_DATA)]   # bastidor e produto ja estao
     assert material(canal)[0]["pergunta_n"] == 0   # a data nao conta no limite
     # o texto que nao e data, com a data em aberto, complementa a legenda em silencio (14:34 de 12/10)
-    passo(canal, s, texto("wamid.t0", "Foto da safra 2025", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
-    assert len(s.enviadas) == 2 and material(canal)[0]["legenda"].endswith(" · Foto da safra 2025")
+    passo(canal, s, texto("wamid.t0", "Foto do campo do Jair", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
+    assert len(s.enviadas) == 2 and material(canal)[0]["legenda"].endswith(" · Foto do campo do Jair")
     assert material(canal)[0]["pergunta_pendente"] == "data" and conversas(canal) == 0
     passo(canal, s, toque("wamid.t1", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
     m = material(canal)[0]
@@ -336,6 +336,23 @@ def test_casar_produto_e_ler_data():
     assert campo.ler_data("2026-10-08", AGORA) == date(2026, 10, 8)
     assert campo.ler_data("30/12", AGORA) == date(2025, 12, 30)
     assert campo.ler_data("nao sei", AGORA) is None and campo.ler_data("31/02", AGORA) is None
+    assert campo.e_safra("safara 2025") and campo.e_safra("Safra 24/25") and campo.e_safra("2023") and campo.e_safra("inverno 2026")
+    assert not campo.e_safra("Foto do Jair") and not campo.e_safra("09/10")
+
+
+def test_a_safra_ou_o_ano_respondem_a_data_sem_dia(canal):
+    """13/10/2026, 13:11: a data e por safra ("safara 2025"), nao por dia: fecha como respondida, o
+    dia fica presumido e a safra fica no texto da foto (o campo proprio e o #982)."""
+    ligar(canal)
+    ia = IAFalsa(campo={"bastidor": "entrega", "produto": None, "fase": None})
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1", "carga saindo"), ia=ia)
+    minuto(canal, s, AGORA + 3 * MIN, ia=ia)
+    assert s.ultima[2] == campo.PERGUNTA_DATA
+    passo(canal, s, texto("wamid.t1", "safara 2025", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
+    m = material(canal)[0]
+    assert s.ultima[2] == campo.ANOTADO and m["fechado_em"] is not None
+    assert m["data_dita"] == date(2026, 10, 12) and m["data_presumida"] is True and m["legenda"] == "carga saindo · safara 2025"
 
 
 def _api(cfg):

@@ -496,12 +496,20 @@ class Campo:
                 self._texto(con, saida, e.pessoa.para, ANOTADO)
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
-            if texto:   # "Foto da safra 2025" com a data em aberto: complementa a legenda, em silencio
+            if texto:
                 con.execute("""UPDATE atendimento.material_de_campo
                                   SET legenda = CASE WHEN legenda = '' THEN %s ELSE legenda || ' · ' || %s END
                                 WHERE id = ANY(%s)""", (texto[:500], texto[:300], self._grupo_de(con, r)))
                 self._ler(con, r["id"], texto, agora)
-                return True
+                if e_safra(texto):
+                    # "safra 2025", "2023", "inverno 2026": e a resposta da pessoa a data, sem dia. Vale
+                    # como respondida (13/10/2026, 13:11: o dono escreveu "safara 2025" e ficou esperando);
+                    # o dia fica presumido e a safra fica no texto da foto, ate o #982 dar campo a ela.
+                    r = self._gravar(con, r, data_dita=_dia(r["recebido_em"]), data_presumida=True)
+                    self._texto(con, saida, e.pessoa.para, ANOTADO)
+                    self._perguntar_proxima(con, saida, r, agora)
+                    return True
+                return True   # outro texto qualquer: fica na foto, em silencio; a data continua aberta
             return toque.startswith("campo:")
         if q == "qual_dia":
             dia = ler_data(texto, agora) if texto else None
@@ -582,6 +590,12 @@ def ultima_mensagem_de(con, wa_id: str | None) -> datetime | None:
     r = con.execute("""SELECT max(recebido_em) AS em FROM atendimento.eventos_meta
                         WHERE tipo = 'mensagem' AND corpo->'msg'->>'from' = %s""", (wa_id,)).fetchone()
     return r["em"] if r else None
+
+
+def e_safra(texto: str) -> bool:
+    """"safra 2025", "safara 2025", "2023", "inverno 2026", "verao 25/26": uma data sem dia."""
+    t = _sem_acento(texto)
+    return bool(re.search(r"\bsaf[a-z]*ra\b|\binverno\b|\bverao\b|\b(19|20)\d{2}\b", t))
 
 
 def ler_data(texto: str, agora: datetime) -> date | None:
