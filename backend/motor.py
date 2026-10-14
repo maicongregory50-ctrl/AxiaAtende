@@ -216,6 +216,11 @@ def _conversa_retomada(con, pessoa: Pessoa, agora: datetime):
 def _chegou(con, pessoa: Pessoa, conversa, agora: datetime) -> None:
     """Toda mensagem conta como a ultima interacao, e a pergunta ainda nao feita anda junto."""
     con.execute("UPDATE atendimento.conversas SET ultimo_toque_em = %s WHERE id = %s", (agora, conversa["id"]))
+    _empurrar_a_pergunta(con, pessoa, agora)
+
+
+def _empurrar_a_pergunta(con, pessoa: Pessoa, agora: datetime) -> None:
+    """As 4h30 contam da ultima mensagem da pessoa, inclusive do "obrigado" que nao abre conversa."""
     con.execute("""UPDATE atendimento.conversas SET pergunta_em = %s
                     WHERE bsuid = %s AND situacao = 'com_link' AND pergunta_feita_em IS NULL""",
                 (hora_da_pergunta(con, agora), pessoa.bsuid))
@@ -405,6 +410,9 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
             responder_pos(con, saida, p, c, e.toque, agora)
         return
 
+    if e.texto and not e.toque and depois_do_atendimento(con, saida, p, e.texto, agora):
+        return
+
     conversa = _conversa_aberta(con, p)
     if conversa is None and e.toque and (e.toque.startswith("ia:sim:") or e.toque == "ia:volta"):
         # a resposta a RETOMADA (#989) que chegou depois de a conversa voltar a "parou no meio":
@@ -473,6 +481,69 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
             propor(con, saida, ia, p, conversa, e.texto or "", nova, no=parecido)
         else:
             propor(con, saida, ia, p, conversa, e.texto or "", nova)
+
+
+# ── depois do link: o joinha e a resposta automatica (dono, 14/10/2026) ──────
+# Os dois "parados" de 13 e 14/10 eram isto: o dionaton mandou "👍🏻" dois minutos depois do link,
+# e a ausencia automatica da Giovana respondeu a pergunta das 4h30 no mesmo minuto. Os dois abriram
+# conversa, levaram o menu principal e viraram "parou no meio". Decisao do dono, sem IA (so regra):
+# - a resposta automatica, a qualquer hora em que mandamos algo nas ultimas 24h: SILENCIO, porque
+#   do outro lado e uma maquina e responder arrisca o vaivem entre os dois robos;
+# - o agradecimento (so emoji, ou so palavras de "obrigado/ok/valeu"), sem conversa em curso e com
+#   link, encerramento ou pergunta nas ultimas 24h: UMA LINHA CURTA, nunca silencio -- se a regra
+#   errar, quem pediu algo le "Por nada" e escreve de novo, e a segunda mensagem segue o caminho normal.
+# Nenhum dos dois abre conversa nem entra na conta de "pararam no meio".
+
+DEPOIS_DO_ATENDIMENTO = timedelta(hours=24)
+POR_NADA = "Por nada! Se precisar de mais alguma coisa, é só escrever."
+# so frases que gente pedindo algo nao escreve: "assim que possivel" ficou de fora de proposito
+# ("preciso do boleto assim que possivel" seria silenciado)
+AUTOMATICA = ("mensagem automatica", "resposta automatica", "nao estou disponivel", "nao estamos disponiveis",
+              "agradeco sua mensagem", "agradecemos sua mensagem", "agradecemos o contato", "agradecemos seu contato",
+              "obrigado por entrar em contato", "obrigada por entrar em contato", "obrigado pelo contato",
+              "obrigada pelo contato")
+AGRADECE = {"obrigado", "obrigada", "obrigadao", "obg", "obgd", "brigado", "brigada", "valeu", "vlw", "ok", "okay",
+            "blz", "beleza", "show", "top", "certo", "perfeito", "otimo", "grato", "grata", "agradeco", "joia", "tmj"}
+ACOMPANHA = {"muito", "mt", "mto", "muitissimo", "de", "nada", "boa", "bom", "tarde", "noite", "dia", "entao", "ta",
+             "tudo", "sim", "e", "a", "o", "pela", "pelo", "ajuda", "atencao", "abraco", "abs", "att", "deus", "abencoe"}
+
+
+def e_automatica(texto: str) -> bool:
+    t = _sem_acento(texto)
+    return any(f in t for f in AUTOMATICA)
+
+
+def e_agradecimento(texto: str) -> bool:
+    """So emoji (e pontuacao), ou so palavras de agradecimento com pelo menos uma de AGRADECE."""
+    if len(texto or "") > 60:
+        return False
+    palavras = "".join(c if c.isalnum() else " " for c in _sem_acento(texto)).split()
+    if not palavras:   # so emoji: pelo menos um simbolo fora do ASCII ("?" sozinho nao e joinha)
+        return any(ord(c) > 0x2000 for c in texto or "")
+    return all(w in AGRADECE or w in ACOMPANHA for w in palavras) and any(w in AGRADECE for w in palavras)
+
+
+def depois_do_atendimento(con, saida: Saida, pessoa: Pessoa, texto: str, agora: datetime) -> bool:
+    """True quando a mensagem foi tratada aqui (e nao abre conversa)."""
+    desde = agora - DEPOIS_DO_ATENDIMENTO
+    if e_automatica(texto):
+        if con.execute("SELECT 1 FROM atendimento.enviadas WHERE para = ANY(%s) AND enviada_em > %s LIMIT 1",
+                       ([x for x in (pessoa.wa_id, pessoa.bsuid) if x], desde)).fetchone():
+            print("motor: resposta automatica de %s: sem resposta" % pessoa.para, flush=True)
+            return True
+        return False
+    if not e_agradecimento(texto) or _conversa_aberta(con, pessoa):
+        return False
+    c = con.execute("""SELECT id FROM atendimento.conversas
+                        WHERE bsuid = %s AND situacao IN ('com_link', 'encerrada')
+                          AND GREATEST(link_em, pergunta_feita_em, ultimo_toque_em) > %s
+                        ORDER BY id DESC LIMIT 1""", (pessoa.bsuid, desde)).fetchone()
+    if not c:
+        return False
+    _empurrar_a_pergunta(con, pessoa, agora)
+    w = saida.texto(pessoa.para, _ajuste(con, "agradecimento", POR_NADA))
+    _registrar(con, c["id"], pessoa.para, "texto", "por nada: %s" % texto, w)
+    return True
 
 
 # ── depois do link: a pergunta das 4h30 ─────────────────────────────────────
@@ -600,10 +671,13 @@ JANELA_DA_META = timedelta(hours=24)
 
 
 def _o_que_a_pessoa_disse(con, conversa) -> str:
-    """Os textos e os titulos dos toques da pessoa nesta conversa, juntos: e o que a IA rele."""
+    """Os textos e os titulos dos toques da pessoa nesta conversa, juntos: e o que a IA rele.
+    Pelo `processado_em`, e nao pelo `recebido_em` (14/10/2026): o evento e gravado quando a Meta
+    avisa e a conversa nasce quando ele e processado, com o MESMO momento do `processado_em`. Pelo
+    `recebido_em` a mensagem que abriu a conversa ficava de fora, e quem mandou uma so dava "sem texto"."""
     partes = []
     for e in con.execute("""SELECT corpo FROM atendimento.eventos_meta
-                             WHERE tipo = 'mensagem' AND recebido_em >= %s
+                             WHERE tipo = 'mensagem' AND processado_em >= %s
                                AND (bsuid = %s OR corpo->'msg'->>'from' = %s) ORDER BY id""",
                          (conversa["iniciada_em"], conversa["bsuid"], conversa["wa_id"] or "")).fetchall():
         msg = (e["corpo"] or {}).get("msg") or {}

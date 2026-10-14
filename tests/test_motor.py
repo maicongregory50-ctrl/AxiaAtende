@@ -455,3 +455,72 @@ def test_fora_das_24h_ou_sem_ia_a_retomada_nao_manda_nada_e_nao_tenta_de_novo(li
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=IAFalsa(resposta=None))
     c = _conversa(ligado)
     assert len(s.enviadas) == n and c["retomada_chave"] == "sem opcao"
+
+
+# ── 14/10/2026: o joinha e a resposta automatica depois do atendimento ──────────────────────
+
+def _com_link(cfg, s):
+    passo(cfg, s, texto("wamid.1", "oi"))
+    passo(cfg, s, toque("wamid.2", "menu:fretes", lista=True))
+    assert _conversa(cfg)["situacao"] == "com_link"
+
+
+def _quantas(cfg):
+    with conexao(cfg) as con:
+        return con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"]
+
+
+@pytest.mark.parametrize("corpo", ["👍🏻", "🙏🙏", "Obrigado!", "ok, obrigada", "valeu, boa tarde", "Muito obrigado pela ajuda"])
+def test_agradecimento_depois_do_link_recebe_uma_linha_e_nao_abre_conversa(ligado, corpo):
+    s = SaidaFalsa()
+    _com_link(ligado, s)
+    tipo, _, texto_saido, _ = passo(ligado, s, texto("wamid.3", corpo), agora=QUINTA_14H + timedelta(minutes=2))
+    assert tipo == "texto" and texto_saido.startswith("Por nada!")
+    assert _quantas(ligado) == 1 and _conversa(ligado)["situacao"] == "com_link"
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=40))
+    with conexao(ligado) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas WHERE situacao = 'parou_no_meio'").fetchone()["n"] == 0
+
+
+@pytest.mark.parametrize("corpo", ["boa tarde", "?", "obrigado, mas preciso falar com o financeiro", "ok quero comprar soja"])
+def test_o_que_nao_e_so_agradecimento_segue_o_caminho_de_sempre(ligado, corpo):
+    s = SaidaFalsa()
+    _com_link(ligado, s)
+    tipo, _, texto_saido, _ = passo(ligado, s, texto("wamid.3", corpo), agora=QUINTA_14H + timedelta(minutes=2))
+    assert _quantas(ligado) == 2 and not (texto_saido or "").startswith("Por nada")
+
+
+def test_joinha_sem_atendimento_recente_segue_o_caminho_de_sempre(ligado):
+    s = SaidaFalsa()
+    tipo, *_ = passo(ligado, s, texto("wamid.1", "👍"))
+    assert tipo == "lista" and _quantas(ligado) == 1
+
+
+def test_resposta_automatica_a_pergunta_das_4h30_nao_e_respondida(ligado):
+    """O caso da Giovana: a ausencia automatica respondeu a pergunta no mesmo minuto."""
+    s = SaidaFalsa()
+    _com_link(ligado, s)
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=4, minutes=31))
+    n = len(s.enviadas)
+    passo(ligado, s, texto("wamid.3", "Agradeço sua mensagem. Não estou disponível no momento, mas respondo assim que possível.😉"),
+          agora=QUINTA_14H + timedelta(hours=4, minutes=31))
+    assert len(s.enviadas) == n and _quantas(ligado) == 1
+
+
+def test_resposta_automatica_sem_nada_nosso_nas_24h_segue_o_caminho_de_sempre(ligado):
+    s = SaidaFalsa()
+    tipo, *_ = passo(ligado, s, texto("wamid.1", "Mensagem automática: obrigado pelo contato"))
+    assert tipo == "lista" and _quantas(ligado) == 1
+
+
+def test_a_retomada_le_a_mensagem_que_abriu_a_conversa(ligado):
+    """O evento e gravado ANTES de a conversa nascer (recebido_em < iniciada_em): a IA tem de le-lo."""
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "quero ser revendedor em SC"))   # sem IA: menu principal
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.eventos_meta SET recebido_em = %s", (QUINTA_14H - timedelta(seconds=1),))
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=31))
+    ia = IAFalsa(resposta="comercial.revenda.sc")
+    R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=ia)
+    assert ia.perguntas[-1] == "quero ser revendedor em SC"
+    assert _conversa(ligado)["retomada_chave"] == "comercial.revenda.sc"
