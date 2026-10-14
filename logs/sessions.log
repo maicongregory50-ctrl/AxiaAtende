@@ -11,3 +11,4 @@
 [2026-10-13][AXIAATENDE-END] #989 retomada pela OlivIA no master; falta Restart-Service dos dois servicos (dono) e a prova com uma conversa parada
 [2026-10-13][AXIAATENDE-END] #982 safra como resposta a data (migracao 017, dd4344b); falta Restart-Service axiaatende-backend e recepcionista (dono)
 [2026-10-14][ATENDE-END] retomada lia sem a 1a mensagem (recebido_em -> processado_em); joinha depois do link responde 'Por nada' sem abrir conversa; ausencia automatica nao e respondida. Casos: dionaton #26, Giovana #27. Sem chamado (dono). Falta restart do recepcionista
+[2026-10-14][ATENDE-END] destino ativo da tela Destinos e equipe no canal de campo quando o ERP nao reconhece (celular de trabalho fora do cadastro; 5 de 6 destinos). Por hora (dono); volta = cadastrar no ERP. Falta restart do recepcionista. Token de verificacao da Meta: trocar depois (dono)

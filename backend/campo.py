@@ -35,6 +35,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import agenda
+from .envio import com_nove
 from .saida import Opcao
 
 FUSO = ZoneInfo("America/Sao_Paulo")
@@ -91,14 +92,23 @@ def guardar_produtos(con, lista: list[str]) -> int:
 
 
 def quem_e(con, wa_id: str | None) -> dict | None:
-    """O cadastro de quem mandou, se for equipe ou representante reconhecido (um cadastro so)."""
+    """O cadastro de quem mandou, se for equipe ou representante reconhecido (um cadastro so).
+    Sem isso, um destino ATIVO da tela Destinos tambem e equipe, sem codigo (dono, 14/10/2026, "por
+    hora"): o celular de trabalho de quem atende (o do Faturamento, do Benedito) nao esta no cadastro
+    do ERP, e 5 dos 6 destinos chegavam como cliente. O ERP decide primeiro; o destino so completa.
+    O caminho de volta e cadastrar o numero como contato do colaborador e tirar este complemento."""
     q = agenda.reconhecer(con, wa_id)
-    if not q or q.get("erp_cadastros") != 1:
+    if q and q.get("erp_cadastros") == 1:
+        papel = next((p for p in PAPEIS if p in (q.get("erp_papeis") or [])), None)
+        if papel:
+            return {"codigo": q["erp_codigo"], "papel": papel, "nome": q["erp_nome"] or ""}
+    numero = com_nove(wa_id or "")
+    if not numero:
         return None
-    papel = next((p for p in PAPEIS if p in (q.get("erp_papeis") or [])), None)
-    if not papel:
-        return None
-    return {"codigo": q["erp_codigo"], "papel": papel, "nome": q["erp_nome"] or ""}
+    for d in con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE ativo ORDER BY id").fetchall():
+        if com_nove(d["whatsapp"]) == numero:
+            return {"codigo": None, "papel": "equipe", "nome": d["nome"]}
+    return None
 
 
 def _dia(momento: datetime) -> date:

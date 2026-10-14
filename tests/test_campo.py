@@ -429,3 +429,20 @@ def test_os_avisos_saem_so_dentro_da_janela_e_uma_vez_por_grupo(canal):
     n = len(s2.enviadas)
     minuto(canal, s2, AGORA + 40 * H + MIN)
     assert len(s2.enviadas) == n and material(canal)[0]["aviso_ar"] == "fora_da_janela"
+
+
+def test_destino_ativo_fora_do_cadastro_e_equipe_e_o_erp_decide_primeiro(canal):
+    """14/10/2026: o celular do Faturamento (destino do Benedito) chegava como cliente."""
+    ligar(canal)
+    faturamento = "5549999190249"
+    with conexao(canal) as con:
+        con.execute("INSERT INTO atendimento.destinos (nome, whatsapp) VALUES ('Benedito', '554999190249')")
+        assert campo.quem_e(con, "554999190249") == {"codigo": None, "papel": "equipe", "nome": "Benedito"}
+        assert campo.quem_e(con, EQUIPE)["codigo"] == 12             # o cadastro do ERP vence
+        assert campo.quem_e(con, CLIENTE) is None                     # cliente segue cliente
+    s = SaidaFalsa()
+    passo(canal, s, texto("wamid.f0", "nota do pedido 123", numero=faturamento), numero=faturamento, bsuid="BR.fat")
+    assert textos(s) == [campo.ANOTADO_FRASE] and conversas(canal) == 0
+    with conexao(canal) as con:   # destino desligado na tela: volta a ser como qualquer um
+        con.execute("UPDATE atendimento.destinos SET ativo = false WHERE whatsapp LIKE '%99190249'")   # a 002 ja traz o Benedito
+        assert campo.quem_e(con, faturamento) is None
