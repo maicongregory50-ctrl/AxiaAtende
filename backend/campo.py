@@ -34,7 +34,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import agenda
+from . import agenda, internos
 from .envio import com_nove
 from .saida import Opcao
 
@@ -70,7 +70,8 @@ NAO_ACHEI_PRODUTO = "Não achei esse produto na lista; deixo para o marketing co
 AVISO_CATALOGO = "Sua foto entrou no catálogo da Renascer. Obrigado!"
 AVISO_AR = "A sua foto virou o Stories do dia."
 ANOTADO_FRASE = "Anotado. Se for para falar com alguém da empresa, me escreva *menu*."
-PEDE_MENU = ("menu", "menu.", "atendimento", "opções", "opcoes", "ajuda", "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite")
+# A lista mudou de lugar no #1031: mora em internos.py, porque o motor tambem a pergunta.
+PEDE_MENU = internos.PEDE_MENU
 
 
 def ligado(con) -> bool:
@@ -92,23 +93,11 @@ def guardar_produtos(con, lista: list[str]) -> int:
 
 
 def quem_e(con, wa_id: str | None) -> dict | None:
-    """O cadastro de quem mandou, se for equipe ou representante reconhecido (um cadastro so).
-    Sem isso, um destino ATIVO da tela Destinos tambem e equipe, sem codigo (dono, 14/10/2026, "por
-    hora"): o celular de trabalho de quem atende (o do Faturamento, do Benedito) nao esta no cadastro
-    do ERP, e 5 dos 6 destinos chegavam como cliente. O ERP decide primeiro; o destino so completa.
-    O caminho de volta e cadastrar o numero como contato do colaborador e tirar este complemento."""
-    q = agenda.reconhecer(con, wa_id)
-    if q and q.get("erp_cadastros") == 1:
-        papel = next((p for p in PAPEIS if p in (q.get("erp_papeis") or [])), None)
-        if papel:
-            return {"codigo": q["erp_codigo"], "papel": papel, "nome": q["erp_nome"] or ""}
-    numero = com_nove(wa_id or "")
-    if not numero:
-        return None
-    for d in con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE ativo ORDER BY id").fetchall():
-        if com_nove(d["whatsapp"]) == numero:
-            return {"codigo": None, "papel": "equipe", "nome": d["nome"]}
-    return None
+    """Quem e da casa. A REGRA MUDOU DE LUGAR, nao de conteudo (#1031): ela mora em
+    `backend/internos.py`, porque ser interno deixou de depender da chave do canal de fotos.
+
+    Esta funcao fica como atalho de quem ja a chamava daqui -- uma verdade so, em um lugar so."""
+    return internos.quem_e(con, wa_id)
 
 
 def _dia(momento: datetime) -> date:
@@ -539,7 +528,11 @@ class Campo:
 
     @staticmethod
     def e_interno(con, wa_id: str | None) -> bool:
-        """Equipe ou representante reconhecido, com o canal ligado."""
+        """Equipe ou representante reconhecido, com o canal DE FOTOS ligado.
+
+        #1031: continua exigindo `campo.ligado` de proposito -- o canal de fotos e deste modulo, e
+        esta pergunta e "pode mandar foto?". Quem pergunta "e da casa?" usa `internos.e_interno`,
+        que confere a chave `interno.ligado`."""
         return ligado(con) and quem_e(con, wa_id) is not None
 
     def texto_de_interno(self, con, saida, e, agora: datetime) -> bool:
@@ -548,7 +541,7 @@ class Campo:
         texto = (e.texto or "").strip()
         if not texto or e.toque or not ligado(con):
             return False
-        if texto.lower().strip(" !") in PEDE_MENU:
+        if internos.pede_menu(texto):
             return False   # pediu: o atendimento de sempre
         if not quem_e(con, e.pessoa.wa_id):
             return False

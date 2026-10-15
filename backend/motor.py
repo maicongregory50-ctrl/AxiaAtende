@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda
+from . import agenda, internos
 from .saida import MAX_BOTOES, Opcao, Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
@@ -117,17 +117,29 @@ def _filhos(con, no_id: int):
                        (no_id,)).fetchall()
 
 
+RAIZ = "raiz"                  # a arvore do cliente
+RAIZ_INTERNA = "raiz_interna"  # a arvore de quem e da casa (#1031)
+RAIZES = (RAIZ, RAIZ_INTERNA)
+
+
 def folhas_e_menus(con) -> list[dict]:
-    """O que a IA pode propor: toda opcao ativa, com o caminho de rotulos ate ela."""
+    """O que a IA pode propor: toda opcao ativa DA ARVORE DO CLIENTE, com o caminho ate ela.
+
+    PARTE DA RAIZ DO CLIENTE, e nao de `pai_id IS NULL` como partia (#1031). Essa linha era o fio
+    mais perigoso desta etapa: com a segunda raiz no banco e a CTE partindo de toda raiz, a IA
+    passaria a alcancar a arvore interna, e um CLIENTE escrevendo texto livre poderia ouvir
+    "Entendi que voce quer: Mandar foto do campo. E isso?". Nao e hipotese remota -- e o caminho de
+    todo mundo que escreve em vez de tocar, e a IA e oferecida a toda conversa.
+    """
     linhas = con.execute("""
         WITH RECURSIVE c AS (
             SELECT id, chave, rotulo, descricao, acao, ARRAY[]::text[] AS caminho
-              FROM atendimento.menu WHERE pai_id IS NULL AND ativo
+              FROM atendimento.menu WHERE chave = %s AND ativo
             UNION ALL
             SELECT m.id, m.chave, m.rotulo, m.descricao, m.acao, c.caminho || m.rotulo
               FROM atendimento.menu m JOIN c ON m.pai_id = c.id WHERE m.ativo)
         SELECT chave, rotulo, descricao, acao, caminho FROM c
-         WHERE chave <> 'raiz' AND acao <> 'encerrar' ORDER BY chave""").fetchall()
+         WHERE chave <> %s AND acao <> 'encerrar' ORDER BY chave""", (RAIZ, RAIZ)).fetchall()
     return [dict(r) for r in linhas]
 
 
@@ -197,12 +209,25 @@ def hora_da_pergunta(con, ultima: datetime) -> datetime:
     return ultima + timedelta(hours=horas)   # janela sem dia nenhum: como era
 
 
+# #1031: a linha de quem chegou ao proprio destino. Diz o que aconteceu e oferece o caminho de
+# volta, em vez de mandar a pessoa conversar consigo mesma.
+ESSE_E_VOCE = ("Esse atendimento é você mesmo, {nome}. Se quiser falar com outra pessoa da equipe, "
+               "escreva *menu* e escolha outro caminho.")
+
+
 def mandar_link(con, saida: Saida, pessoa: Pessoa, no, agora: datetime) -> str:
     """O destino. `link_formato` (ajuste): `cartao` (o padrao, decisao do dono no ensaio de
     09/10/2026: o endereco solto "nao sai bonito") manda o texto e depois o cartao de contato de
     quem atende; `texto` manda o endereco wa.me no texto, como era."""
     d = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
                     (no["destino_id"],)).fetchone()
+    if internos.destino_proprio(con, pessoa.wa_id, no["destino_id"]):
+        # #1031: ninguem recebe o proprio cartao. Medido em 15/10/2026: o Benedito percorreu o menu
+        # de cliente e recebeu o cartao de contato DELE MESMO tres vezes, por ser o destino de
+        # Fretes. A conversa segue marcada com link (ela chegou ao fim do caminho); o que nao sai e
+        # o cartao, porque mandar a pessoa conversar consigo e a unica resposta que nao serve.
+        print("motor: %s escolheu o destino que e ele mesmo (%s): sem cartao" % (pessoa.wa_id, d["nome"]), flush=True)
+        return saida.texto(pessoa.para, ESSE_E_VOCE.format(nome=d["nome"].split()[0]))
     cartao = _ajuste(con, "link_formato", "cartao") == "cartao"
     partes = []
     if no["texto_antes"]:
@@ -301,6 +326,15 @@ def escolher(con, saida: Saida, pessoa: Pessoa, conversa, no, agora: datetime) -
                           SET situacao = 'com_link', destino_id = %s, link_em = %s, pergunta_em = %s
                         WHERE id = %s""", (no["destino_id"], agora, hora_da_pergunta(con, agora), conversa["id"]))
         _registrar(con, conversa["id"], pessoa.para, "texto", "link: %s" % no["chave"], w)
+    elif no["acao"] == "texto":
+        # #1031: o no diz a sua linha e PARA. Serve a opcao interna que explica o canal de campo:
+        # nao leva a destino nem abre submenu, porque o que vem depois e a pessoa mandar a foto.
+        w = saida.texto(pessoa.para, no["pergunta"])
+        _registrar(con, conversa["id"], pessoa.para, "texto", "diz: %s" % no["chave"], w)
+    elif no["acao"] == "menu_cliente":
+        # #1031: a saida de quem e da casa para o atendimento de cliente -- e por onde falar com um
+        # colega continua acontecendo, ja que "falar com um colega" nao e opcao do menu interno.
+        mostrar_menu(con, saida, pessoa, conversa, False)
     else:   # encerrar
         w = saida.texto(pessoa.para, _ajuste(con, "encerrar", "Obrigado."))
         con.execute("UPDATE atendimento.conversas SET situacao = 'encerrada' WHERE id = %s", (conversa["id"],))
@@ -308,11 +342,28 @@ def escolher(con, saida: Saida, pessoa: Pessoa, conversa, no, agora: datetime) -
 
 
 def mostrar_menu(con, saida: Saida, pessoa: Pessoa, conversa, com_boas_vindas: bool) -> None:
-    raiz = _no(con, "raiz")
+    raiz = _no(con, RAIZ)
     antes = _ajuste(con, "boas_vindas", "") if com_boas_vindas else ""
     w = perguntar(con, saida, pessoa, raiz, antes)
     con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], conversa["id"]))
     _registrar(con, conversa["id"], pessoa.para, "lista", "menu principal", w)
+
+
+def mostrar_menu_interno(con, saida: Saida, pessoa: Pessoa, conversa) -> None:
+    """O menu da casa (#1031). Sem boas-vindas de cliente: quem e da casa nao precisa ser acolhido.
+
+    Se a raiz interna nao existir (migracao 018 nao aplicada), cai no menu do cliente -- degradar
+    para o comportamento de antes e melhor que nao responder a ninguem.
+    """
+    raiz = _no(con, RAIZ_INTERNA)
+    if not raiz:
+        print("motor: raiz_interna ausente (migracao 018?): menu de cliente", flush=True)
+        mostrar_menu(con, saida, pessoa, conversa, True)
+        return
+    w = perguntar(con, saida, pessoa, raiz)
+    con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], conversa["id"]))
+    # "botoes" e nao "lista": sao duas opcoes, e `perguntar` manda botoes com MAX_BOTOES ou menos
+    _registrar(con, conversa["id"], pessoa.para, "botoes", "menu da casa", w)
 
 
 NAO_ENTENDO = ("Recebi, mas por aqui eu entendo texto e os botões. Me conta em uma linha o que você "
@@ -357,8 +408,11 @@ def _no_por_id(con, toque: str):
     """O toque numerico de uma lista antiga: quando e o id de um no ativo, e esse no."""
     if not (toque or "").strip().isdigit():
         return None
-    return con.execute("SELECT * FROM atendimento.menu WHERE id = %s AND ativo AND chave <> 'raiz'",
-                       (int(toque),)).fetchone()
+    # #1031: as DUAS raizes ficam fora. Um toque numerico que acertasse o id da raiz interna poria
+    # um cliente dentro da arvore da casa -- e e justamente de lista velha que vem esse toque.
+    return con.execute("""SELECT * FROM atendimento.menu
+                           WHERE id = %s AND ativo AND chave <> ALL(%s)""",
+                       (int(toque), list(RAIZES))).fetchone()
 
 
 def _sem_acento(t: str) -> str:
@@ -512,8 +566,8 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         pai = None
         if conversa["ia_proposta_id"]:
             pai = con.execute("""SELECT pai.* FROM atendimento.menu pai JOIN atendimento.menu filho ON filho.pai_id = pai.id
-                                  WHERE filho.id = %s AND pai.ativo AND pai.chave <> 'raiz'""",
-                              (conversa["ia_proposta_id"],)).fetchone()
+                                  WHERE filho.id = %s AND pai.ativo AND pai.chave <> ALL(%s)""",
+                              (conversa["ia_proposta_id"], list(RAIZES))).fetchone()
         if pai:
             con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (pai["id"], conversa["id"]))
             w = perguntar(con, saida, p, pai)
@@ -533,6 +587,13 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         # Quem foi convidado e escreveu: o texto fica tambem na linha dele na tela Envios.
         if envio is not None and e.texto:
             envio.tratar_texto_de_convidado(con, e, agora)
+        # #1031: quem e da casa pedindo menu recebe o MENU DA CASA. Era aqui o furo: o Benedito
+        # escreveu "Boa Tarde" (que esta no PEDE_MENU), o canal de campo devolveu False por isso, e
+        # o fluxo de cliente rodou -- 15 das 20 conversas de interno abriram assim. A pergunta de
+        # texto vem antes da do banco de proposito: ela e barata e descarta quase tudo.
+        if internos.pede_menu(e.texto or "") and internos.e_interno(con, p.wa_id):
+            mostrar_menu_interno(con, saida, p, conversa)
+            return
         # Texto numa pergunta de botoes ou lista (#988: o Vinicius escreveu "Sc" no "em qual estado?"
         # e voltou ao menu principal tres vezes): primeiro as opcoes do no onde a pessoa esta --
         # o casamento exato escolhe na hora; a IA restrita as opcoes propoe com a confirmacao de

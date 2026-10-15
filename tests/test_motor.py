@@ -593,3 +593,101 @@ def test_uma_midia_isolada_continua_recebendo_a_linha_curta(ligado):
     s = SaidaFalsa()
     passo(ligado, s, _midia("wamid.s1", "document"))
     assert (s.ultima[0], s.ultima[2]) == ("texto", motor.NAO_ENTENDO)
+
+
+# ── #1031 (15/10/2026): quem e da casa tem menu proprio ──────────────────────────────────────
+# O Benedito escreveu "Boa Tarde" as 13:52 e recebeu o menu de CLIENTE, embora a conversa fosse
+# gravada com erp_codigo 7687 e papeis {equipe,cliente}. 15 das 20 conversas de interno abriram
+# com uma saudacao do PEDE_MENU.
+
+def _sou_destino(cfg, numero="5549999990000"):
+    """Poe o numero do teste como destino ATIVO: e a 2a camada do reconhecimento (dono, 14/10)."""
+    with conexao(cfg) as con:
+        con.execute("INSERT INTO atendimento.destinos (nome, whatsapp, ativo) VALUES ('Fulano', %s, true)",
+                    (numero,))
+        return con.execute("SELECT id FROM atendimento.destinos WHERE whatsapp = %s", (numero,)).fetchone()["id"]
+
+
+def test_a_ia_nao_alcanca_a_arvore_interna(ligado):
+    """O FIO da spec: folhas_e_menus partia de `pai_id IS NULL` e pegaria a segunda raiz -- um
+    CLIENTE escrevendo texto livre poderia ouvir "Entendi que voce quer: Mandar foto do campo"."""
+    from backend import motor
+    with conexao(ligado) as con:
+        chaves = {f["chave"] for f in motor.folhas_e_menus(con)}
+    assert chaves, "a arvore do cliente nao pode voltar vazia"
+    assert not any(c.startswith("interna.") or c == "raiz_interna" for c in chaves)
+
+
+def test_saudacao_de_quem_e_da_casa_traz_o_menu_da_casa(ligado):
+    from backend import motor
+    _sou_destino(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "Boa Tarde"))      # o texto exato do Benedito
+    with conexao(ligado) as con:
+        interna = motor._no(con, "raiz_interna")
+    assert _conversa(ligado)["no_atual_id"] == interna["id"]
+    rotulos = [t for _, t in s.ultima[3]]
+    assert any("campo" in r.lower() for r in rotulos) and any("cliente" in r.lower() for r in rotulos)
+
+
+def test_saudacao_de_quem_nao_e_da_casa_traz_o_menu_do_cliente(ligado):
+    """A regra nao pode vazar para cliente: PEDE_MENU continua identico para quem e de fora."""
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "Boa Tarde"))
+    with conexao(ligado) as con:
+        raiz = motor._no(con, "raiz")
+    assert _conversa(ligado)["no_atual_id"] == raiz["id"]
+
+
+def test_com_a_chave_desligada_quem_e_da_casa_volta_a_ser_cliente(ligado):
+    """O rollback da etapa: um UPDATE numa linha, sem restart."""
+    from backend import motor
+    _sou_destino(ligado)
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.ajustes SET valor = 'false'::jsonb WHERE chave = 'interno.ligado'")
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    with conexao(ligado) as con:
+        raiz = motor._no(con, "raiz")
+    assert _conversa(ligado)["no_atual_id"] == raiz["id"]
+
+
+def test_ver_o_menu_do_cliente_leva_a_arvore_do_cliente(ligado):
+    from backend import motor
+    _sou_destino(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    passo(ligado, s, toque("wamid.2", "menu:interna.cliente", lista=True),
+          agora=QUINTA_14H + timedelta(minutes=1))
+    with conexao(ligado) as con:
+        raiz = motor._no(con, "raiz")
+    assert _conversa(ligado)["no_atual_id"] == raiz["id"]
+
+
+def test_mandar_foto_do_campo_diz_a_linha_e_para(ligado):
+    """O verbo `texto`: o no diz a sua linha e nao avanca no nenhum."""
+    _sou_destino(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    passo(ligado, s, toque("wamid.2", "menu:interna.campo", lista=True),
+          agora=QUINTA_14H + timedelta(minutes=1))
+    assert s.ultima[0] == "texto" and "foto" in s.ultima[2].lower()
+
+
+def test_ninguem_recebe_o_proprio_cartao(ligado):
+    """O Benedito recebeu o cartao dele mesmo tres vezes, por ser o destino de Fretes."""
+    from backend import motor
+    meu = _sou_destino(ligado)
+    with conexao(ligado) as con:   # Fretes passa a apontar para o proprio numero do teste
+        con.execute("UPDATE atendimento.menu SET destino_id = %s WHERE chave = 'fretes'", (meu,))
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    passo(ligado, s, toque("wamid.2", "menu:interna.cliente", lista=True),
+          agora=QUINTA_14H + timedelta(minutes=1))
+    passo(ligado, s, toque("wamid.3", "menu:fretes", lista=True),
+          agora=QUINTA_14H + timedelta(minutes=2))
+    tipos = [x[0] for x in s.enviadas]
+    assert "contato" not in tipos                      # o cartao NAO saiu
+    assert "você mesmo" in s.ultima[2]
+    assert motor.ESSE_E_VOCE.split("{")[0] in s.ultima[2]

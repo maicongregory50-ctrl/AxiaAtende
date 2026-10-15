@@ -14,7 +14,12 @@ pessoa: se chegou ao link, se parou no meio e, quatro horas e meia depois, se di
 
 Quando quem chamou já está no **cadastro do ERP**, a tela mostra quem é: o nome, o código, o papel
 (cliente, fornecedor, produtor, representante, equipe) e por qual contato do cadastro o número foi
-achado. Isso só registra: o que a pessoa recebe no WhatsApp é o mesmo para todos.
+achado.
+
+**Desde 15/10/2026 (#1031) esse reconhecimento muda o atendimento, e não só o registro.** Quem é
+**equipe** ou **representante** recebe o **menu da casa** em vez do menu de cliente — ver a seção *O
+menu da casa* no fim deste manual. Para todos os outros, o que a pessoa recebe no WhatsApp continua
+sendo o mesmo.
 
 E quando você precisa falar com a pessoa, a coluna **Quem** é o caminho: um clique abre a conversa
 com ela no **seu** WhatsApp Web, já no lugar certo (#1025). Antes era preciso sair da tela e procurar
@@ -127,3 +132,34 @@ quer dizer que ninguém esbarrou nelas, ou que o serviço acabou de subir.
 **O que isto NÃO faz:** não avisa ninguém, não aparece na lista da Recepção (mensagem que não foi
 enviada não deixa registro) e não se desfaz sozinho — o número que recusou a lista não volta a
 recebê-la sem mudança de código.
+
+## O menu da casa (#1031, 15/10/2026)
+
+**Quem é da equipe ou representante da Renascer não é mais atendido como cliente.** Ao escrever no
+número da empresa, recebe um menu curto da casa, com duas opções:
+
+- **📸 Foto do campo** — explica em uma linha o que fazer: é só mandar a foto ou o vídeo ali mesmo, e
+  a OlivIA pergunta o que faltar para catalogar;
+- **👤 Menu do cliente** — mostra exatamente o que um cliente vê, inclusive o caminho para falar com
+  um colega (Fretes, Qualidade, Comercial).
+
+**Por que existe.** Em 15/10 o Benedito escreveu "Boa Tarde" e recebeu o menu de cliente, embora o
+sistema soubesse que ele é equipe. E havia um caso pior, medido: ele percorreu o menu de cliente até
+Fretes e **recebeu o cartão de contato dele mesmo, três vezes** — porque ele é o destino de Fretes.
+
+| O que você vê | O que quer dizer |
+|---|---|
+| O **menu da casa** depois de um "oi" | a pessoa foi reconhecida como equipe ou representante — pelo cadastro do ERP, ou por ser um dos contatos da tela **Destinos** |
+| O **menu do cliente** depois de um "oi", de alguém da casa | ela **não** foi reconhecida: o número não está no cadastro do ERP nem é um destino ativo. Não é erro dela |
+| *"Esse atendimento é você mesmo"* no lugar de um cartão | a pessoa chegou a um caminho que leva ao próprio WhatsApp dela. Antes o sistema mandava o próprio cartão |
+| Na Recepção, a etiqueta azul **Equipe** ou **Representante** | é o mesmo reconhecimento que troca o menu |
+
+**Quem é reconhecido, e por onde.** Primeiro o **cadastro do ERP** (papel equipe ou representante);
+depois, como complemento, os **destinos ativos** da tela Destinos — porque o celular de trabalho de
+quem atende não sempre está no cadastro. Hoje três dos seis destinos estão no ERP e três entram só
+pelo complemento: **desativar alguém na tela Destinos devolve essa pessoa ao menu de cliente**, se o
+número dela não estiver no ERP.
+
+**O que isto NÃO faz:** não troca o atendimento de quem também é cliente (o menu do cliente está na
+segunda opção); não manda a foto por você; não abre chamado no suporte; e **não é editável pela tela
+Destinos** — o menu da casa tem duas opções fixas, e a tela continua administrando o do cliente.

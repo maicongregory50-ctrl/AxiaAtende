@@ -72,14 +72,20 @@ def test_a_proxima_leitura_e_as_seis_da_manha():
     assert agenda.proxima_leitura(noite) == datetime(2026, 10, 10, 9, 0, tzinfo=timezone.utc)
 
 
-def test_quem_chama_e_reconhecido_mesmo_sem_o_9_e_recebe_o_mesmo_menu(ligado):
+def test_quem_chama_e_reconhecido_mesmo_sem_o_9_e_quem_e_da_casa_tem_menu_proprio(ligado):
+    """O reconhecimento sem o nono digito e o de sempre (#969). O MENU mudou em 15/10/2026 (#1031):
+    este cadastro tem papel `equipe`, e quem e da casa deixou de receber as boas-vindas de cliente.
+    Ate aqui o teste afirmava "nada muda para a pessoa", que era a decisao do #969 -- e e exatamente
+    essa decisao que o #1031 derruba."""
     _carregar(ligado)
     s = SaidaFalsa()
     R.gravar(ligado, aviso([texto("w1", "oi")], numero="554991505565", bsuid="BR.maicon"))   # sem o 9
     R.processar_pendentes(ligado, s, None, agora=AGORA)
     c = _ultima(ligado)
     assert c["erp_cadastros"] == 1 and c["erp_codigo"] == 12 and c["erp_papeis"] == ["equipe", "representante"]
-    assert s.ultima[0] == "lista" and s.ultima[2].startswith("Seja bem-vindo")   # nada muda para a pessoa
+    # o menu da casa: duas opcoes (logo, botoes), sem as boas-vindas de cliente
+    assert s.ultima[0] == "botoes" and not s.ultima[2].startswith("Seja bem-vindo")
+    assert [t for _, t in s.ultima[3]] == ["📸 Foto do campo", "👤 Menu do cliente"]
 
 
 def test_fora_do_cadastro_e_numero_em_dois(ligado):

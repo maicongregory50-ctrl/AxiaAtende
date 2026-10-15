@@ -16,6 +16,10 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 
 ## 3. O caminho comum
 
+0. **Não precisa pedir nada antes — mas se você escrever "oi" primeiro, agora vem o menu da casa**
+   (#1031, 15/10/2026), com **📸 Foto do campo** e **👤 Menu do cliente**. A primeira opção só
+   explica o que está escrito abaixo; a segunda mostra o atendimento que o cliente recebe, que é por
+   onde se pega o contato de um colega. Antes desta data, um "oi" seu trazia o menu de **cliente**.
 1. Mande a foto ou o vídeo para o **WhatsApp da Renascer (49 3664 0121)**, com uma frase dizendo o
    que é e de que produto (*"colheita do centeio IPR 89 no campo do Jair"*). A frase pode ir antes
    ou junto da foto.
