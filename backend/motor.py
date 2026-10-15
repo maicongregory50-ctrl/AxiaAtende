@@ -369,6 +369,21 @@ def mostrar_menu_interno(con, saida: Saida, pessoa: Pessoa, conversa) -> None:
 NAO_ENTENDO = ("Recebi, mas por aqui eu entendo texto e os botões. Me conta em uma linha o que você "
                "precisa.")
 
+# #1027 (dono, 15/10/2026): ARQUIVO tem linha propria. A Yasmin mandou um PDF de apresentacao e
+# recebeu a frase de cima, que nao diz POR QUE o arquivo nao serve nem abre caminho. A de cima fica
+# para figurinha, localizacao, contato e `unsupported`.
+# SO ESTES TRES TIPOS, e a lista e curta de proposito: `document` e o unico caso medido (2 envios);
+# imagem fica fora porque de quem e da equipe ela e o canal de campo e de cliente NUNCA chegou (0);
+# e `unsupported` fica fora porque os 13 sao do robo do #1028 -- chamar aquilo de arquivo seria
+# dizer a quem mandou uma coisa falsa.
+TIPOS_DE_ARQUIVO = ("document", "audio", "video")
+NAO_ABRO_ARQUIVO = ("Recebi o arquivo, mas não consigo abrir arquivo por aqui. Me conte em uma linha "
+                    "o que você precisa, ou escreva *menu* para ver as opções.")
+
+
+def linha_do_que_nao_leio(tipo: str | None) -> str:
+    return NAO_ABRO_ARQUIVO if tipo in TIPOS_DE_ARQUIVO else NAO_ENTENDO
+
 # #1028: o teto do "nao entendo". POR DESTINO e nao por conversa, de proposito -- a linha so e
 # registrada quando ha conversa aberta, entao contar por conversa deixaria o caso SEM conversa
 # sempre em zero, que e justamente onde o teto precisa engatar.
@@ -514,7 +529,7 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
                   % (e.tipo or "?", p.wa_id, e.wamid, TETO_NAO_ENTENDO, TETO_JANELA_H), flush=True)
             return
         print("motor: %s de %s (%s) nao e texto nem botao: linha curta" % (e.tipo or "?", p.wa_id, e.wamid), flush=True)
-        w = saida.texto(p.para, NAO_ENTENDO)
+        w = saida.texto(p.para, linha_do_que_nao_leio(e.tipo))
         aberta = _conversa_aberta(con, p)
         if aberta:
             _chegou(con, p, aberta, agora)

@@ -588,11 +588,14 @@ def test_teto_de_dois_nao_entendo_por_destino(ligado):
 
 
 def test_uma_midia_isolada_continua_recebendo_a_linha_curta(ligado):
-    """O caso dos tres reais medidos (um 'nao entendo' cada): o teto nao pode tocar neles."""
+    """O caso dos tres reais medidos (um 'nao entendo' cada): o teto nao pode tocar neles.
+
+    O TEXTO deste tipo mudou no #1027 (`document` ganhou linha propria). O que este teste afirma e
+    o TETO, nao o texto -- por isso ele pergunta ao proprio motor qual e a linha do tipo."""
     from backend import motor
     s = SaidaFalsa()
     passo(ligado, s, _midia("wamid.s1", "document"))
-    assert (s.ultima[0], s.ultima[2]) == ("texto", motor.NAO_ENTENDO)
+    assert (s.ultima[0], s.ultima[2]) == ("texto", motor.linha_do_que_nao_leio("document"))
 
 
 # ── #1031 (15/10/2026): quem e da casa tem menu proprio ──────────────────────────────────────
@@ -691,3 +694,39 @@ def test_ninguem_recebe_o_proprio_cartao(ligado):
     assert "contato" not in tipos                      # o cartao NAO saiu
     assert "você mesmo" in s.ultima[2]
     assert motor.ESSE_E_VOCE.split("{")[0] in s.ultima[2]
+
+
+# ── #1027 (15/10/2026): arquivo ganha linha propria ──────────────────────────────────────────
+
+def test_documento_recebe_a_linha_de_arquivo_e_nao_a_generica(ligado):
+    """O PDF da Yasmin recebia "entendo texto e os botoes", que nao diz por que o arquivo nao serve."""
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, _midia("wamid.d1", "document"))
+    assert (s.ultima[0], s.ultima[2]) == ("texto", motor.NAO_ABRO_ARQUIVO)
+    assert "menu" in s.ultima[2]          # a linha abre caminho, nao so explica
+
+
+def test_figurinha_e_unsupported_continuam_na_linha_generica(ligado):
+    """A decisao de 12/10 nao foi revogada: so tres tipos ganharam texto proprio."""
+    from backend import motor
+    for i, tipo in enumerate(("sticker", "unsupported", "location"), start=1):
+        s = SaidaFalsa()
+        passo(ligado, s, _midia("wamid.g%d" % i, tipo), agora=QUINTA_14H + timedelta(minutes=i))
+        assert s.ultima[2] == motor.NAO_ENTENDO, tipo
+
+
+def test_audio_e_video_tambem_sao_arquivo(ligado):
+    from backend import motor
+    for i, tipo in enumerate(("audio", "video"), start=1):
+        s = SaidaFalsa()
+        passo(ligado, s, _midia("wamid.a%d" % i, tipo), agora=QUINTA_14H + timedelta(minutes=10 + i))
+        assert s.ultima[2] == motor.NAO_ABRO_ARQUIVO, tipo
+
+
+def test_imagem_fica_fora_da_linha_de_arquivo(ligado):
+    """Decisao medida: de equipe a imagem e o canal de campo, e de cliente NUNCA chegou (0 casos)."""
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, _midia("wamid.i1", "image"))
+    assert s.ultima[2] == motor.NAO_ENTENDO

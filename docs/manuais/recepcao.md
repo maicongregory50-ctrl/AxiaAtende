@@ -63,6 +63,9 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **"número em 2 cadastros"** | o mesmo celular está em mais de um cadastro; o sistema não escolhe. Vale conferir o cadastro no ERP |
 | **Quem só com o número, sem etiqueta** | a conversa chegou antes de o cadastro ser lido pela primeira vez |
 | **"Cadastro lido em 09/10 06:00 (884 números)"** | o cadastro é lido uma vez por dia, às 06:00: quem foi cadastrado hoje é reconhecido amanhã. Se a leitura falhar, a frase diz o motivo e fica valendo a do dia anterior |
+| No menu principal, **"Comercial"** diz *comprar* e **"Fornecedores"** diz *vender para a Renascer* | mudou em 15/10/2026 (#1027). Antes "Comercial" dizia só "Cotar sementes", e quem escrevia *"posso te fazer uma cotação"* querendo **vender** caía no Comercial — foi o caso de uma empresa de embalagens naquela manhã |
+| *"Recebi o arquivo, mas não consigo abrir arquivo por aqui…"* | alguém mandou **PDF, áudio ou vídeo**. A frase diz por que não serve e abre caminho (escrever em uma linha, ou *menu*) |
+| *"Recebi, mas por aqui eu entendo texto e os botões"* | continua valendo para **figurinha, localização e contato** — o que não é arquivo |
 | **Caminho** | o que a pessoa tocou, na ordem ("Comercial › Produtor rural › PR › Cascavel") |
 | **"— só chegou"** | mandou mensagem e ainda não escolheu nada |
 | **Mandado para** | quem recebeu a pessoa pelo link (a tela Destinos diz quem é quem) |

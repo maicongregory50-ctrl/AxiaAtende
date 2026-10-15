@@ -70,3 +70,35 @@ def test_as_opcoes_do_menu_de_hoje_cabem_na_lista(cfg):
     chaves = {o["chave"] for o in ops}
     assert {"fretes", "qualidade", "financeiro.boleto", "comercial.produtor.pr.cascavel"} <= chaves
     assert "raiz" not in chaves and "encerrar" not in chaves
+
+
+# ── #1027 (15/10/2026): a direcao do pedido ──────────────────────────────────────────────────
+# A Yasmin, da World Rafia, escreveu "posso te fazer uma cotacao para apresentar nossos precos" e
+# foi classificada como `comercial` -- o caminho de quem quer COMPRAR. A causa era o cadastro: a
+# unica opcao cujo texto continha "cotar" era `comercial` ("Cotar sementes").
+
+def test_a_instrucao_diz_que_a_direcao_do_pedido_importa():
+    i = IAmod.INSTRUCOES.lower()
+    assert "direção do pedido" in i and "fornecedores, não comercial" in i
+    assert "cotação" in i          # a palavra que aparece nos dois lados, dita como tal
+
+
+def test_as_opcoes_de_fornecedores_dizem_vender_e_as_de_comercial_dizem_comprar(cfg):
+    """O INSUMO da IA, que e o que esta etapa muda. Sem estas palavras na lista, nenhuma instrucao
+    salva: a IA so ve `chave: caminho (descricao)`."""
+    with conexao(cfg) as con:
+        por_chave = {o["chave"]: o for o in folhas_e_menus(con)}
+    lista = IAmod._lista(list(por_chave.values())).lower()
+    assert "vender à renascer" in lista or "vender para a renascer" in lista
+    assert "comprar" in lista
+    # e a armadilha saiu: "cotar sementes" nao e mais a unica mencao a cotacao
+    assert "cotar sementes" not in lista
+    assert "cotação de venda" in lista
+
+
+def test_nenhuma_descricao_passa_do_limite_da_coluna(cfg):
+    """72 e o CHECK `menu_descricao`, e tambem o que a linha de lista do WhatsApp suporta."""
+    with conexao(cfg) as con:
+        ops = folhas_e_menus(con)
+    longas = [(o["chave"], len(o["descricao"])) for o in ops if len(o["descricao"] or "") > 72]
+    assert longas == []
