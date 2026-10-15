@@ -56,4 +56,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                             "010_canal_de_campo.sql", "011_frase_do_campo.sql", "012_palpite_fase.sql",
                             "013_atendente_de_campo.sql", "014_perguntas_feitas.sql",
                             "015_grupo_da_conversa.sql", "016_retomada.sql", "017_safra_dita.sql",
-                            "018_menu_interno.sql", "019_direcao_do_pedido.sql"]
+                            "018_menu_interno.sql", "019_direcao_do_pedido.sql",
+                            "020_pelo_nome_e_a_logo.sql"]

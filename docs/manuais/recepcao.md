@@ -166,3 +166,30 @@ número dela não estiver no ERP.
 **O que isto NÃO faz:** não troca o atendimento de quem também é cliente (o menu do cliente está na
 segunda opção); não manda a foto por você; não abre chamado no suporte; e **não é editável pela tela
 Destinos** — o menu da casa tem duas opções fixas, e a tela continua administrando o do cliente.
+
+**Pelo nome (#1036, 15/10/2026).** O menu da casa chama você pelo primeiro nome, lido do cadastro —
+se ele estiver em caixa alta no ERP, sai como gente escreve ("Benedito", não "BENEDITO").
+
+## A logo de um cliente, mandada pelo WhatsApp (#1036, 15/10/2026)
+
+Quando um cliente te manda a logo dele para a arte personalizada, **mande o arquivo para o WhatsApp
+da Renascer e ela não se perde mais**. A OlivIA confirma que recebeu, pergunta **de qual cliente é**
+(o **código no ERP** — é por ele que o marketing liga a parceira; o nome não serve) e **o nome da
+marca**, como deve aparecer na arte. Depois diz que guardou.
+
+**O limite, e ele é o ponto:** a OlivIA **não autoriza nada**. Arte com a marca de um cliente só sai
+com a **autorização de uso** registrada na tela **Parceiras** do marketing, com documento — e isso
+não se faz por WhatsApp.
+
+| O que você vê | O que quer dizer |
+|---|---|
+| Ela confirma a logo e **pergunta o código** | o arquivo chegou e está guardado. A pergunta é só para ligar ao cliente certo |
+| *"a autorização de uso é na tela Parceiras"* | o limite acima. Guardar não é autorizar |
+| *"Não achei um código aí"* | o que você respondeu não tinha números. Ela pergunta **uma vez** mais e depois guarda sem o cliente |
+| *"Deixei a logo guardada sem o cliente"* | ninguém disse de quem era. **Está guardada, não perdida** — alguém completa depois |
+| Nada acontece ao mandar um `.docx`, `.zip` ou similar | só **PDF, SVG, PNG e JPG** viram logo, porque são os quatro que a tela Parceiras aceita |
+
+**O que este caminho NÃO faz:** não autoriza e não gera arte; não manda a logo a ninguém; **não lê o
+PDF** nem gera a versão em branco da logo (isso é do gerador do marketing); e **ainda não faz a logo
+aparecer na tela Parceiras** — puxá-la para lá é a etapa seguinte, em chamado próprio. Até ela
+existir, a logo fica guardada aqui, esperando.

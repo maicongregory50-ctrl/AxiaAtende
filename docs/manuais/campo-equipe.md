@@ -17,9 +17,17 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 ## 3. O caminho comum
 
 0. **Não precisa pedir nada antes — mas se você escrever "oi" primeiro, agora vem o menu da casa**
-   (#1031, 15/10/2026), com **📸 Foto do campo** e **👤 Menu do cliente**. A primeira opção só
-   explica o que está escrito abaixo; a segunda mostra o atendimento que o cliente recebe, que é por
-   onde se pega o contato de um colega. Antes desta data, um "oi" seu trazia o menu de **cliente**.
+   (#1031, 15/10/2026), com **📸 Foto do campo** e **👤 Menu do cliente**, e ele te chama pelo nome.
+   A primeira opção só explica o que está escrito abaixo; a segunda mostra o atendimento que o
+   cliente recebe, que é por onde se pega o contato de um colega. Antes desta data, um "oi" seu
+   trazia o menu de **cliente**.
+
+> **Foto é uma coisa; arquivo de logo é outra** (#1036, 15/10/2026). O que está escrito abaixo vale
+> para **foto e vídeo**, que vão para o catálogo do marketing. Se você mandar o **arquivo da logo de
+> um cliente** (PDF, SVG, PNG ou JPG, como um anexo), a OlivIA segue outro caminho: pergunta o
+> **código do cliente no ERP** e o **nome da marca**, e guarda a logo para a tela Parceiras — onde a
+> autorização de uso é registrada. Ela **não autoriza nada** e **não gera arte**. Antes de 15/10
+> esse arquivo era ignorado em silêncio.
 1. Mande a foto ou o vídeo para o **WhatsApp da Renascer (49 3664 0121)**, com uma frase dizendo o
    que é e de que produto (*"colheita do centeio IPR 89 no campo do Jair"*). A frase pode ir antes
    ou junto da foto.

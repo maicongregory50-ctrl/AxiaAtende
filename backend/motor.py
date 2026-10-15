@@ -28,7 +28,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda, internos
+from . import agenda, internos, logos
+from .envio import primeiro_nome
 from .saida import MAX_BOTOES, Opcao, Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
@@ -62,6 +63,19 @@ class Midia:
 
 
 @dataclass
+class Documento:
+    """#1036: o arquivo que nao e foto nem video (a logo de cliente chega assim).
+
+    NAO e `midia`, e isso e deliberado: `campo.receber` toma tudo o que e `midia`, e logo de cliente
+    nao e material de campo -- misturar poria uma logo no catalogo do marketing como foto de lavoura.
+    """
+    id: str
+    mime: str = ""
+    nome_arquivo: str = ""
+    legenda: str = ""
+
+
+@dataclass
 class Entrada:
     """O que a pessoa fez, ja lido do aviso da Meta."""
     wamid: str
@@ -70,6 +84,7 @@ class Entrada:
     texto: str | None = None      # o que ela escreveu (ou None para audio, foto...)
     contexto: str | None = None   # a mensagem nossa a que ela respondeu
     midia: Midia | None = None    # #970: foto ou video (so o canal de campo a usa)
+    documento: Documento | None = None   # #1036: so o caminho da logo o usa
     tipo: str = ""                # o `type` da Meta: text, interactive, button, image, reaction, sticker...
 
 
@@ -98,6 +113,12 @@ def ler_mensagem(valor: dict, msg: dict) -> Entrada:
         if m.get("id"):
             e.midia = Midia(id=m["id"], tipo="foto" if tipo == "image" else "video",
                             mime=m.get("mime_type", ""), legenda=m.get("caption", "") or "")
+    elif tipo == "document":   # #1036: a logo de cliente. Campo proprio, nao `midia` -- ver Documento
+        d = msg.get("document") or {}
+        if d.get("id"):
+            e.documento = Documento(id=d["id"], mime=d.get("mime_type", ""),
+                                    nome_arquivo=d.get("filename", "") or "",
+                                    legenda=d.get("caption", "") or "")
     return e
 
 
@@ -227,7 +248,9 @@ def mandar_link(con, saida: Saida, pessoa: Pessoa, no, agora: datetime) -> str:
         # Fretes. A conversa segue marcada com link (ela chegou ao fim do caminho); o que nao sai e
         # o cartao, porque mandar a pessoa conversar consigo e a unica resposta que nao serve.
         print("motor: %s escolheu o destino que e ele mesmo (%s): sem cartao" % (pessoa.wa_id, d["nome"]), flush=True)
-        return saida.texto(pessoa.para, ESSE_E_VOCE.format(nome=d["nome"].split()[0]))
+        # #1036: por `primeiro_nome` e nao `.split()[0]` -- este nome vem da tela Destinos, que e
+        # bem escrita, mas a mesma funcao serve ao nome do ERP, que vem em caixa alta.
+        return saida.texto(pessoa.para, ESSE_E_VOCE.format(nome=primeiro_nome(d["nome"])))
     cartao = _ajuste(con, "link_formato", "cartao") == "cartao"
     partes = []
     if no["texto_antes"]:
@@ -350,7 +373,14 @@ def mostrar_menu(con, saida: Saida, pessoa: Pessoa, conversa, com_boas_vindas: b
 
 
 def mostrar_menu_interno(con, saida: Saida, pessoa: Pessoa, conversa) -> None:
-    """O menu da casa (#1031). Sem boas-vindas de cliente: quem e da casa nao precisa ser acolhido.
+    """O menu da casa (#1031), chamando a pessoa PELO NOME (#1036).
+
+    Sem boas-vindas de cliente: quem e da casa nao precisa ser acolhido.
+
+    O TEXTO E CADASTRO e o NOME E CODIGO: a `pergunta` do no traz `{nome}` e aqui ele e formatado
+    com `primeiro_nome`, que tambem resolve a caixa alta do ERP ("BENEDITO  VASKEVICZ" ->
+    "Benedito"). Quem editar a frase e tirar o marcador recebe a frase SEM o nome, nao um erro --
+    e por isso o `format` nao pode ser usado cru aqui.
 
     Se a raiz interna nao existir (migracao 018 nao aplicada), cai no menu do cliente -- degradar
     para o comportamento de antes e melhor que nao responder a ninguem.
@@ -360,6 +390,9 @@ def mostrar_menu_interno(con, saida: Saida, pessoa: Pessoa, conversa) -> None:
         print("motor: raiz_interna ausente (migracao 018?): menu de cliente", flush=True)
         mostrar_menu(con, saida, pessoa, conversa, True)
         return
+    quem = internos.quem_e(con, pessoa.wa_id)
+    raiz = dict(raiz)
+    raiz["pergunta"] = (raiz["pergunta"] or "").replace("{nome}", primeiro_nome((quem or {}).get("nome") or ""))
     w = perguntar(con, saida, pessoa, raiz)
     con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], conversa["id"]))
     # "botoes" e nao "lista": sao duas opcoes, e `perguntar` manda botoes com MAX_BOTOES ou menos
@@ -506,7 +539,17 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     if campo is not None:
         if e.midia is not None and campo.receber(con, saida, e, agora):
             return
+        # #1036: a LOGO DE CLIENTE, ao lado do campo.receber e nao dentro dele -- logo nao e material
+        # de campo. E ANTES do ramo que cala para quem e da casa, que e onde ela se perdia.
+        if e.documento is not None and logos.receber(con, saida, e, agora, campo.pasta):
+            return
         if campo.responder(con, saida, e, agora):
+            return
+        # #1036: a resposta da logo vem DEPOIS de campo.responder (para nao roubar a resposta de uma
+        # pergunta de foto ja aberta) e ANTES de texto_de_interno (senao "7687" viraria a frase da
+        # proxima foto, e a logo ficaria para sempre sem cliente). A ordem destas tres linhas e
+        # trava, nao gosto.
+        if logos.responder(con, saida, e, agora):
             return
         if campo.texto_de_interno(con, saida, e, agora):
             return
