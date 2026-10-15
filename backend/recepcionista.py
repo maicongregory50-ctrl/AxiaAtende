@@ -227,6 +227,10 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
                 "chegadas": chegadas,
+                # #1028: o que o motor DEIXOU de mandar desde que o servico subiu, para a regra que
+                # cala nao ser ela mesma um fracasso silencioso. Zero nao quer dizer desligada: quer
+                # dizer que ninguem esbarrou nela, ou que o servico acabou de subir.
+                "calados": dict(motor.calados),
                 # o nome publico la fora (vigia.py): None = ainda nao conferido
                 "endereco": endereco and {"situacao": endereco["situacao"], "desde": endereco["desde"].isoformat(),
                                           "conferido_em": endereco["conferido_em"].isoformat()}}

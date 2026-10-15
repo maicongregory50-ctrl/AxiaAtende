@@ -101,3 +101,29 @@ em "IA acertou"; sem resposta volta a "parou no meio" em 30 minutos, e não há 
 é mandado quando a pessoa escreveu há mais de 24 horas, quando a IA não achou opção que servisse, ou
 quando a IA estava fora; nos três casos a conversa fica "parou no meio" como antes. A frase da
 retomada é o ajuste `retomada` (a sessão troca pela porta, se um dia for preciso).
+
+## Quando a OlivIA fica calada de propósito (#1028, 15/10/2026)
+
+Em dois casos ela **para de responder**, e isso é decisão, não falha. Se você vir uma conversa sem
+resposta nossa, veja se é um destes antes de procurar defeito:
+
+| O que você vê | O que quer dizer |
+|---|---|
+| A conversa **recebeu o menu uma vez e nunca mais** | o WhatsApp daquele número **recusou** o menu — a Meta respondeu "não entregável". Em vez de insistir, paramos de mandar o menu para ele. Quase sempre é um robô do outro lado; pode ser alguém com WhatsApp muito antigo |
+| **Duas** respostas *"Recebi, mas por aqui eu entendo texto e os botões"* e nada depois | mandaram um terceiro conteúdo que não dá para ler — figurinha, enquete, áudio, documento. Depois de avisar duas vezes, ela para: avisar uma terceira não ajudaria ninguém |
+
+**Por que existe.** Em 15/10/2026 um robô do outro lado ficou 100 minutos trocando mensagens com a
+OlivIA: ele mandava algo ilegível, ela respondia, ele respondia, e o menu dela voltava como "não
+entregável" — sete vezes. Insistir com quem não recebe é o que estraga a reputação do nosso número
+na Meta, e é essa reputação que nos deixa mandar material à carteira.
+
+**Quem recusa o menu continua recebendo texto.** Não é bloqueio do contato: só o menu com lista de
+opções deixa de ser tentado.
+
+**Onde conferir se alguma das duas agiu:** no `/saude` do recepcionista, o bloco `calados`. Número
+maior que zero quer dizer que agiu desde que o serviço subiu. **Zero não quer dizer desligada** —
+quer dizer que ninguém esbarrou nelas, ou que o serviço acabou de subir.
+
+**O que isto NÃO faz:** não avisa ninguém, não aparece na lista da Recepção (mensagem que não foi
+enviada não deixa registro) e não se desfaz sozinho — o número que recusou a lista não volta a
+recebê-la sem mudança de código.

@@ -33,6 +33,12 @@ from .saida import MAX_BOTOES, Opcao, Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
 
+# #1028: o que este processo deixou de mandar desde que subiu. Vai ao /saude do recepcionista, e
+# existe para a etapa nao ser ela mesma um fracasso silencioso: regra que cala sem deixar rastro e
+# justamente o que este projeto combate. ZERO NAO QUER DIZER DESLIGADA -- quer dizer que ninguem
+# esbarrou nela, ou que o servico acabou de subir.
+calados = {"lista_recusada": 0, "nao_entendo": 0}
+
 
 @dataclass
 class Pessoa:
@@ -125,13 +131,39 @@ def folhas_e_menus(con) -> list[dict]:
     return [dict(r) for r in linhas]
 
 
-def perguntar(con, saida: Saida, pessoa: Pessoa, no, texto_antes: str = "") -> str:
-    """Manda a pergunta do no com os filhos como botoes (ate 3) ou lista (mais de 3)."""
+# #1028: a lista que a Meta recusou nao e tentada de novo para aquele destino. Em 15/10/2026 um robo
+# do outro lado (5511933157031) produziu 7 envios com 131026 Message undeliverable em 100 minutos, e
+# e a nota do numero que libera o envio em degraus -- regra permanente 1 do projeto.
+# O discriminador e o 131026, NUNCA o texto da mensagem: consertar pela lista AUTOMATICA esta
+# descartado pelo critorio escrito dela ("so frases que gente pedindo algo nao escreve"), porque
+# "nao consegui entender" e exatamente o que pessoa confusa escreve.
+# E cala a LISTA, nao o destino: medido naquele numero, texto entregou 13 de 13 e lista falhou 7 de 7.
+ERRO_NAO_ENTREGAVEL = "131026"
+
+
+def lista_recusada(con, para: str) -> bool:
+    """O WhatsApp desse destino ja recusou uma lista interativa? Entao nao mandamos outra."""
+    return con.execute("""SELECT 1 FROM atendimento.enviadas
+                           WHERE para = %s AND tipo = 'lista' AND erro LIKE %s LIMIT 1""",
+                       (para, ERRO_NAO_ENTREGAVEL + "%")).fetchone() is not None
+
+
+def perguntar(con, saida: Saida, pessoa: Pessoa, no, texto_antes: str = "") -> str | None:
+    """Manda a pergunta do no com os filhos como botoes (ate 3) ou lista (mais de 3).
+
+    None quando a lista foi calada pelo #1028 -- e `_registrar` nao grava envio que nao aconteceu.
+    """
     filhos = _filhos(con, no["id"])
     opcoes = [Opcao("menu:%s" % f["chave"], f["rotulo"], f["descricao"]) for f in filhos]
     texto = (texto_antes + "\n\n" if texto_antes else "") + no["pergunta"]
     if len(opcoes) <= MAX_BOTOES:
         return saida.botoes(pessoa.para, texto, opcoes)
+    if lista_recusada(con, pessoa.para):
+        # o caminho de botoes acima NAO e calado: so a lista foi medida recusando (#1028)
+        calados["lista_recusada"] += 1
+        print("motor: %s ja recusou lista (131026): o menu '%s' nao foi mandado"
+              % (pessoa.para, no["chave"]), flush=True)
+        return None
     return saida.lista(pessoa.para, texto, "Ver opções", opcoes)
 
 
@@ -245,6 +277,8 @@ def _nova_conversa(con, pessoa: Pessoa, agora: datetime):
 
 
 def _registrar(con, conversa_id, para, tipo, resumo, wamid):
+    if not wamid:
+        return   # #1028: envio calado nao deixa linha -- enviadas conta o que a Meta aceitou
     con.execute("""INSERT INTO atendimento.enviadas (wamid, conversa_id, para, tipo, resumo)
                    VALUES (%s, %s, %s, %s, %s)""", (wamid, conversa_id, para, tipo, resumo[:200]))
 
@@ -283,6 +317,30 @@ def mostrar_menu(con, saida: Saida, pessoa: Pessoa, conversa, com_boas_vindas: b
 
 NAO_ENTENDO = ("Recebi, mas por aqui eu entendo texto e os botões. Me conta em uma linha o que você "
                "precisa.")
+
+# #1028: o teto do "nao entendo". POR DESTINO e nao por conversa, de proposito -- a linha so e
+# registrada quando ha conversa aberta, entao contar por conversa deixaria o caso SEM conversa
+# sempre em zero, que e justamente onde o teto precisa engatar.
+# Medido em 15/10/2026: gente de verdade levou UM "nao entendo" cada (tres casos em 169 envios); o
+# robo levou 13 numa conversa. O teto tem folga de 100% sobre o pior caso real.
+TETO_NAO_ENTENDO = 2
+TETO_JANELA_H = 24
+JANELA_NAO_ENTENDO = timedelta(hours=TETO_JANELA_H)
+
+
+def _ja_avisou_bastante(con, para: str, agora: datetime) -> bool:
+    """Ja mandamos a linha curta TETO_NAO_ENTENDO vezes para esse destino na janela? (#1028)
+
+    LIMITE CONHECIDO: a linha curta so e REGISTRADA quando ha conversa aberta (ver o `if aberta` no
+    fim de `processar`), entao o teto so engata nesse caso -- que era o do robo de 15/10 (conversa
+    34, 13 linhas). Um robo que mandasse so `unsupported`, sem nunca escrever texto, nao abriria
+    conversa e nao seria contado. Fechar isso exigiria gravar linha de envio calado, o que a spec
+    deste chamado decidiu NAO fazer (nada escrito nesta etapa); se acontecer, e chamado proprio.
+    """
+    r = con.execute("""SELECT count(*) AS n FROM atendimento.enviadas
+                        WHERE para = %s AND resumo LIKE 'nao entendo:%%' AND enviada_em > %s""",
+                    (para, agora - JANELA_NAO_ENTENDO)).fetchone()
+    return r["n"] >= TETO_NAO_ENTENDO
 
 
 LISTA_ANTIGA = "Essa lista é antiga; escolha de novo aqui:"
@@ -394,6 +452,12 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         # material, e a duvida fica no log (12/10/2026: a segunda foto do lote do dono recebeu-a)
         if campo is not None and campo.e_interno(con, p.wa_id):
             print("campo: %s de %s (%s) sem texto nem midia: ignorado" % (e.tipo or "?", p.wa_id, e.wamid), flush=True)
+            return
+        if _ja_avisou_bastante(con, p.para, agora):
+            # #1028: avisar uma terceira vez nao ajuda ninguem, e do outro lado pode ser maquina
+            calados["nao_entendo"] += 1
+            print("motor: %s de %s (%s): ja avisei %d vezes em %dh -- calado"
+                  % (e.tipo or "?", p.wa_id, e.wamid, TETO_NAO_ENTENDO, TETO_JANELA_H), flush=True)
             return
         print("motor: %s de %s (%s) nao e texto nem botao: linha curta" % (e.tipo or "?", p.wa_id, e.wamid), flush=True)
         w = saida.texto(p.para, NAO_ENTENDO)

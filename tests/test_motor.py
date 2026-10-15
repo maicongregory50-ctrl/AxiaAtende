@@ -524,3 +524,72 @@ def test_a_retomada_le_a_mensagem_que_abriu_a_conversa(ligado):
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=32), ia=ia)
     assert ia.perguntas[-1] == "quero ser revendedor em SC"
     assert _conversa(ligado)["retomada_chave"] == "comercial.revenda.sc"
+
+
+# ── #1028 (15/10/2026): o atendente para de martelar quem nao recebe ─────────────────────────
+# O robo 5511933157031: 7 menus falharam com 131026 e 13 textos foram ENTREGUES, em 100 minutos.
+
+def _midia(wamid, tipo="sticker"):
+    return {"from": "5549999990000", "id": wamid, "timestamp": "1760040000", "type": tipo,
+            tipo: {"id": "x-1", "mime_type": "image/webp"}}
+
+
+def _marcar_erro(cfg, tipo, erro="131026 Message undeliverable"):
+    """A Meta avisa DEPOIS do envio: e por isso que a guarda so pega da segunda lista em diante."""
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.enviadas SET status = 'falhou', erro = %s WHERE tipo = %s",
+                    (erro, tipo))
+
+
+def test_lista_recusada_com_131026_nao_e_tentada_de_novo(ligado):
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    assert s.ultima[0] == "lista"                      # o menu principal sai como lista
+    _marcar_erro(ligado, "lista")
+    antes = len(s.enviadas)
+    passo(ligado, s, texto("wamid.2", "oi de novo"), agora=QUINTA_14H + timedelta(minutes=1))
+    assert len(s.enviadas) == antes                    # calado: a lista nao foi tentada de novo
+    with conexao(ligado) as con:
+        assert motor.lista_recusada(con, "5549999990000") is True
+
+
+def test_quem_recusa_a_lista_continua_recebendo_texto(ligado):
+    """Calar a LISTA, nao o destino: o texto entregou 13 de 13 naquele numero."""
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    _marcar_erro(ligado, "lista")
+    passo(ligado, s, _midia("wamid.s1"), agora=QUINTA_14H + timedelta(minutes=1))
+    assert (s.ultima[0], s.ultima[2]) == ("texto", motor.NAO_ENTENDO)
+
+
+def test_erro_131026_em_outro_tipo_nao_cala_o_menu(ligado):
+    """`enviadas` tem tres escritores: um convite do envio.py que falhe nao pode calar o menu."""
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))
+    with conexao(ligado) as con:
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo, status, erro)
+                       VALUES ('wamid.m1', '5549999990000', 'modelo', 'convite', 'falhou',
+                               '131026 Message undeliverable')""")
+    antes = len(s.enviadas)
+    passo(ligado, s, texto("wamid.2", "oi de novo"), agora=QUINTA_14H + timedelta(minutes=1))
+    assert len(s.enviadas) > antes and s.ultima[0] == "lista"
+
+
+def test_teto_de_dois_nao_entendo_por_destino(ligado):
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, texto("wamid.1", "oi"))           # abre a conversa: o registro depende dela
+    for i in (1, 2, 3, 4):
+        passo(ligado, s, _midia("wamid.s%d" % i), agora=QUINTA_14H + timedelta(minutes=i))
+    curtas = [x for x in s.enviadas if x[0] == "texto" and x[2] == motor.NAO_ENTENDO]
+    assert len(curtas) == motor.TETO_NAO_ENTENDO == 2  # a 3a e a 4a nao sairam
+
+
+def test_uma_midia_isolada_continua_recebendo_a_linha_curta(ligado):
+    """O caso dos tres reais medidos (um 'nao entendo' cada): o teto nao pode tocar neles."""
+    from backend import motor
+    s = SaidaFalsa()
+    passo(ligado, s, _midia("wamid.s1", "document"))
+    assert (s.ultima[0], s.ultima[2]) == ("texto", motor.NAO_ENTENDO)
