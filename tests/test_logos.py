@@ -156,3 +156,24 @@ def test_formato_lido_do_mime_ou_do_nome():
     assert L._formato("", "LOGO.SVG") == "svg"
     assert L._formato("application/octet-stream", "logo.png") == "png"
     assert L._formato("application/zip", "pacote.zip") is None
+
+
+def test_o_dialogo_da_logo_fica_em_enviadas(ligado):
+    """O defeito achado na PRIMEIRA rodada em producao (15/10, 16:30): a logo foi colhida certo, mas
+    `ler_conversa.py` mostrou so o que o Benedito mandou -- as falas da OlivIA nao estavam em
+    `enviadas`, entao o dialogo nao se reconstroi e o status da Meta nao tem onde pousar.
+
+    E a mesma falha que o commit 71047bb do #981 consertou para o canal de campo. Este teste existe
+    para ela nao voltar uma terceira vez."""
+    _sou_da_casa(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, documento("wamid.1"))
+    passo(ligado, s, texto("wamid.2", "7687"), agora=AGORA + timedelta(minutes=1))
+    passo(ligado, s, texto("wamid.3", "Agro Rigo"), agora=AGORA + timedelta(minutes=2))
+    with conexao(ligado) as con:
+        ditas = con.execute("""SELECT resumo FROM atendimento.enviadas
+                                WHERE resumo LIKE 'logo:%' ORDER BY id""").fetchall()
+    # as tres falas: recebi + pergunta da marca + guardada
+    assert len(ditas) == 3, [d["resumo"] for d in ditas]
+    assert "ERP" in ditas[0]["resumo"] and "marca" in ditas[1]["resumo"].lower()
+    assert "Parceiras" in ditas[2]["resumo"]

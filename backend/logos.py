@@ -50,6 +50,24 @@ def _nome_seguro(texto: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", texto or "")[:120] or "sem_nome"
 
 
+def _dizer(con, saida, para: str, texto: str) -> str:
+    """Manda E REGISTRA em `atendimento.enviadas`, no molde de `campo._registrar`.
+
+    NAO e detalhe: sem o registro, `scripts/ler_conversa.py` nao reconstroi o dialogo (so aparece o
+    que a PESSOA mandou) e o aviso de status da Meta nao tem onde pousar. A casa ja pagou por isso
+    uma vez -- o commit 71047bb do #981 fez exatamente este conserto para o canal de campo, depois
+    de a primeira leitura mostrar a conversa sem as falas da OlivIA. O modulo novo repetiu o erro
+    na primeira rodada em producao (15/10, 16:30) e este e o conserto.
+
+    `ON CONFLICT (wamid) DO NOTHING` porque o wamid e unico em `enviadas`.
+    """
+    w = saida.texto(para, texto)
+    con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
+                   VALUES (%s, %s, 'texto', %s) ON CONFLICT (wamid) DO NOTHING""",
+                (w, para, ("logo: " + (texto or ""))[:200]))
+    return w
+
+
 def _formato(mime: str, nome_arquivo: str) -> str | None:
     f = FORMATOS.get((mime or "").split(";")[0].strip().lower())
     if f:
@@ -107,7 +125,7 @@ def receber(con, saida, e, agora: datetime, pasta) -> bool:
                 (e.pessoa.bsuid, e.pessoa.wa_id, quem.get("nome") or "", e.wamid,
                  d.nome_arquivo[:200], arquivo, sha, d.mime[:100], formato, agora, erro))
     nome = (" *%s*" % d.nome_arquivo) if d.nome_arquivo else ""
-    saida.texto(e.pessoa.para, RECEBI.format(arquivo=nome))
+    _dizer(con, saida, e.pessoa.para, RECEBI.format(arquivo=nome))
     print("logos: logo de %s por %s (%s): %s" % (formato, quem.get("nome"), e.pessoa.wa_id,
                                                  arquivo or ("falhou -- " + erro)), flush=True)
     return True
@@ -138,21 +156,21 @@ def responder(con, saida, e, agora: datetime) -> bool:
             if linha["insistiu"]:
                 con.execute("""UPDATE atendimento.logos_de_cliente
                                   SET pergunta_pendente = NULL WHERE id = %s""", (linha["id"],))
-                saida.texto(e.pessoa.para, GUARDADA_SEM_CLIENTE)
+                _dizer(con, saida, e.pessoa.para, GUARDADA_SEM_CLIENTE)
                 return True
             con.execute("UPDATE atendimento.logos_de_cliente SET insistiu = true WHERE id = %s",
                         (linha["id"],))
-            saida.texto(e.pessoa.para, SEM_CODIGO)
+            _dizer(con, saida, e.pessoa.para, SEM_CODIGO)
             return True
         con.execute("""UPDATE atendimento.logos_de_cliente
                           SET erp_codigo = %s, pergunta_pendente = 'nome_marca', insistiu = false
                         WHERE id = %s""", (int(digitos), linha["id"]))
-        saida.texto(e.pessoa.para, PERGUNTA_MARCA.format(codigo=int(digitos)))
+        _dizer(con, saida, e.pessoa.para, PERGUNTA_MARCA.format(codigo=int(digitos)))
         return True
 
     # nome_marca: o que a pessoa escrever vale, e o dialogo termina aqui
     con.execute("""UPDATE atendimento.logos_de_cliente
                       SET nome_marca = %s, pergunta_pendente = NULL, completada_em = %s
                     WHERE id = %s""", (texto[:120], agora, linha["id"]))
-    saida.texto(e.pessoa.para, GUARDADA.format(marca=texto[:120]))
+    _dizer(con, saida, e.pessoa.para, GUARDADA.format(marca=texto[:120]))
     return True
