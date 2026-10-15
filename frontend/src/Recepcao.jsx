@@ -1,5 +1,9 @@
 // A Recepcao (#950): quem chamou no 49 3664 0121, o que escolheu e para quem foi mandado.
 // #969: quem ja esta no cadastro do ERP aparece com o nome, o papel e o contato (so registro).
+// #1025: a coluna QUEM linka para o WhatsApp de quem chamou -- um clique e a conversa abre no
+//        WhatsApp Web de quem esta na tela. O endereco vem PRONTO do servidor, no campo `conversar`:
+//        esta tela nao sabe formar endereco de WhatsApp, e e de proposito -- sem o campo nao ha link
+//        (nunca um link morto), e tirar o campo do backend apaga o recurso inteiro daqui.
 // Manual: docs/manuais/recepcao.md.
 import React, { useEffect, useState } from 'react'
 import { pegar, quando, hora } from './api.js'
@@ -10,18 +14,29 @@ const PAPEL = {
   produtor: ['Produtor', ''], fornecedor: ['Fornecedor', ''],
 }
 
+// o convite a conversar, so quando o servidor mandou endereco (#1025)
+function Conversar({ para, className, children }) {
+  if (!para) return null
+  return <a className={className} href={para} target="_blank" rel="noopener noreferrer"
+    title="Abrir a conversa no seu WhatsApp Web">{children}</a>
+}
+
 function Quem({ l }) {
   if (l.cadastro) {
     const c = l.cadastro
     const contato = c.contato_setor && `contato ${c.contato_setor}${c.contato_nome ? ': ' + c.contato_nome : ''}`
     return <>
-      {c.nome} <span className="cod">· {c.codigo}</span><br />
+      {c.nome} <span className="cod">· {c.codigo}</span>{' '}
+      <Conversar para={l.conversar} className="zap">Conversar no WhatsApp</Conversar><br />
       {c.papeis.map((p) => <span key={p} className={'chip ' + (PAPEL[p] || [p, ''])[1]}>{(PAPEL[p] || [p])[0]}</span>)}
       {contato && <span className="chip">{contato}</span>}
     </>
   }
   return <>
-    {l.numero} <span className="leve">{l.perfil ? `(${l.perfil})` : ''}</span>
+    {/* o numero continua mascarado; quem carrega o numero inteiro e o endereco do link (#1025) */}
+    {l.conversar
+      ? <Conversar para={l.conversar} className="zap-num">{l.numero}</Conversar>
+      : l.numero} <span className="leve">{l.perfil ? `(${l.perfil})` : ''}</span>
     {l.cadastros === 0 && <><br /><span className="chip fora">fora do cadastro</span></>}
     {l.cadastros > 1 && <><br /><span className="chip duvida">número em {l.cadastros} cadastros</span></>}
   </>

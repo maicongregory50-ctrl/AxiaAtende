@@ -16,6 +16,10 @@ Quando quem chamou já está no **cadastro do ERP**, a tela mostra quem é: o no
 (cliente, fornecedor, produtor, representante, equipe) e por qual contato do cadastro o número foi
 achado. Isso só registra: o que a pessoa recebe no WhatsApp é o mesmo para todos.
 
+E quando você precisa falar com a pessoa, a coluna **Quem** é o caminho: um clique abre a conversa
+com ela no **seu** WhatsApp Web, já no lugar certo (#1025). Antes era preciso sair da tela e procurar
+o número em outro sistema.
+
 ## 2. Quem usa e quando
 
 Você, no computador, quando quiser acompanhar o atendimento — por exemplo, uma vez por dia.
@@ -29,6 +33,10 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
    os contatos novos (os leads), **"Só quem não está"**.
 4. Leia os cartões.
 5. Na lista, olhe primeiro as linhas **"parou no meio"** e **"Não · você foi avisado"**.
+6. Para chamar alguém de volta, clique na coluna **Quem**: no botão **Conversar no WhatsApp** (quando
+   a pessoa está no nosso cadastro) ou no **próprio número** (quando não está). Abre uma aba nova com
+   a conversa dela no seu WhatsApp Web — **a primeira mensagem é você que escreve**, o sistema não
+   manda nada. Depois volte para a aba da Recepção, que continua como estava.
 
 ## 4. O que significa cada sinal
 
@@ -41,7 +49,12 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **IA acertou / errou** | quem escreveu em vez de tocar recebeu a proposta da IA ("Entendi que você quer… É isso?"): **Sim** é acerto, **Ver todas as opções** é erro |
 | **Do nosso cadastro** | quantos dos que chegaram no período estão no cadastro do ERP |
 | **Quem: "Agro Real Insumos · 5475"** e as etiquetas | o número está no cadastro: o nome e o código dele. As etiquetas verdes (Cliente, Fornecedor, Produtor) e azuis (Equipe, Representante) dizem o papel; "contato comercial: João" diz de qual contato do cadastro o número veio |
+| O botão verde **Conversar no WhatsApp**, ao lado do nome | abre a conversa com essa pessoa no seu WhatsApp Web, pelo número por onde ela chamou. É um atalho: nada é mandado, e nada é registrado |
 | **"fora do cadastro"** | o número não está em nenhum cadastro. Pode ser um contato novo, ou alguém da casa cujo celular não foi cadastrado; aparece o número com o meio escondido e o nome do perfil do WhatsApp |
+| O **número sublinhado** de verde (`+55 46 9…·4421`) | o número é o link: clique e a conversa abre no seu WhatsApp Web. O meio continua escondido de propósito — você **clica**, não lê o número inteiro |
+| O nome **sem** o botão, ou o número **sem** sublinhado | não temos telefone dessa conversa (ela chegou só pelo identificador do WhatsApp). Não é erro, e por aqui não há como chamar essa pessoa |
+| **"sem número"** no lugar do número | o mesmo caso acima, dito por extenso |
+| O clique abre o WhatsApp pedindo o código QR | o seu WhatsApp Web não está conectado neste navegador. Conecte e clique de novo |
 | **"número em 2 cadastros"** | o mesmo celular está em mais de um cadastro; o sistema não escolhe. Vale conferir o cadastro no ERP |
 | **Quem só com o número, sem etiqueta** | a conversa chegou antes de o cadastro ser lido pela primeira vez |
 | **"Cadastro lido em 09/10 06:00 (884 números)"** | o cadastro é lido uma vez por dia, às 06:00: quem foi cadastrado hoje é reconhecido amanhã. Se a leitura falhar, a frase diz o motivo e fica valendo a do dia anterior |
@@ -62,6 +75,11 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 
 - **Não mostra a conversa** da pessoa com o atendente: ela acontece no WhatsApp de quem recebeu o link.
 - **Não responde ninguém** pela tela.
+- **Não manda mensagem no clique da coluna Quem:** ele só abre a conversa. Quem escreve é você.
+- **Não fala pelo número da empresa:** a conversa sai do **seu** WhatsApp, não do 49 3664 0121 — a
+  pessoa vai ver que é você.
+- **Não mostra o número inteiro**, nem depois do clique: o que você lê continua mascarado.
+- **Não registra** que você clicou, nem avisa a pessoa.
 - **Não muda o menu nem para quem cada motivo vai:** isso é a tela **Destinos**.
 - **Não corrige o cadastro:** número faltando ou repetido se corrige no ERP.
 - **Não reconhece de novo conversas antigas:** cada conversa guarda quem era no momento em que chegou.

@@ -25,6 +25,25 @@ def mascarar(numero: str | None) -> str:
     return "+%s %s %s…·%s" % (d[:2], d[2:4], d[4], d[-4:])
 
 
+def link_conversa(numero: str | None) -> str | None:
+    """O endereco que abre a conversa no WhatsApp Web de QUEM ESTA NA TELA, ou None (#1025).
+
+    Quem monta o endereco e aqui, nao a tela: a forma do numero e o endereco mudam num lugar so, e
+    tirar o campo da resposta apaga todo link da Recepcao -- e o rollback parcial da etapa.
+
+    O numero vai COMO A META O ENTREGOU (`wa_id`), que e o identificador da conta de WhatsApp, e nao
+    pela forma `com_nove` do cadastro do ERP: 31 dos 33 wa_id medidos em 15/10/2026 vem sem o nono
+    digito, e acrescenta-lo daria um numero diferente do que a conta usa.
+
+    O limiar e o MESMO da mascara de cima: o que ela chama de "sem numero" nao vira link, para o
+    texto e o endereco nunca discordarem.
+    """
+    d = re.sub(r"\D", "", numero or "")
+    if len(d) < 10:
+        return None
+    return "https://web.whatsapp.com/send?phone=%s" % d
+
+
 class Destino(BaseModel):
     nome: str
     whatsapp: str
@@ -107,7 +126,8 @@ def rotas(cfg, usuario) -> APIRouter:
                                         "contato_setor": l["erp_contato_setor"], "contato_nome": l["erp_contato_nome"]}
                                        if l["erp_cadastros"] == 1 else None),
                           "cadastros": l["erp_cadastros"],
-                          "numero": mascarar(l["wa_id"]), "perfil": l["nome_perfil"],
+                          "numero": mascarar(l["wa_id"]), "conversar": link_conversa(l["wa_id"]),
+                          "perfil": l["nome_perfil"],
                           "caminho": l["caminho"], "destino": l["destino_nome"], "estado": estado,
                           "pergunta_em": l["pergunta_em"].isoformat() if l["pergunta_em"] else None,
                           "aviso_nao_em": l["aviso_nao_em"].isoformat() if l["aviso_nao_em"] else None,

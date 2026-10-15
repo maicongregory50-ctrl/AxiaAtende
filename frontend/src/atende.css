@@ -40,6 +40,16 @@
 .cod { color: #777; font-size: 12px; }
 .erro-leve { color: #a33; }
 
+/* #1025: conversar no WhatsApp pela coluna QUEM. A pilula e acao, e por isso fica na linha do nome,
+   e nao na fileira das etiquetas de papel, que sao descricao. O numero mascarado vira link discreto:
+   nada de azul de navegador no meio de uma tabela verde. */
+.zap { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; white-space: nowrap;
+       background: #25d366; color: #0b3d20; border: 1px solid #1faa51; text-decoration: none; font-weight: 600; }
+.zap:hover { background: #1faa51; color: #fff; }
+.zap-num { color: var(--texto); text-decoration: underline; text-decoration-color: #1faa51;
+           text-underline-offset: 2px; white-space: nowrap; }
+.zap-num:hover { color: #1faa51; }
+
 /* Destinos, passada de design de 11/10/2026 (#970): cartoes de ajuste como no ERP (h2, ajuda em
    cinza, cartao branco com borda e sombra leve), botoes com o estado escrito, dias em botoes. */
 .atende.destinos { max-width: 1100px; }

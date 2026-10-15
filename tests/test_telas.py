@@ -10,7 +10,7 @@ from backend import seguranca
 from backend.banco import conexao
 from backend.envio import Envio
 from backend.main import CABECALHO_DA_TELA, criar_app
-from backend.rotas_telas import mascarar
+from backend.rotas_telas import link_conversa, mascarar
 from tests.avisos_meta import aviso, texto, toque
 from tests.saida_falsa import SaidaFalsa
 from tests.test_envio import cliente, pedido, pedir
@@ -45,6 +45,19 @@ def test_mascara_nunca_mostra_o_numero_inteiro():
     assert mascarar(None) == "sem número"
 
 
+def test_link_da_conversa_usa_o_numero_da_meta_e_cala_quando_nao_ha():
+    """#1025: o link da coluna QUEM."""
+    # o wa_id como a Meta o entregou, sem acrescentar o nono digito do cadastro do ERP
+    assert link_conversa("554699784298") == "https://web.whatsapp.com/send?phone=554699784298"
+    assert link_conversa("5546999784298") == "https://web.whatsapp.com/send?phone=5546999784298"
+    # o numero e opcional por desenho (regra 7: a conversa e chaveada pelo BSUID). Sem ele, SEM LINK
+    # -- nunca um link morto. Hoje sao 0 linhas no banco, e e justamente por isso que o teste existe.
+    assert link_conversa(None) is None
+    assert link_conversa("") is None
+    # o mesmo limiar da mascara: o que ela chama de "sem numero" nao vira link
+    assert mascarar("55469") == "sem número" and link_conversa("55469") is None
+
+
 def test_recepcao_conta_e_lista(ligado, tela):
     s = SaidaFalsa()
     R.gravar(ligado, aviso([toque("w1", "menu:fretes", lista=True)]))
@@ -56,6 +69,8 @@ def test_recepcao_conta_e_lista(ligado, tela):
     assert d["cartoes"]["pararam_no_meio"] == 1
     fretes = next(l for l in d["linhas"] if l["destino"])
     assert fretes["destino"] == "Benedito" and fretes["caminho"] == ["🚚 Fretes"] and "…" in fretes["numero"]
+    # #1025: a linha leva o endereco pronto, e a tela so o desenha
+    assert fretes["conversar"] == "https://web.whatsapp.com/send?phone=5549999990000"
     assert [l["estado"] for l in tela.get("/api/recepcao", params={"situacao": "parou"}).json()["linhas"]] == ["parou"]
     assert [m["chave"] for m in d["motivos"]][:2] == ["comercial", "fretes"]
 
