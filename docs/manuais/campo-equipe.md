@@ -28,6 +28,12 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 > **código do cliente no ERP** e o **nome da marca**, e guarda a logo para a tela Parceiras — onde a
 > autorização de uso é registrada. Ela **não autoriza nada** e **não gera arte**. Antes de 15/10
 > esse arquivo era ignorado em silêncio.
+>
+> **Desde 19/10/2026 (#1037) a logo chega sozinha ao marketing**, em até um minuto depois da sua
+> última resposta, e você recebe **"A logo de <marca> chegou ao marketing"** — dizendo que a parceira
+> foi cadastrada e espera a autorização, ou que a logo espera a conferência do dono. O aviso só sai
+> dentro das 24 h da sua última mensagem. Se você não responder as perguntas, a logo vai assim mesmo
+> depois de 24 h, sem cliente, e o dono resolve.
 1. Mande a foto ou o vídeo para o **WhatsApp da Renascer (49 3664 0121)**, com uma frase dizendo o
    que é e de que produto (*"colheita do centeio IPR 89 no campo do Jair"*). A frase pode ir antes
    ou junto da foto.
