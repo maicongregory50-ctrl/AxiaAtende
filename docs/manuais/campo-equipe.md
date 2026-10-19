@@ -33,10 +33,17 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
    ou junto da foto.
 2. A OlivIA responde **"Recebi."** Ela lê a sua frase e, um ou dois minutos depois, pergunta **só o
    que faltou**, uma coisa por vez, em conversa: o que a foto mostra, de que produto é (o nome como
-   está na embalagem), em que fase está a lavoura, e **"É de hoje?"** (toque **Sim**, ou **Outra
+   está na embalagem), em que fase está a lavoura, e — **só se você não disse a data na frase** —
+   **"É de hoje?"** (toque **Sim**, ou **Outra
    data** e diga o dia, *09/10*; se não souber o dia, escreva a **safra**, *safra 2025*: a safra vai
-   de 1º de julho a 30 de junho, e a foto entra sem dia, com a safra). Responda escrevendo, com as suas palavras; ela encaixa. Com a
-   frase completa, ela só pergunta a data.
+   de 1º de julho a 30 de junho, e a foto entra sem dia, com a safra). Responda escrevendo, com as suas palavras; ela encaixa.
+
+> **Diga a data na frase e ela não pergunta** (#1047, 19/10/2026). Escrever *"hoje"*, *"ontem"*,
+> *"09/10"* ou *"safra 2025"* junto com a foto **já responde**: a data vale igual à do botão, não é
+> palpite. **Com a frase completa, a foto entra no catálogo sem nenhuma pergunta.** Antes desta data a
+> OlivIA perguntava *"É de hoje?"* mesmo quando você já tinha escrito "hoje" — era o defeito deste
+> chamado. Ela ainda **não adivinha**: só *hoje*, *ontem*, *anteontem*, uma data escrita e a safra;
+> qualquer outra coisa continua levando à pergunta.
 3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida, são **uma
    conversa só**: as respostas valem para todas. Enquanto uma pergunta estiver sem resposta, a foto
    que chegar entra nessa mesma conversa, mesmo meia hora depois. Escreveu algo a mais no meio

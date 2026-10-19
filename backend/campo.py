@@ -327,7 +327,17 @@ class Campo:
         return None
 
     def _perguntar_proxima(self, con, saida, r, agora: datetime) -> bool:
-        """Faz a proxima pergunta do grupo, respeitando o limite; sem nada a perguntar, fecha."""
+        """Faz a proxima pergunta do grupo, respeitando o limite; sem nada a perguntar, fecha.
+
+        #1047: RELE A LINHA antes de decidir, em vez de confiar na que o chamador passou -- uma
+        mensagem processada entre a leitura do chamador e este instante nao se perde.
+
+        GANHO ESTREITO, e dito como tal: a janela e de segundos (processamento em 0 a 3 s contra o
+        tique de um minuto do laco), NAO ha ocorrencia medida, e isto NAO teria mudado o caso de
+        19/10 que originou o #1047 -- ali o estado estava correto e o que faltava era o parser da
+        data. Entra porque o dono pediu, informado disso, e porque custa uma linha.
+        """
+        r = self._linha(con, r["id"]) or r
         falta = self._falta(r)
         if falta and falta != "data" and r["pergunta_n"] >= MAX_PERGUNTAS:
             falta = "data" if r["data_dita"] is None else None   # estourou: so a data ainda vale
@@ -405,6 +415,41 @@ class Campo:
         con.execute("UPDATE atendimento.material_de_campo SET pergunta_pendente = NULL, retomar_em = NULL WHERE id = ANY(%s)", (ids,))
         return self._linha(con, r["id"])
 
+    def _data_da_frase(self, con, r, texto: str, agora: datetime) -> bool:
+        """#1047: a data ou a safra DITA NA FRASE, antes de alguem perguntar.
+
+        Em 19/10/2026, 08:10:36, o dono escreveu "Hoje" junto com duas fotos -- e as 08:11:33 a
+        OlivIA perguntou "E de hoje?". O palpite da IA ja havia rodado as 08:10:43 COM o texto na
+        mao: nao faltou reler, faltou LER. `ia.ler_campo` extrai bastidor, produto e fase, e data nao
+        e um deles; a data so entrava pela resposta a uma pergunta ja feita.
+
+        POR PARSER, NAO PELA IA, de proposito: `ler_data` e `ler_safra` ja existem, ja sao testadas e
+        ja sao a regua que interpreta a RESPOSTA -- entao a frase e a resposta passam a ser lidas
+        pela mesma regua. A IA erraria uma data de vez em quando, em silencio, e data errada vai ao
+        catalogo sem ninguem ver.
+
+        A PRIMEIRA RESPOSTA VALE: havendo data ou safra, uma frase posterior nao as troca.
+
+        Nao usa `_gravar` porque ele limpa a `pergunta_pendente`, e este caminho tambem roda com uma
+        pergunta aberta (o ramo `bastidor`), onde limpar seria errado.
+        """
+        if r["data_dita"] is not None or r["safra_dita"] is not None:
+            return False
+        dia = ler_data(texto, agora)
+        if dia:
+            campos = {"data_dita": dia, "data_presumida": False}
+        else:
+            safra = ler_safra(texto)
+            if not safra:
+                return False
+            # #982: com a safra, a foto entra SEM dia -- e o dia nao e presumido no fechamento
+            campos = {"safra_dita": safra, "data_presumida": False}
+        ids = self._grupo_de(con, r)
+        for k, v in campos.items():
+            con.execute("UPDATE atendimento.material_de_campo SET %s = %%s WHERE id = ANY(%%s)" % k, (v, ids))
+        print("campo: data da frase %r -> %s (grupo %s)" % (texto[:40], campos, r["grupo_id"]), flush=True)
+        return True
+
     def responder(self, con, saida, e, agora: datetime) -> bool:
         """Texto ou toque `campo:*` de quem tem pergunta pendente. True quando o canal o tomou."""
         toque, texto = e.toque or "", (e.texto or "").strip()
@@ -421,6 +466,7 @@ class Campo:
                                       SET legenda = CASE WHEN legenda = '' THEN %s ELSE legenda || ' · ' || %s END
                                     WHERE id = ANY(%s)""", (texto[:500], texto[:300], ids))
                     self._ler(con, lider["id"], texto, agora)
+                    self._data_da_frase(con, lider, texto, agora)   # #1047
                     return True
             return toque.startswith("campo:")   # botao velho: engole, sem levar ao menu
         q = r["pergunta_pendente"]
@@ -449,6 +495,7 @@ class Campo:
                                 WHERE id = ANY(%s)""", (texto[:500], texto[:300], ids))
                 r = self._gravar(con, r)
                 self._ler(con, r["id"], texto, agora)
+                self._data_da_frase(con, r, texto, agora)   # #1047: o MESMO ponto, do outro caminho
                 self._perguntar_proxima(con, saida, self._linha(con, r["id"]), agora)
                 return True
             return toque.startswith("campo:")

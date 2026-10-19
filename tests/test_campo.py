@@ -446,3 +446,59 @@ def test_destino_ativo_fora_do_cadastro_e_equipe_e_o_erp_decide_primeiro(canal):
     with conexao(canal) as con:   # destino desligado na tela: volta a ser como qualquer um
         con.execute("UPDATE atendimento.destinos SET ativo = false WHERE whatsapp LIKE '%99190249'")   # a 002 ja traz o Benedito
         assert campo.quem_e(con, faturamento) is None
+
+
+# ── #1047 (19/10/2026): a resposta que chega ANTES da pergunta ───────────────────────────────
+# O caso real: as 08:10:36 o dono escreveu "Hoje" junto com duas fotos, e as 08:11:33 a OlivIA
+# perguntou "E de hoje?". O palpite ja havia rodado as 08:10:43 COM o texto na mao -- nao faltou
+# reler, faltou LER: `ia.ler_campo` nao extrai data. `ler_data` ja existia e nunca foi chamada aqui.
+
+def test_a_data_dita_na_frase_dispensa_a_pergunta(canal):
+    """A manha de 19/10 ponta a ponta: duas fotos + frase + "Hoje" => ZERO perguntas."""
+    ligar(canal)
+    s = SaidaFalsa()
+    ia = IAFalsa(campo={"bastidor": "controle-de-qualidade", "produto": None, "fase": None})
+    passo(canal, s, foto("w1"), ia=ia)
+    passo(canal, s, foto("w2"), agora=AGORA + MIN, ia=ia)
+    passo(canal, s, texto("w3", "Começar segunda conferindo qualidade."), agora=AGORA + 2 * MIN, ia=ia)
+    passo(canal, s, texto("w4", "Hoje"), agora=AGORA + 3 * MIN, ia=ia)
+    minuto(canal, s, AGORA + 5 * MIN, ia=ia)
+    for m in material(canal):
+        assert m["data_dita"] == date(2026, 10, 12) and m["data_presumida"] is False
+        assert "data" not in (m["perguntas_feitas"] or [])
+    assert not any("de hoje" in (x[2] or "") for x in s.enviadas), [x[2] for x in s.enviadas]
+
+
+def test_a_safra_dita_na_frase_tambem(canal):
+    """#982: com a safra, a foto entra SEM dia -- e o dia nao e presumido."""
+    ligar(canal)
+    s = SaidaFalsa()
+    ia = IAFalsa(campo={"bastidor": "colheita", "produto": "CENTEIO IPR 89", "fase": None})
+    passo(canal, s, foto("w1"), ia=ia)
+    passo(canal, s, texto("w2", "colheita do centeio, safra 2025"), agora=AGORA + MIN, ia=ia)
+    minuto(canal, s, AGORA + 5 * MIN, ia=ia)
+    m = material(canal)[0]
+    assert m["safra_dita"] == 2025 and m["data_dita"] is None and m["data_presumida"] is False
+    assert not any("de hoje" in (x[2] or "") for x in s.enviadas)
+
+
+def test_frase_sem_data_continua_levando_a_pergunta(canal):
+    """A etapa nao adivinha: sem data na frase, a pergunta e a de sempre."""
+    ligar(canal)
+    s = SaidaFalsa()
+    ia = IAFalsa(campo={"bastidor": "controle-de-qualidade", "produto": None, "fase": None})
+    passo(canal, s, foto("w1"), ia=ia)
+    passo(canal, s, texto("w2", "conferindo a germinação"), agora=AGORA + MIN, ia=ia)
+    minuto(canal, s, AGORA + 5 * MIN, ia=ia)
+    assert any("de hoje" in (x[2] or "") for x in s.enviadas), [x[2] for x in s.enviadas]
+
+
+def test_a_primeira_data_vale_e_uma_frase_depois_nao_a_troca(canal):
+    ligar(canal)
+    s = SaidaFalsa()
+    ia = IAFalsa(campo={"bastidor": "colheita", "produto": None, "fase": None})
+    passo(canal, s, foto("w1"), ia=ia)
+    passo(canal, s, texto("w2", "ontem"), agora=AGORA + MIN, ia=ia)
+    passo(canal, s, texto("w3", "hoje"), agora=AGORA + 2 * MIN, ia=ia)
+    m = material(canal)[0]
+    assert m["data_dita"] == date(2026, 10, 11)   # ontem, a primeira resposta
