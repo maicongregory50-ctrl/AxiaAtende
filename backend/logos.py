@@ -27,9 +27,10 @@ licao do teto do #1028, aplicada aqui antes de o defeito existir.
 """
 import hashlib
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from . import internos
+from .campo import JANELA, ultima_mensagem_de
 
 # os quatro formatos que a tela Parceiras do marketing aceita (parceiras_logos_formato)
 FORMATOS = {"application/pdf": "pdf", "image/svg+xml": "svg", "svg": "svg",
@@ -44,6 +45,13 @@ SEM_CODIGO = ("Não achei um código aí. Me diga só os números do código do 
               "souber agora, deixo a logo guardada e alguém completa depois.")
 GUARDADA_SEM_CLIENTE = ("Deixei a logo guardada sem o cliente. Ela não se perde: alguém completa "
                         "depois, na tela Parceiras.")
+# #1037: o que o marketing fez com ela, dito a quem mandou (so dentro das 24 h)
+CHEGOU_PARCEIRA_NOVA = ("A logo de {marca} chegou ao marketing: a parceira foi cadastrada e espera a "
+                        "autorização.")
+CHEGOU_A_CONFERIR = "A logo de {marca} chegou ao marketing e espera a conferência."
+RESULTADOS = {"parceira_nova": CHEGOU_PARCEIRA_NOVA, "a_conferir": CHEGOU_A_CONFERIR}
+# o dialogo que a pessoa largou no meio tambem vai: sem isto a logo ficaria esperando para sempre
+ABANDONADA = timedelta(hours=24)
 
 
 def _nome_seguro(texto: str) -> str:
@@ -174,3 +182,57 @@ def responder(con, saida, e, agora: datetime) -> bool:
                     WHERE id = %s""", (texto[:120], agora, linha["id"]))
     _dizer(con, saida, e.pessoa.para, GUARDADA.format(marca=texto[:120]))
     return True
+
+
+# ── #1037: o marketing puxa ─────────────────────────────────────────────────
+
+def a_puxar(con, agora: datetime) -> list[dict]:
+    """As logos que o marketing ainda nao levou: o dialogo terminado, ou largado ha mais de 24 h.
+
+    Sem telefone nem bsuid: o marketing precisa do arquivo, do cliente e de quem mandou (o nome do
+    cadastro), e de nada mais.
+    """
+    return [dict(r) for r in con.execute(
+        """SELECT id, enviada_por, nome_arquivo, arquivo IS NOT NULL AS tem_arquivo, sha256, formato,
+                  erp_codigo, nome_marca, recebida_em, erro
+             FROM atendimento.logos_de_cliente
+            WHERE puxada_em IS NULL AND (pergunta_pendente IS NULL OR recebida_em < %s)
+            ORDER BY id""", (agora - ABANDONADA,)).fetchall()]
+
+
+def puxada(con, logo_id: int, resultado: str, agora: datetime) -> dict | None:
+    """O marketing levou a logo e diz o que fez. A segunda vez nao muda nada (a volta que caiu entre
+    o lote e este aviso repete o aviso, e so)."""
+    if resultado not in RESULTADOS:
+        raise ValueError("resultado %r: e parceira_nova ou a_conferir" % resultado)
+    x = con.execute("""UPDATE atendimento.logos_de_cliente
+                          SET puxada_em = COALESCE(puxada_em, %s), resultado = COALESCE(resultado, %s),
+                              pergunta_pendente = NULL
+                        WHERE id = %s
+                    RETURNING id, puxada_em, resultado""", (agora, resultado, logo_id)).fetchone()
+    return dict(x) if x else None
+
+
+def mandar_avisos(con, saida, agora: datetime) -> int:
+    """Quem mandou fica sabendo que a logo chegou ao marketing, so dentro das 24 h da ultima
+    mensagem dele; fora, fica anotado `fora_da_janela` e nada sai (seria modelo pago). O molde e o
+    `Campo.mandar_avisos`."""
+    feitos = 0
+    for r in con.execute("""SELECT * FROM atendimento.logos_de_cliente
+                             WHERE puxada_em IS NOT NULL AND resultado IS NOT NULL AND aviso IS NULL
+                             ORDER BY id LIMIT 20""").fetchall():
+        ultima = ultima_mensagem_de(con, r["wa_id"])
+        estado = "fora_da_janela"
+        if ultima is not None and agora - ultima < JANELA:
+            marca = r["nome_marca"] or (r["nome_arquivo"] or "cliente")
+            try:
+                _dizer(con, saida, r["wa_id"] or r["bsuid"], RESULTADOS[r["resultado"]].format(marca=marca))
+                estado = "enviado"
+                feitos += 1
+            except Exception as falha:  # noqa: BLE001 -- tenta na proxima volta; a linha diz o erro
+                con.execute("UPDATE atendimento.logos_de_cliente SET erro = %s WHERE id = %s",
+                            (("aviso: %s" % falha)[:300], r["id"]))
+                continue
+        con.execute("UPDATE atendimento.logos_de_cliente SET aviso = %s, aviso_em = %s WHERE id = %s",
+                    (estado, agora, r["id"]))
+    return feitos

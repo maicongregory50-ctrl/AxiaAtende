@@ -177,3 +177,117 @@ def test_o_dialogo_da_logo_fica_em_enviadas(ligado):
     assert len(ditas) == 3, [d["resumo"] for d in ditas]
     assert "ERP" in ditas[0]["resumo"] and "marca" in ditas[1]["resumo"].lower()
     assert "Parceiras" in ditas[2]["resumo"]
+
+
+# ── #1037: o marketing puxa ─────────────────────────────────────────────────
+
+@pytest.fixture
+def porta(cfg, tmp_path):
+    return replace(cfg, responde=True, campo_pasta=tmp_path / "campo", chave_pedido="chave-de-teste")
+
+
+def _api(cfg):
+    from fastapi.testclient import TestClient
+    from backend.main import criar_app
+    return TestClient(criar_app(cfg)), {"X-Axiaatende-Chave": "chave-de-teste"}
+
+
+def _logo_completa(cfg, s, agora=AGORA):
+    passo(cfg, s, documento("wamid.1"), agora=agora)
+    passo(cfg, s, texto("wamid.2", "7687"), agora=agora + timedelta(minutes=1))
+    passo(cfg, s, texto("wamid.3", "Agro Rigo"), agora=agora + timedelta(minutes=2))
+    return _logos(cfg)[0]
+
+
+def _janela_em(cfg, quando):
+    """A janela conta da ultima mensagem DELA, que o banco carimba com o relogio real: fixa."""
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.eventos_meta SET recebido_em = %s", (quando,))
+
+
+def test_o_marketing_so_leva_o_dialogo_terminado_ou_largado(porta):
+    """Terminado entra; a meio caminho espera; largado ha mais de 24 h entra -- senao a logo ficaria
+    esperando para sempre, que e o defeito que o #1036 consertou, em outra forma."""
+    _sou_da_casa(porta)
+    s = SaidaFalsa()
+    passo(porta, s, documento("wamid.1"))                       # so a pergunta do codigo, sem resposta
+    with conexao(porta) as con:
+        assert L.a_puxar(con, AGORA + timedelta(hours=1)) == []
+        largada = L.a_puxar(con, AGORA + timedelta(hours=25))
+    assert [x["id"] for x in largada] == [_logos(porta)[0]["id"]]
+    assert largada[0]["erp_codigo"] is None and "wa_id" not in largada[0] and "bsuid" not in largada[0]
+
+
+def test_puxada_duas_vezes_nao_muda_nada(porta):
+    _sou_da_casa(porta)
+    linha = _logo_completa(porta, SaidaFalsa())
+    with conexao(porta) as con:
+        assert [x["id"] for x in L.a_puxar(con, AGORA + timedelta(minutes=3))] == [linha["id"]]
+        primeira = L.puxada(con, linha["id"], "parceira_nova", AGORA + timedelta(minutes=4))
+        segunda = L.puxada(con, linha["id"], "a_conferir", AGORA + timedelta(minutes=9))
+        assert L.a_puxar(con, AGORA + timedelta(minutes=10)) == []
+    assert segunda == primeira and segunda["resultado"] == "parceira_nova"
+
+
+def test_puxada_fecha_a_pergunta_largada(porta):
+    """A logo largada no meio e levada; a pergunta aberta nao pode roubar a proxima mensagem."""
+    _sou_da_casa(porta)
+    passo(porta, SaidaFalsa(), documento("wamid.1"))
+    with conexao(porta) as con:
+        L.puxada(con, _logos(porta)[0]["id"], "a_conferir", AGORA + timedelta(hours=25))
+    assert _logos(porta)[0]["pergunta_pendente"] is None
+
+
+def test_quem_mandou_sabe_que_chegou_so_dentro_da_janela(porta):
+    _sou_da_casa(porta)
+    linha = _logo_completa(porta, SaidaFalsa())
+    _janela_em(porta, AGORA)
+    with conexao(porta) as con:
+        L.puxada(con, linha["id"], "parceira_nova", AGORA + timedelta(minutes=4))
+    s = SaidaFalsa()
+    R.rotina_do_minuto(porta, s, agora=AGORA + timedelta(minutes=5))
+    frase = L.CHEGOU_PARCEIRA_NOVA.format(marca="Agro Rigo")
+    assert frase in [e[2] for e in s.enviadas if e[0] == "texto"]
+    assert _logos(porta)[0]["aviso"] == "enviado"
+    R.rotina_do_minuto(porta, s, agora=AGORA + timedelta(minutes=6))   # uma vez so
+    assert [e[2] for e in s.enviadas if e[0] == "texto"].count(frase) == 1
+
+
+def test_fora_da_janela_nada_sai(porta):
+    _sou_da_casa(porta)
+    linha = _logo_completa(porta, SaidaFalsa())
+    _janela_em(porta, AGORA)
+    with conexao(porta) as con:
+        L.puxada(con, linha["id"], "a_conferir", AGORA + timedelta(hours=30))
+    s = SaidaFalsa()
+    R.rotina_do_minuto(porta, s, agora=AGORA + timedelta(hours=30, minutes=1))
+    assert not any("chegou ao marketing" in e[2] for e in s.enviadas if e[0] == "texto")
+    assert _logos(porta)[0]["aviso"] == "fora_da_janela"
+
+
+def test_as_rotas_das_logos_so_com_a_chave(porta):
+    _sou_da_casa(porta)
+    linha = _logo_completa(porta, SaidaFalsa())
+    api, chave = _api(porta)
+    assert api.get("/logos/pendentes").status_code == 403
+    assert api.get("/logos/pendentes", headers={"X-Axiaatende-Chave": "errada"}).status_code == 403
+    itens = api.get("/logos/pendentes", headers=chave).json()["itens"]
+    assert [x["id"] for x in itens] == [linha["id"]] and itens[0]["nome_marca"] == "Agro Rigo"
+    assert itens[0]["enviada_por"] == "Benedito Vaskevicz" and itens[0]["tem_arquivo"] is True
+    arq = api.get("/logos/%d/arquivo" % linha["id"], headers=chave)
+    assert arq.status_code == 200 and arq.content == (porta.campo_pasta / linha["arquivo"]).read_bytes()
+    assert api.get("/logos/999/arquivo", headers=chave).status_code == 404
+    assert api.post("/logos/%d/puxada" % linha["id"], headers=chave, json={"resultado": "outro"}).status_code == 422
+    r = api.post("/logos/%d/puxada" % linha["id"], headers=chave, json={"resultado": "a_conferir"})
+    assert r.status_code == 200 and r.json()["resultado"] == "a_conferir"
+    assert api.get("/logos/pendentes", headers=chave).json()["itens"] == []
+
+
+def test_o_arquivo_nao_sai_da_pasta_das_logos(porta):
+    _sou_da_casa(porta)
+    linha = _logo_completa(porta, SaidaFalsa())
+    with conexao(porta) as con:
+        con.execute("UPDATE atendimento.logos_de_cliente SET arquivo = '../../fora.pdf' WHERE id = %s",
+                    (linha["id"],))
+    api, chave = _api(porta)
+    assert api.get("/logos/%d/arquivo" % linha["id"], headers=chave).status_code == 404

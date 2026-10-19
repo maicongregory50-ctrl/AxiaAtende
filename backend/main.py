@@ -140,6 +140,9 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
     # ── o canal de campo (#970): o marketing busca o que a equipe mandou, com a mesma chave ──
     from .rotas_campo import rotas as rotas_campo
     app.include_router(rotas_campo(cfg))
+    # ── as logos de cliente (#1037): o marketing puxa o que a equipe mandou, com a mesma chave ──
+    from .rotas_logos import rotas as rotas_logos
+    app.include_router(rotas_logos(cfg))
 
     # ── a tela ───────────────────────────────────────────────────────────────
 
