@@ -409,7 +409,12 @@ def test_as_rotas_do_marketing_so_com_a_chave(canal):
     assert api.get("/campo/classificados", headers=chave).json()["itens"] == []
     assert api.post("/campo/%d/foi-ao-ar" % item["id"], json={"peca": "ao-vivo-2026-10-12-colheita"}, headers=chave).status_code == 200
     assert api.post("/campo/999/catalogado", json={"atv": "ATV-1"}, headers=chave).status_code == 404
-    med = api.get("/campo/medidas", headers=chave).json()
+    # `dias=90` e deliberado: a rota usa o RELOGIO REAL e a janela padrao e de 7 dias, mas a fixture
+    # grava o material em AGORA (12/10/2026 13:00). Em 19/10, pouco depois das 13:00 reais, o
+    # material caiu FORA da janela de 7 dias e este teste passou a falhar pela HORA DO DIA -- passou
+    # as 10:00 e falhou as 14:00, sem ninguem mexer em nada. Era uma bomba de relogio achada no
+    # #1049; a janela larga tira o relogio da conta sem afrouxar a contagem.
+    med = api.get("/campo/medidas?dias=90", headers=chave).json()
     assert (med["recebidos"], med["buscados"], med["catalogados"], med["classificados"], med["ligado"]) == (1, 1, 1, 1, True)
     assert api.get("/campo/qualquer").status_code in (403, 404, 422)   # a tela nao serve /campo/
 
@@ -559,3 +564,21 @@ def test_o_rotulo_do_palpite_vem_do_cadastro(canal):
     palpite(canal, 1, "estoque", None, AGORA + MIN)
     minuto(canal, s, AGORA + 3 * MIN, ia=ia)
     assert s.ultima[2] == campo.PERGUNTA_PALPITE % "estoque / armazém"
+
+
+def test_a_rota_de_bastidores_e_irma_da_do_portfolio(canal):
+    """#1049: o MARKETING e o dono da lista e a empurra, no molde do portfolio."""
+    api, chave = _api(canal)
+    nove = [{"chave": b["chave"], "rotulo": b["rotulo"], "descricao": b.get("descricao", ""),
+             "institucional": bool(b.get("institucional"))} for b in [
+        {"chave": "colheita", "rotulo": "Colheita", "descricao": "colheitadeira"},
+        {"chave": "estoque", "rotulo": "Estoque / armazém", "descricao": "armazém", "institucional": True}]]
+    assert api.post("/campo/bastidores", json={"bastidores": nove}).status_code == 403   # sem a chave
+    assert api.post("/campo/bastidores", json={"bastidores": nove}, headers=chave).json() == {"bastidores": 2}
+    with conexao(canal) as con:
+        assert [b["chave"] for b in campo.bastidores(con)] == ["colheita", "estoque"]
+    # lista VAZIA e recusada: aceita-la apagaria o cadastro e nada classificaria, em silencio
+    assert api.post("/campo/bastidores", json={"bastidores": []}, headers=chave).status_code == 422
+    # chave fora do formato tambem
+    assert api.post("/campo/bastidores", json={"bastidores": [{"chave": "Estoque!", "rotulo": "x"}]},
+                    headers=chave).status_code == 422

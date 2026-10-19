@@ -39,6 +39,21 @@ class Portfolio(BaseModel):
     produtos: list[str] = Field(max_length=200)
 
 
+class Bastidor(BaseModel):
+    """#1049: uma categoria do catalogo, como o MARKETING a define -- ele e o dono da lista, no
+    molde do portfolio. Aqui ela so e recebida e guardada."""
+    chave: str = Field(min_length=1, max_length=40, pattern=r"^[a-z0-9-]+$")
+    rotulo: str = Field(min_length=1, max_length=24)   # 24 = o limite da linha de lista no WhatsApp
+    descricao: str = Field(default="", max_length=120)
+    institucional: bool = False
+
+
+class Bastidores(BaseModel):
+    # `min_length=1`: lista VAZIA e recusada. Aceita-la apagaria o cadastro e deixaria o enum do
+    # modelo sem nada -- nada classificaria, em silencio (#1048).
+    bastidores: list[Bastidor] = Field(min_length=1, max_length=40)
+
+
 def rotas(cfg) -> APIRouter:
     r = APIRouter()
 
@@ -104,6 +119,18 @@ def rotas(cfg) -> APIRouter:
         conferir(x_axiaatende_chave)
         with conexao(cfg) as con:
             return {"produtos": campo.guardar_produtos(con, dados.produtos)}
+
+    @r.post("/campo/bastidores")
+    def bastidores(dados: Bastidores, x_axiaatende_chave: str | None = Header(default=None)):
+        """#1049: a lista de categorias do catalogo, mantida pelo MARKETING -- irma da do portfolio.
+
+        O dono do vocabulario e ele: a etiqueta, a regra de produto e o prompt do Gemini que da o
+        palpite moram la. Aqui a lista alimenta o botao, a lista fechada do atendente e o enum do
+        classificador (#1048). A migracao 022 e a semente, valida ate o primeiro empurrao.
+        """
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            return {"bastidores": campo.guardar_bastidores(con, [b.model_dump() for b in dados.bastidores])}
 
     @r.get("/campo/novos")
     def novos(x_axiaatende_chave: str | None = Header(default=None)):
