@@ -30,7 +30,10 @@ primeira tabela.
 
 **O horário:** marque os dias, ajuste as faixas e **Salvar horário**.
 
-**Quem é avisado quando alguém diz que não foi atendido:** escolha a pessoa no fim da tela.
+**Quem é avisado quando alguém diz que não foi atendido:** escolha a pessoa no fim da tela. A mesma
+pessoa recebe os outros avisos internos: o endereço público fora do ar e, desde o #926, o plano de
+marketing parado há 7, 14, 21... dias sem registro (às 08:00, pedido pelo marketing). Trocar a
+pessoa aqui troca também quem recebe esses.
 
 **Canal de campo (#970):** a chave *ligado*. Ligada, a foto ou o vídeo que um colaborador ou
 representante do cadastro manda ao WhatsApp da Renascer é guardado, a OlivIA pergunta o que é e se é

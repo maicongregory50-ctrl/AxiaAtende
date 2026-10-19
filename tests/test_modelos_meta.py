@@ -51,10 +51,10 @@ def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
     feitos = modelos_meta.propor(replace(cfg, meta_token="t"), imagem,
                                  http=cliente_falso(pedidos, ja_tem=["aviso_recusa"]))
     assert sorted(f["nome"] for f in feitos) == ["aviso_avaliacao_ruim", "aviso_endereco_fora",
-                                                 "aviso_endereco_voltou", "aviso_sem_atendimento",
-                                                 "epoca_de_plantio", "pecas_da_revenda"]
+                                                 "aviso_endereco_voltou", "aviso_plano_sem_registro",
+                                                 "aviso_sem_atendimento", "epoca_de_plantio", "pecas_da_revenda"]
     criados = [p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]
-    assert len(criados) == 6
+    assert len(criados) == 7
     assert all(p.method in ("GET", "POST") for p in pedidos)      # nada de DELETE
     assert not any("/register" in p.url.path or "/deregister" in p.url.path for p in pedidos)
 

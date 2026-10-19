@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from . import envio as E
 from .banco import conexao
+from .motor import _ajuste
 
 TIPOS = {".jpg", ".jpeg", ".png"}
 
@@ -139,5 +140,40 @@ def rotas(cfg) -> APIRouter:
                                                              AND resposta_em >= %(d)s AND resposta_em < %(a)s) AS recusaram
                      FROM atendimento.envio_destinatarios""", {"d": desde, "a": ate}).fetchone()
         return dict(r1)
+
+    class Aviso(BaseModel):
+        tipo: Literal["plano_sem_registro"]
+        partes: list[str] = Field(min_length=1, max_length=3)
+
+    @r.post("/pedido/aviso")
+    def pedir_aviso(pedido: Aviso, x_axiaatende_chave: str | None = Header(default=None)):
+        """O aviso ao dono pedido pelo Marketing (#926, o Controle do plano): vai para a fila de
+        avisos, para quem o ajuste `avisado_no_nao` aponta, e sai na volta do envio. So o tipo do
+        plano: os outros avisos nascem aqui dentro."""
+        conferir(x_axiaatende_chave)
+        if any("|" in p for p in pedido.partes):
+            raise HTTPException(status_code=422, detail="parte do aviso com barra vertical")
+        with conexao(cfg) as con:
+            quem = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
+                               (_ajuste(con, "avisado_no_nao"),)).fetchone()
+            if not quem:
+                raise HTTPException(status_code=422, detail="ninguém configurado para receber o aviso")
+            a = con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
+                               VALUES (%s, %s, %s, %s) RETURNING id""",
+                            (pedido.tipo, quem["nome"], quem["whatsapp"], "|".join(pedido.partes))).fetchone()
+        return {"aviso_id": a["id"]}
+
+    @r.get("/pedido/aviso/{aviso_id}")
+    def situacao_do_aviso(aviso_id: int, x_axiaatende_chave: str | None = Header(default=None)):
+        """Na fila (sem enviado_em e sem erro), enviado (com a hora) ou com o erro. So os do plano."""
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            a = con.execute("""SELECT criado_em, enviado_em, erro FROM atendimento.avisos
+                                WHERE id = %s AND tipo = 'plano_sem_registro'""", (aviso_id,)).fetchone()
+        if not a:
+            raise HTTPException(status_code=404, detail="aviso não encontrado")
+        situacao = "erro" if a["erro"] else ("enviado" if a["enviado_em"] else "na_fila")
+        return {"situacao": situacao, "criado_em": a["criado_em"], "enviado_em": a["enviado_em"],
+                "erro": a["erro"]}
 
     return r
