@@ -179,9 +179,13 @@ def test_o_limite_de_tres_perguntas_deixa_o_resto_a_classificar(canal):
     assert m["legenda"] == "coisa do dia · colhendo no Jair"
 
 
-def test_o_que_a_ia_nao_encaixa_fica_na_legenda_e_a_pergunta_nao_se_repete(canal):
-    """O manejo do cliente, que nao esta na lista: duas respostas sem encaixe, nenhuma pergunta
-    repetida, e o grupo fecha a classificar com o texto como legenda (para o dono)."""
+def test_o_que_a_ia_nao_encaixa_recebe_a_lista_uma_vez_e_o_fim_sem_classe_e_dito(canal):
+    """Duas respostas sem encaixe. A pergunta continua NAO se repetindo -- o que mudou no #1048 e que
+    a primeira recebe a LISTA fechada, uma vez, e que fechar sem classe passa a ser DITO.
+
+    Ate 19/10 este teste afirmava que a segunda resposta ja levava a pergunta de data e que o grupo
+    fechava calado. Era a decisao que o #1048 derruba, depois de oito fotos irem ao catalogo sem
+    classe sem ninguem ser avisado."""
     ligar(canal)
     ia = IAFalsa(campo=None)
     s = SaidaFalsa()
@@ -190,13 +194,17 @@ def test_o_que_a_ia_nao_encaixa_fica_na_legenda_e_a_pergunta_nao_se_repete(canal
     passo(canal, s, texto("wamid.t1", "cliente fazendo o manejo do azevem", numero=EQUIPE), agora=AGORA + 4 * MIN, ia=ia)
     assert s.ultima[2] == campo.PERGUNTA_BASTIDOR
     passo(canal, s, texto("wamid.t2", "e a dessecacao antes do plantio", numero=EQUIPE), agora=AGORA + 5 * MIN, ia=ia)
-    assert s.ultima[2] == campo.PERGUNTA_DATA   # nao repete; nao ha produto a perguntar sem bastidor
-    passo(canal, s, toque("wamid.t3", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 6 * MIN, ia=ia)
+    assert s.ultima[0] == "lista" and s.ultima[2] == campo.NAO_ACHEI_NA_LISTA   # #1048: nao e silencio
+    assert [c for c, _ in s.ultima[3]][:2] == ["campo:bastidor:campo-de-sementes", "campo:bastidor:colheita"]
+    passo(canal, s, texto("wamid.t3", "nao sei dizer", numero=EQUIPE), agora=AGORA + 6 * MIN, ia=ia)
+    assert s.ultima[2] == campo.PERGUNTA_DATA   # a lista NAO se repete
+    passo(canal, s, toque("wamid.t4", "campo:hoje:sim", numero=EQUIPE), agora=AGORA + 7 * MIN, ia=ia)
+    assert campo.SEM_CLASSE in textos(s)        # #1048: o fim sem classe e DITO
     m = material(canal)[0]
     assert m["fechado_em"] is not None and m["classe_bastidor"] is None and m["pergunta_n"] == 2
-    assert m["legenda"] == "cliente fazendo o manejo do azevem · e a dessecacao antes do plantio"
+    assert m["legenda"] == "cliente fazendo o manejo do azevem · e a dessecacao antes do plantio · nao sei dizer"
     with conexao(canal) as con:
-        assert campo.pendentes(con, AGORA + 6 * MIN)[0]["falta"] == ["bastidor"]
+        assert campo.pendentes(con, AGORA + 7 * MIN)[0]["falta"] == ["bastidor"]
 
 
 def test_o_palpite_de_imagem_molda_a_pergunta_do_bastidor(canal):
@@ -502,3 +510,52 @@ def test_a_primeira_data_vale_e_uma_frase_depois_nao_a_troca(canal):
     passo(canal, s, texto("w3", "hoje"), agora=AGORA + 2 * MIN, ia=ia)
     m = material(canal)[0]
     assert m["data_dita"] == date(2026, 10, 11)   # ontem, a primeira resposta
+
+
+# ── #1048 (19/10/2026): a lista de bastidores vira cadastro ──────────────────────────────────
+# O caso real: 8 fotos com a legenda "Estoque.", o palpite de beneficiamento recusado, e as oito ao
+# catalogo SEM CLASSE -- porque "estoque" nao existia na lista de cinco, e ninguem disse isso.
+
+def test_estoque_classifica_agora_e_vem_do_cadastro(canal):
+    """O caso de 19/10: "Estoque." deixa de nao ter onde ir."""
+    ligar(canal)
+    ia = IAFalsa(campo={"bastidor": "estoque", "produto": None, "fase": None})
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1", legenda="Estoque."), ia=ia)
+    minuto(canal, s, AGORA + 3 * MIN, ia=ia)
+    m = material(canal)[0]
+    assert m["classe_bastidor"] == "estoque"
+    # a IA recebeu as NOVE chaves do cadastro, nao as cinco do codigo
+    assert "estoque" in ia.bastidores_vistos[0] and len(ia.bastidores_vistos[0]) == 9
+
+
+def test_o_cadastro_tem_as_nove_e_e_a_verdade(canal):
+    with conexao(canal) as con:
+        lista = campo.bastidores(con)
+        chaves = [b["chave"] for b in lista]
+    assert len(chaves) == 9 and len(set(chaves)) == 9
+    assert {"estoque", "estrutura", "produto-embalagem", "manejo"} <= set(chaves)
+    # as cinco de hoje nao mudaram de chave nem de rotulo
+    assert {b["chave"]: b["rotulo"] for b in lista}["entrega"] == "Entrega / carregamento"
+    # a regra de institucional das tres de hoje foi preservada
+    inst = {b["chave"] for b in lista if b.get("institucional")}
+    assert {"beneficiamento", "controle-de-qualidade", "entrega"} <= inst
+
+
+def test_sem_a_linha_do_cadastro_cai_na_semente_de_cinco(canal):
+    """Apagar a linha nao pode deixar o enum vazio e nada classificando, em silencio."""
+    with conexao(canal) as con:
+        con.execute("DELETE FROM atendimento.ajustes WHERE chave = 'campo.bastidores'")
+        chaves = [b["chave"] for b in campo.bastidores(con)]
+    assert chaves == [b["chave"] for b in campo.SEMENTE_BASTIDORES] and len(chaves) == 5
+
+
+def test_o_rotulo_do_palpite_vem_do_cadastro(canal):
+    """"Parece estoque. E isso?" -- a frase usa o rotulo cadastrado, nao uma constante."""
+    ligar(canal)
+    ia = IAFalsa(campo=None)
+    s = SaidaFalsa()
+    passo(canal, s, foto("wamid.f1"), ia=ia)
+    palpite(canal, 1, "estoque", None, AGORA + MIN)
+    minuto(canal, s, AGORA + 3 * MIN, ia=ia)
+    assert s.ultima[2] == campo.PERGUNTA_PALPITE % "estoque / armazém"

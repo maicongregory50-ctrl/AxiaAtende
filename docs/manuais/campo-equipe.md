@@ -38,6 +38,17 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
    data** e diga o dia, *09/10*; se não souber o dia, escreva a **safra**, *safra 2025*: a safra vai
    de 1º de julho a 30 de junho, e a foto entra sem dia, com a safra). Responda escrevendo, com as suas palavras; ela encaixa.
 
+> **As categorias que ela reconhece, e o que acontece quando a sua resposta não encaixa** (#1048,
+> 19/10/2026). São **nove**: campo de sementes, colheita, beneficiamento, controle de qualidade,
+> entrega/carregamento, **estoque/armazém**, **estrutura da empresa**, **produto/embalagem** e
+> **manejo/implemento**. As quatro últimas nasceram hoje, porque o que vocês fotografavam não tinha
+> onde entrar — oito fotos de *"Estoque."* foram ao catálogo sem classe nenhuma, e ninguém foi
+> avisado.
+>
+> E **se a sua resposta não encaixar em nenhuma, ela diz isso** e manda a lista para você escolher —
+> **uma vez só**. Se você não escolher, ela avisa que a foto **vai sem classe** e que o marketing
+> resolve na Caixa. O que não acontece mais é a foto ir vazia em silêncio.
+
 > **Diga a data na frase e ela não pergunta** (#1047, 19/10/2026). Escrever *"hoje"*, *"ontem"*,
 > *"09/10"* ou *"safra 2025"* junto com a foto **já responde**: a data vale igual à do botão, não é
 > palpite. **Com a frase completa, a foto entra no catálogo sem nenhuma pergunta.** Antes desta data a

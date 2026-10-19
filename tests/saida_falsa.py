@@ -60,9 +60,11 @@ class IAFalsa:
     def __init__(self, resposta=None, falha=False, campo=None):
         self.resposta, self.falha, self.perguntas = resposta, falha, []
         self.campo, self.frases = campo, []   # #970: o que `ler_campo` devolve, e as frases lidas
+        self.bastidores_vistos = []           # #1048: as chaves que o cadastro entregou ao modelo
 
-    def ler_campo(self, texto, produtos):
+    def ler_campo(self, texto, produtos, bastidores=None):
         self.frases.append(texto)
+        self.bastidores_vistos.append([b["chave"] for b in (bastidores or [])])
         if self.falha:
             raise TimeoutError("a IA demorou")
         if isinstance(self.campo, list):   # uma leitura por frase, na ordem

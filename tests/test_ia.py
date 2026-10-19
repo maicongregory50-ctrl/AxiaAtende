@@ -1,5 +1,6 @@
 """D3 do plano #950: a IA so devolve uma chave da lista; qualquer outra coisa vira None (o menu).
 A Anthropic e falsa: nenhum pedido sai da maquina e nada e cobrado."""
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -102,3 +103,36 @@ def test_nenhuma_descricao_passa_do_limite_da_coluna(cfg):
         ops = folhas_e_menus(con)
     longas = [(o["chave"], len(o["descricao"])) for o in ops if len(o["descricao"] or "") > 72]
     assert longas == []
+
+
+# ── #1048: o enum e a prosa do campo vem do CADASTRO ─────────────────────────────────────────
+
+def test_a_prosa_do_campo_e_montada_do_cadastro():
+    """Antes, acrescentar uma categoria exigia editar este texto, o enum, e mais quatro lugares --
+    e esquecer um deles nao dava erro: dava silencio."""
+    lista = [{"chave": "estoque", "rotulo": "Estoque / armazém",
+              "descricao": "semente guardada, armazém, pálete"},
+             {"chave": "colheita", "rotulo": "Colheita", "descricao": "colheitadeira"}]
+    prosa = IAmod.IA.instrucoes_campo(lista)
+    assert "estoque = semente guardada, armazém, pálete" in prosa
+    assert "colheita = colheitadeira" in prosa
+    assert "beneficiamento" not in prosa      # o que nao esta no cadastro nao entra na prosa
+
+
+def test_o_enum_do_campo_tem_as_chaves_do_cadastro():
+    """O enum CONTINUA FECHADO: muda de onde a lista vem, nao que exista uma."""
+    c = ClienteFalso(resposta(json.dumps({"bastidor": "estoque", "produto": "nenhum", "fase": "nenhuma"})))
+    lista = [{"chave": "estoque", "rotulo": "Estoque", "descricao": "armazém"},
+             {"chave": "manejo", "rotulo": "Manejo", "descricao": "rolo-faca"}]
+    r = IAmod.IA(cliente=c).ler_campo("foto do armazém", ["CENTEIO IPR 89"], lista)
+    assert r["bastidor"] == "estoque"
+    enum = c.pedidos[-1]["output_config"]["format"]["schema"]["properties"]["bastidor"]["enum"]
+    assert enum == ["estoque", "manejo", "nenhum"]
+
+
+def test_sem_cadastro_o_campo_cai_nas_cinco_originais():
+    c = ClienteFalso(resposta(json.dumps({"bastidor": "colheita", "produto": "nenhum", "fase": "nenhuma"})))
+    IAmod.IA(cliente=c).ler_campo("colheita", [])
+    enum = c.pedidos[-1]["output_config"]["format"]["schema"]["properties"]["bastidor"]["enum"]
+    assert enum == ["campo-de-sementes", "colheita", "beneficiamento", "controle-de-qualidade",
+                    "entrega", "nenhum"]

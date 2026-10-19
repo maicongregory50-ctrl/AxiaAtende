@@ -48,8 +48,25 @@ MAX_PERGUNTAS = 3                      # perguntas de classificacao por grupo (a
 EXTENSOES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
              "video/mp4": ".mp4", "video/3gpp": ".3gp", "video/quicktime": ".mov"}
 
-BASTIDORES = {"campo-de-sementes": "Campo de sementes", "colheita": "Colheita", "beneficiamento": "Beneficiamento",
-              "controle-de-qualidade": "Controle de qualidade", "entrega": "Entrega / carregamento"}
+# #1048: A VERDADE DOS BASTIDORES E O CADASTRO (`ajustes`, chave `campo.bastidores`), no molde dos
+# produtos. ISTO AQUI E A SEMENTE, e serve a um caso so: a linha faltar. Nao e a lista.
+#
+# Por que semente e nao lista vazia: sem ela, apagar a linha deixaria o `enum` do modelo vazio e
+# NADA classificaria, em silencio -- o modo de falha que este projeto combate. Degradar para as cinco
+# originais e pior que nove e muito melhor que zero. E a doutrina do `interno.ligado` do #1031, onde
+# a ausencia tambem tem um padrao seguro em vez de um buraco.
+SEMENTE_BASTIDORES = [
+    {"chave": "campo-de-sementes", "rotulo": "Campo de sementes",
+     "descricao": "lavoura em pé, vistoria, plantio, floração", "institucional": False},
+    {"chave": "colheita", "rotulo": "Colheita",
+     "descricao": "colheitadeira, grãos saindo", "institucional": False},
+    {"chave": "beneficiamento", "rotulo": "Beneficiamento",
+     "descricao": "UBS, limpeza, ensaque", "institucional": True},
+    {"chave": "controle-de-qualidade", "rotulo": "Controle de qualidade",
+     "descricao": "laboratório, amostra, germinação", "institucional": True},
+    {"chave": "entrega", "rotulo": "Entrega / carregamento",
+     "descricao": "carregamento, caminhão, revenda, cliente", "institucional": True},
+]
 FASES = {"inicial": "Inicial (recém-nascida)", "vegetativo": "Vegetativo (verde)", "flor": "Flor / espigando",
          "pre-colheita": "Pré-colheita (madura)", "semente": "Semente (grão de perto)"}
 COM_PRODUTO = ("campo-de-sementes", "colheita")
@@ -70,6 +87,13 @@ NAO_ACHEI_PRODUTO = "Não achei esse produto na lista; deixo para o marketing co
 AVISO_CATALOGO = "Sua foto entrou no catálogo da Renascer. Obrigado!"
 AVISO_AR = "A sua foto virou o Stories do dia."
 ANOTADO_FRASE = "Anotado. Se for para falar com alguém da empresa, me escreva *menu*."
+
+# #1048: as duas frases que acabam com o silencio. A primeira oferece a lista fechada quando a
+# resposta nao encaixou; a segunda e dita quando nem a lista resolveu -- a peca vai sem classe, mas
+# quem mandou SABE. Ir sem classe calado e o que esta etapa nao aceita.
+NAO_ACHEI_NA_LISTA = ("Não achei isso na minha lista. É algum destes? (se não for, deixo sem "
+                      "classificar e o marketing resolve na Caixa)")
+SEM_CLASSE = "Guardei sem classificar; o marketing classifica na Caixa. A foto está no catálogo."
 # A lista mudou de lugar no #1031: mora em internos.py, porque o motor tambem a pergunta.
 PEDE_MENU = internos.PEDE_MENU
 
@@ -83,6 +107,32 @@ def produtos(con) -> list[str]:
     """A lista do portfolio do marketing (ajuste `campo.produtos`, mantida pelo publicador de la)."""
     r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = 'campo.produtos'").fetchone()
     return [str(p) for p in (r["valor"] if r and isinstance(r["valor"], list) else [])]
+
+
+def bastidores(con) -> list[dict]:
+    """A lista de bastidores, do cadastro (`campo.bastidores`). Sem a linha, a SEMENTE (#1048).
+
+    Cada item: {chave, rotulo, descricao, institucional}. `chave` vai ao `enum` do modelo e a
+    `material_de_campo.classe_bastidor`; `rotulo` ao botao, a linha da lista e a etiqueta;
+    `descricao` a prosa que o modelo le; `institucional` a regra de produto do marketing.
+    """
+    r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = 'campo.bastidores'").fetchone()
+    lista = r["valor"] if r and isinstance(r["valor"], list) else None
+    if not lista:
+        return [dict(b) for b in SEMENTE_BASTIDORES]
+    return [b for b in lista if isinstance(b, dict) and b.get("chave") and b.get("rotulo")]
+
+
+def guardar_bastidores(con, lista: list[dict]) -> int:
+    con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES ('campo.bastidores', %s::jsonb)
+                   ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now()""",
+                (json.dumps(lista[:40], ensure_ascii=False),))
+    return len(lista)
+
+
+def rotulos_de_bastidor(con) -> dict:
+    """{chave: rotulo} -- o que a antiga constante `BASTIDORES` era."""
+    return {b["chave"]: b["rotulo"] for b in bastidores(con)}
 
 
 def guardar_produtos(con, lista: list[str]) -> int:
@@ -255,7 +305,7 @@ class Campo:
         lido = None
         if self.ia is not None and hasattr(self.ia, "ler_campo"):
             try:
-                lido = self.ia.ler_campo(texto, produtos(con))
+                lido = self.ia.ler_campo(texto, produtos(con), bastidores(con))
             except Exception:  # noqa: BLE001 -- sem leitura, o atendente pergunta
                 lido = None
         if not lido:
@@ -305,13 +355,16 @@ class Campo:
         return feitas
 
     @staticmethod
-    def _falta(r) -> str | None:
+    def _falta(r, chaves=()) -> str | None:
         """O que ainda falta para classificar: a proxima pergunta, ou None quando esta fechado. Cada
-        pergunta e feita UMA vez (decisao 15): a resposta que a IA nao encaixou fica na legenda."""
+        pergunta e feita UMA vez (decisao 15): a resposta que a IA nao encaixou fica na legenda.
+
+        `chaves` sao as do cadastro de bastidores (#1048). Vazio: so a conferencia do palpite deixa
+        de valer -- o resto da regua nao depende da lista."""
         feitas = r["perguntas_feitas"] or []
         legenda = (r["legenda"] or "").strip()
         if r["classe_bastidor"] is None:
-            if not legenda and r["palpite_bastidor"] in BASTIDORES and "bastidor" not in feitas:
+            if not legenda and r["palpite_bastidor"] in chaves and "bastidor" not in feitas:
                 return "bastidor"   # "Parece X. E isso?": so quando a pessoa nao escreveu nada
             if not legenda and "legenda" not in feitas:
                 return "legenda"
@@ -326,6 +379,31 @@ class Campo:
             return "data"
         return None
 
+    def _oferecer_a_lista(self, con, saida, r, agora: datetime) -> bool:
+        """#1048: a lista fechada de bastidores, UMA vez, quando a resposta nao encaixou.
+
+        Devolve True quando tomou a vez (mandou a lista). O que esta etapa nao aceita e a peca ir ao
+        catalogo sem classe EM SILENCIO; ir sem classe DITO e aceitavel -- e e o que acontece se nem
+        a lista resolver (`_fechar` manda a frase).
+
+        Uma tentativa so, marcada em `perguntas_feitas` (array de texto livre -- nao mexe no CHECK de
+        `pergunta_pendente`, que ja aceita 'bastidor').
+        """
+        if r["classe_bastidor"] is not None or "bastidor_lista" in (r["perguntas_feitas"] or []):
+            return False
+        opcoes = [Opcao("campo:bastidor:" + b["chave"], b["rotulo"][:24]) for b in bastidores(con)]
+        if not opcoes:
+            return False
+        ids = self._grupo_de(con, r)
+        con.execute("""UPDATE atendimento.material_de_campo
+                          SET perguntas_feitas = array_append(perguntas_feitas, 'bastidor_lista'),
+                              pergunta_pendente = 'bastidor', retomar_em = %s
+                        WHERE id = ANY(%s)""", (agora + RETOMADA, ids))
+        self._lista(con, saida, r["wa_id"] or r["bsuid"], NAO_ACHEI_NA_LISTA, "Ver as opções", opcoes)
+        print("campo: resposta nao encaixou (grupo %s): mandei a lista de %d bastidores"
+              % (r["grupo_id"], len(opcoes)), flush=True)
+        return True
+
     def _perguntar_proxima(self, con, saida, r, agora: datetime) -> bool:
         """Faz a proxima pergunta do grupo, respeitando o limite; sem nada a perguntar, fecha.
 
@@ -338,10 +416,15 @@ class Campo:
         data. Entra porque o dono pediu, informado disso, e porque custa uma linha.
         """
         r = self._linha(con, r["id"]) or r
-        falta = self._falta(r)
+        falta = self._falta(r, rotulos_de_bastidor(con))
         if falta and falta != "data" and r["pergunta_n"] >= MAX_PERGUNTAS:
             falta = "data" if r["data_dita"] is None else None   # estourou: so a data ainda vale
         if falta is None:
+            # #1048: fechar SEM classe deixa de ser calado. Nao e erro -- a peca vai ao catalogo e o
+            # marketing resolve na Caixa --, mas quem mandou precisa saber, e so quem ja foi
+            # perguntado ouve a frase (grupo que nunca teve pergunta nenhuma nao e avisado de nada).
+            if r["classe_bastidor"] is None and (r["perguntas_feitas"] or []):
+                self._texto(con, saida, r["wa_id"] or r["bsuid"], SEM_CLASSE)
             self._fechar(con, r, agora)
             return False
         self._perguntar(con, saida, r, agora, falta)
@@ -353,8 +436,9 @@ class Campo:
         if qual == "legenda":
             self._texto(con, saida, para, prefixo + PERGUNTA_LEGENDA)
         elif qual == "bastidor":
-            if r["palpite_bastidor"] in BASTIDORES and not (r["legenda"] or "").strip() and not retomando and not r["retomada"]:
-                self._botoes(con, saida, para, PERGUNTA_PALPITE % BASTIDORES[r["palpite_bastidor"]].lower(),
+            rotulos = rotulos_de_bastidor(con)
+            if r["palpite_bastidor"] in rotulos and not (r["legenda"] or "").strip() and not retomando and not r["retomada"]:
+                self._botoes(con, saida, para, PERGUNTA_PALPITE % rotulos[r["palpite_bastidor"]].lower(),
                              [Opcao("campo:bastidor:" + r["palpite_bastidor"], "Sim"), Opcao("campo:bastidor:outra", "Outra coisa")])
             else:
                 self._texto(con, saida, para, prefixo + PERGUNTA_BASTIDOR)
@@ -484,7 +568,7 @@ class Campo:
                 r = self._gravar(con, r)
                 self._perguntar(con, saida, r, agora, "legenda")
                 return True
-            if toque.startswith("campo:bastidor:") and toque[15:] in BASTIDORES:
+            if toque.startswith("campo:bastidor:") and toque[15:] in rotulos_de_bastidor(con):
                 r = self._gravar(con, r, classe_bastidor=toque[15:])
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
@@ -496,6 +580,12 @@ class Campo:
                 r = self._gravar(con, r)
                 self._ler(con, r["id"], texto, agora)
                 self._data_da_frase(con, r, texto, agora)   # #1047: o MESMO ponto, do outro caminho
+                # #1048: a resposta que NAO ENCAIXA passa a ser DITA. Em 19/10 o dono respondeu
+                # "Estoque." a "Parece beneficiamento. E isso?", a IA nao achou, e o fluxo seguiu
+                # CALADO: oito fotos ao catalogo sem classe. Uma vez a lista fechada; nao resolvendo,
+                # a frase de que a peca vai sem classe. Uma tentativa, nunca duas (teto do #1028).
+                if self._oferecer_a_lista(con, saida, self._linha(con, r["id"]), agora):
+                    return True
                 self._perguntar_proxima(con, saida, self._linha(con, r["id"]), agora)
                 return True
             return toque.startswith("campo:")
@@ -505,7 +595,7 @@ class Campo:
             p = casar_produto(texto, produtos(con))
             if not p and self.ia is not None and hasattr(self.ia, "ler_campo"):
                 try:
-                    p = (self.ia.ler_campo(texto, produtos(con)) or {}).get("produto")
+                    p = (self.ia.ler_campo(texto, produtos(con), bastidores(con)) or {}).get("produto")
                 except Exception:  # noqa: BLE001
                     p = None
             if not p:
@@ -522,7 +612,7 @@ class Campo:
                 fase = None
                 if self.ia is not None and hasattr(self.ia, "ler_campo"):
                     try:
-                        fase = (self.ia.ler_campo(texto, produtos(con)) or {}).get("fase")
+                        fase = (self.ia.ler_campo(texto, produtos(con), bastidores(con)) or {}).get("fase")
                     except Exception:  # noqa: BLE001
                         fase = None
                 r = self._gravar(con, r, classe_fase=fase if fase in FASES else None)
