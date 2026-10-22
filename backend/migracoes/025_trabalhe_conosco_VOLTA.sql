@@ -1,15 +1,20 @@
 -- Desfaz a 025 (o Trabalhe conosco, #1098). O no "Trabalhe conosco" volta a mandar o cartao da Fran.
 -- AS TABELAS vagas, candidaturas e respostas_da_vaga FICAM: sao curriculos com consentimento e o
--- retorno da Fran; apaga-las e decisao do dono, por arquivo proprio (spec, ROLLBACK 4). Por isso a
--- coluna conversas.vaga_id tambem fica (a candidatura aponta a conversa).
+-- retorno da Fran; apaga-las e decisao do dono, por arquivo proprio (spec, ROLLBACK 4). Por isso as
+-- colunas trabalhe, vaga_id e vaga_declarou das conversas tambem ficam (a candidatura aponta a conversa).
 BEGIN;
 UPDATE atendimento.conversas SET situacao = 'encerrada'
  WHERE situacao IN ('curriculo_recebido', 'sem_curriculo');
 UPDATE atendimento.conversas SET situacao = 'encerrada'
- WHERE situacao = 'em_curso' AND vaga_id IS NOT NULL;
+ WHERE situacao = 'em_curso' AND trabalhe;
 ALTER TABLE atendimento.conversas DROP CONSTRAINT conversas_situacao;
 ALTER TABLE atendimento.conversas ADD CONSTRAINT conversas_situacao
     CHECK (situacao IN ('em_curso', 'com_link', 'parou_no_meio', 'encerrada', 'envio'));
+
+UPDATE atendimento.enviadas SET tipo = 'texto' WHERE tipo = 'documento';
+ALTER TABLE atendimento.enviadas DROP CONSTRAINT enviadas_tipo;
+ALTER TABLE atendimento.enviadas ADD CONSTRAINT enviadas_tipo
+    CHECK (tipo IN ('texto', 'botoes', 'lista', 'imagem', 'modelo'));
 
 UPDATE atendimento.menu SET acao = 'destino' WHERE acao = 'vaga';
 ALTER TABLE atendimento.menu DROP CONSTRAINT menu_destino_so_na_folha;

@@ -76,6 +76,13 @@ def ler_codigo(segredo: str, codigo: str):
 def falar(con, segredo: str, codigo: str, agora: datetime) -> str | None:
     """O toque no link da direta: anota (so o do cliente, so o primeiro) e devolve o WhatsApp do
     responsavel para onde a pessoa vai. None: codigo que nao e nosso."""
+    if (codigo or "").startswith("v"):
+        # #1098: "Conversar com o candidato", do modelo do curriculo para a Fran
+        base, _, sig = codigo.partition("-")
+        if not base[1:].isdigit() or not hmac.compare_digest(sig, _assinatura(segredo, base)):
+            return None
+        c = con.execute("SELECT wa_id FROM atendimento.candidaturas WHERE id = %s", (int(base[1:]),)).fetchone()
+        return c["wa_id"] if c and c["wa_id"] else None
     lido = ler_codigo(segredo, codigo)
     if not lido:
         return None

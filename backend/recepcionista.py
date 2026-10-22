@@ -166,6 +166,14 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
             c.mandar_avisos(con, saida, momento)
     except Exception as falha:  # noqa: BLE001
         print("campo: %s" % type(falha).__name__, flush=True)
+    try:   # #1098: a pre-triagem e o curriculo para a Fran (um por mensagem); a limpeza dos 12 meses
+        from . import vaga
+        with conexao(cfg) as con:
+            vaga.mandar_a_fran(con, saida, ia, cfg.meta_app_secret, momento)
+            if momento.minute == 0:
+                vaga.limpar(con, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("vaga: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #1037: quem mandou a logo fica sabendo que ela chegou ao marketing (so dentro das 24 h)
         from . import logos
         with conexao(cfg) as con:

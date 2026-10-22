@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda, internos, logos
+from . import agenda, internos, logos, vaga
 from .envio import primeiro_nome
 from .saida import MAX_BOTOES, Opcao, Saida
 
@@ -309,9 +309,10 @@ def _empurrar_a_pergunta(con, pessoa: Pessoa, agora: datetime) -> None:
 
 
 def _nova_conversa(con, pessoa: Pessoa, agora: datetime):
-    # Uma conversa que ficou em curso sem link e a pessoa voltou: a antiga parou no meio.
-    con.execute("""UPDATE atendimento.conversas SET situacao = 'parou_no_meio'
-                    WHERE bsuid = %s AND situacao = 'em_curso'""", (pessoa.bsuid,))
+    # Uma conversa que ficou em curso sem link e a pessoa voltou: a antiga parou no meio (a de vaga,
+    # #1098, termina com ou sem curriculo).
+    con.execute("UPDATE atendimento.conversas SET situacao = " + _SITUACAO_DA_PARADA +
+                " WHERE bsuid = %s AND situacao = 'em_curso'", (pessoa.bsuid,))
     c = con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, nome_perfil, iniciada_em, ultimo_toque_em)
                           VALUES (%s, %s, %s, %s, %s) RETURNING *""",
                     (pessoa.bsuid, pessoa.wa_id, pessoa.nome, agora, agora)).fetchone()
@@ -356,6 +357,9 @@ def escolher(con, saida: Saida, pessoa: Pessoa, conversa, no, agora: datetime) -
         # nao leva a destino nem abre submenu, porque o que vem depois e a pessoa mandar a foto.
         w = saida.texto(pessoa.para, no["pergunta"])
         _registrar(con, conversa["id"], pessoa.para, "texto", "diz: %s" % no["chave"], w)
+    elif no["acao"] == "vaga":
+        # #1098: o Trabalhe conosco abre a conversa da vaga (requisitos, so PDF, a pre-triagem)
+        vaga.do_menu(con, saida, pessoa, conversa, no, agora)
     elif no["acao"] == "menu_cliente":
         # #1031: a saida de quem e da casa para o atendimento de cliente -- e por onde falar com um
         # colega continua acontecendo, ja que "falar com um colega" nao e opcao do menu interno.
@@ -538,6 +542,13 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         if envio is not None:
             envio.tratar_toque(con, saida, e, agora)
         return
+    # #1098: o retorno da Fran sobre a triagem vem ANTES do canal de campo -- ela e "da casa", e o
+    # comentario dela depois de "Triagem errada" viraria a frase da proxima foto. A conversa de vaga
+    # vem antes tambem: o PDF do candidato nao e logo, e a foto dele nao e material de campo.
+    if vaga.retorno_da_fran(con, saida, e, agora):
+        return
+    if vaga.tratar(con, saida, ia, e, agora):
+        return
     if campo is not None:
         if e.midia is not None and campo.receber(con, saida, e, agora):
             return
@@ -658,6 +669,10 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         # e voltou ao menu principal tres vezes): primeiro as opcoes do no onde a pessoa esta --
         # o casamento exato escolhe na hora; a IA restrita as opcoes propoe com a confirmacao de
         # sempre. So depois o caminho de antes: a IA sobre a arvore inteira, e o menu.
+        # #1098: quem teve conversa de vaga nos ultimos 30 dias e volta escrevendo ("receberam meu
+        # curriculo?") e respondido como da vaga, com "Era outro assunto" para o menu
+        if nova and e.texto and vaga.volta(con, saida, ia, p, conversa, e.texto, agora):
+            return
         no_atual = _no_atual(con, conversa)
         certo, parecido = casar_opcao(con, ia, no_atual, e.texto or "")
         if certo:
@@ -720,7 +735,7 @@ def depois_do_atendimento(con, saida: Saida, pessoa: Pessoa, texto: str, agora: 
     if not e_agradecimento(texto) or _conversa_aberta(con, pessoa):
         return False
     c = con.execute("""SELECT id FROM atendimento.conversas
-                        WHERE bsuid = %s AND situacao IN ('com_link', 'encerrada')
+                        WHERE bsuid = %s AND situacao IN ('com_link', 'encerrada', 'curriculo_recebido', 'sem_curriculo')
                           AND GREATEST(link_em, pergunta_feita_em, ultimo_toque_em) > %s
                         ORDER BY id DESC LIMIT 1""", (pessoa.bsuid, desde)).fetchone()
     if not c:
@@ -842,10 +857,16 @@ def responder_pos(con, saida: Saida, pessoa: Pessoa, c, toque: str, agora: datet
             _avisar_o_gestor(con, c, "avaliacao_ruim")
 
 
+# #1098: a conversa de vaga nunca "para no meio": termina com o curriculo recebido ou sem ele.
+_SITUACAO_DA_PARADA = """CASE WHEN NOT trabalhe THEN 'parou_no_meio'
+                          WHEN EXISTS (SELECT 1 FROM atendimento.candidaturas k WHERE k.conversa_id = conversas.id)
+                          THEN 'curriculo_recebido' ELSE 'sem_curriculo' END"""
+
+
 def marcar_paradas(con, agora: datetime, minutos: int = 30) -> int:
     """D5: conversa em curso sem link 30 min depois do ultimo toque parou no meio."""
-    return con.execute("""UPDATE atendimento.conversas SET situacao = 'parou_no_meio'
-                           WHERE situacao = 'em_curso' AND ultimo_toque_em < %s""",
+    return con.execute("UPDATE atendimento.conversas SET situacao = " + _SITUACAO_DA_PARADA +
+                       " WHERE situacao = 'em_curso' AND ultimo_toque_em < %s",
                        (agora - timedelta(minutes=minutos),)).rowcount
 
 

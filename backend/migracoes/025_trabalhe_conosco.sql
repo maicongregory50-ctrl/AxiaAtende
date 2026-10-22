@@ -55,7 +55,7 @@ INSERT INTO atendimento.respostas_da_vaga (chave, descricao, texto, para_ia, ord
     ('recebemos', 'pergunta se o currículo dela chegou, se receberam', 'Recebemos, sim ✅ (em {data}). Os pré-selecionados recebem retorno por aqui.', true, 11),
     ('apresentacao', 'se apresenta por texto (formação, experiência) sem mandar arquivo', 'Anotei 👍 Falta só o currículo: mande o arquivo em PDF aqui mesmo.', true, 12),
     ('sem_pdf', 'diz que não tem currículo, não tem PDF, ou pergunta se pode mandar foto ou Word', 'Precisamos do seu currículo em PDF. Se ele estiver no Word, salve como PDF e mande aqui.', true, 13),
-    ('salario', 'pergunta salário, remuneração ou benefícios', 'Salário atrativo, {beneficios}. Os valores são conversados com os pré-selecionados.', true, 14),
+    ('salario', 'pergunta salário, remuneração ou benefícios', 'Oferecemos {beneficios}. Os valores são conversados com os pré-selecionados.', true, 14),
     ('retorno', 'pergunta quando vão dar retorno, prazo, próximas etapas', 'Estamos fazendo a pré-triagem de todos os currículos. Os pré-selecionados recebem retorno por aqui.', true, 15),
     ('pessoa', 'quer falar com uma pessoa, um humano, alguém da empresa', 'Pode falar com a {nome}, do nosso time:', true, 16),
     ('outro_assunto', 'o assunto não é a vaga (comprar semente, fornecedor, outro assunto)', '', true, 17);
@@ -82,6 +82,7 @@ CREATE TABLE atendimento.candidaturas (
     triagem          jsonb,
     triagem_em       timestamptz,
     triagem_erro     text NOT NULL DEFAULT '',
+    fran_para        text,                         -- o WhatsApp para onde foi (o destino do no, a Fran)
     fran_wamid       text,
     fran_em          timestamptz,
     fran_erro        text NOT NULL DEFAULT '',
@@ -99,11 +100,21 @@ CREATE INDEX candidaturas_pessoa ON atendimento.candidaturas (bsuid, recebida_em
 -- A conversa de vaga: marcada pela vaga. Ela termina como "Curriculo recebido" ou "Sem curriculo",
 -- nunca "parou no meio" (os leitores de decisao -- marcar_paradas, retomar_paradas, a pergunta das
 -- 4h30 -- nao leem estes dois valores, de proposito).
+-- `trabalhe` marca a conversa (com ou sem vaga aberta: sem vaga, o curriculo fica para as proximas);
+-- `vaga_declarou` guarda o botao "atendo todos / nao atendo todos" ate o PDF chegar.
+ALTER TABLE atendimento.conversas ADD COLUMN trabalhe boolean NOT NULL DEFAULT false;
 ALTER TABLE atendimento.conversas ADD COLUMN vaga_id integer REFERENCES atendimento.vagas (id);
+ALTER TABLE atendimento.conversas ADD COLUMN vaga_declarou text
+    CONSTRAINT conversas_vaga_declarou CHECK (vaga_declarou IN ('todos', 'nem_todos'));
 ALTER TABLE atendimento.conversas DROP CONSTRAINT conversas_situacao;
 ALTER TABLE atendimento.conversas ADD CONSTRAINT conversas_situacao
     CHECK (situacao IN ('em_curso', 'com_link', 'parou_no_meio', 'encerrada', 'envio',
                         'curriculo_recebido', 'sem_curriculo'));
+
+-- O curriculo vai a Fran como documento (dentro da janela dela): um tipo a mais no registro do que sai.
+ALTER TABLE atendimento.enviadas DROP CONSTRAINT enviadas_tipo;
+ALTER TABLE atendimento.enviadas ADD CONSTRAINT enviadas_tipo
+    CHECK (tipo IN ('texto', 'botoes', 'lista', 'imagem', 'modelo', 'documento'));
 
 -- O no "Trabalhe conosco" passa a abrir a conversa da vaga. O destino (a Fran) FICA: e o "falar com
 -- uma pessoa" da vaga, e a tela Destinos continua trocando-o.

@@ -80,6 +80,13 @@ class IAFalsa:
             return self.campo.pop(0) if self.campo else None
         return self.campo
 
+    def triar(self, pdf, vaga):
+        """#1098: a pre-triagem; `self.triagem` e o que ela devolve (None = a IA nao respondeu)."""
+        self.triados = getattr(self, "triados", []) + [(pdf, vaga["titulo"])]
+        if self.falha:
+            raise TimeoutError("a IA demorou")
+        return getattr(self, "triagem", None)
+
     def classificar(self, texto, opcoes):
         self.perguntas.append(texto)
         self.opcoes = getattr(self, "opcoes", []) + [[o["chave"] for o in opcoes]]   # #988: o que ela viu
