@@ -37,12 +37,18 @@ POR_MINUTO = 5                       # candidaturas mandadas a Fran por volta do
 TENTAR_DE_NOVO = timedelta(hours=1)  # modelo recusado (ainda nao aprovado): uma tentativa por hora
 COMENTARIO_ATE = timedelta(hours=24)
 
-TODOS, NEM_TODOS, OUTRO = "vaga:todos", "vaga:nem_todos", "vaga:outro"
+OUTRO = "vaga:outro"
+ESTA, OUTRAS = "vaga:esta", "vaga:outras"   # quem vem pelo menu: a vaga aberta ou outras areas (029)
+# A pergunta "Voce atende a esses requisitos?" saiu em 22/10/2026 (029, dono: quem analisa e a
+# triagem). Os toques dela continuam aceitos: a mensagem antiga pode estar na tela de alguem.
+TODOS, NEM_TODOS = "vaga:todos", "vaga:nem_todos"
 MANDAR, ENCERRAR = "vaga:mandar", "vaga:encerrar"
 
 SITUACAO = {"consta": "consta", "nao": "não", "nao_consta": "não consta no currículo"}
 DECLAROU = {"todos": "atende a todos os requisitos", "nem_todos": "não atende a todos os requisitos",
-            None: "não respondeu"}
+            None: "não foi perguntado"}
+# o que mostra que o PDF ja foi pedido nesta conversa (`enviadas.resumo`)
+PEDIU_PDF = ("vaga: abertura", "vaga: pedir pdf", "vaga: banco", "vaga: sem vaga aberta", "vaga: de novo o pdf")
 
 
 # ── o cadastro ──────────────────────────────────────────────────────────────
@@ -100,27 +106,39 @@ def _marcar(con, conversa, vaga) -> dict:
                            WHERE id = %s RETURNING *""", (vaga["id"] if vaga else None, conversa["id"])).fetchone()
 
 
-def abrir(con, saida: Saida, pessoa, conversa, vaga, agora: datetime):
-    """A conversa entra na vaga: os requisitos e os tres botoes. Sem vaga aberta, o pedido do PDF
-    para as proximas."""
+def _saudacao(pessoa) -> str:
+    nome = primeiro_nome(pessoa.nome) if (pessoa.nome or "").strip() else ""
+    return "Olá, %s!" % nome if nome else "Olá!"
+
+
+def abrir(con, saida: Saida, pessoa, conversa, vaga, agora: datetime, pelo_menu: bool = False):
+    """A conversa entra na vaga: os requisitos e o pedido do PDF. Quem veio pelo MENU escolhe antes
+    se e para a vaga aberta ou para outras areas. Sem vaga aberta, o pedido do PDF para as proximas."""
     from .motor import _registrar
     conversa = _marcar(con, conversa, vaga)
     if vaga is None:
         w = saida.texto(pessoa.para, _texto(con, "sem_vaga"))
         _registrar(con, conversa["id"], pessoa.para, "texto", "vaga: sem vaga aberta", w)
-        return conversa
-    nome = primeiro_nome(pessoa.nome) if (pessoa.nome or "").strip() else ""
-    saudacao = "Olá, %s!" % nome if nome else "Olá!"
-    w = saida.botoes(pessoa.para, _texto(con, "abertura", vaga, saudacao=saudacao),
-                     [Opcao(TODOS, "Sim, atendo todos"), Opcao(NEM_TODOS, "Não atendo todos"),
-                      Opcao(OUTRO, "Era outro assunto")])
-    _registrar(con, conversa["id"], pessoa.para, "botoes", "vaga: abertura", w)
+    elif pelo_menu:
+        w = saida.botoes(pessoa.para, _texto(con, "pergunta_menu", vaga, saudacao=_saudacao(pessoa)),
+                         [Opcao(ESTA, _cortar(vaga["titulo"], 20)), Opcao(OUTRAS, "Outras áreas"),
+                          Opcao(OUTRO, "Era outro assunto")])
+        _registrar(con, conversa["id"], pessoa.para, "botoes", "vaga: pergunta do menu", w)
+    else:
+        w = saida.botoes(pessoa.para, _texto(con, "abertura", vaga, saudacao=_saudacao(pessoa)),
+                         [Opcao(OUTRO, "Era outro assunto")])
+        _registrar(con, conversa["id"], pessoa.para, "botoes", "vaga: abertura", w)
     return conversa
 
 
 def do_menu(con, saida: Saida, pessoa, conversa, no, agora: datetime) -> None:
     """O no "Trabalhe conosco" (acao `vaga`), tocado no menu."""
-    abrir(con, saida, pessoa, conversa, vaga_aberta(con), agora)
+    abrir(con, saida, pessoa, conversa, vaga_aberta(con), agora, pelo_menu=True)
+
+
+def _ja_mandou(con, conversa, resumos) -> bool:
+    return con.execute("SELECT 1 FROM atendimento.enviadas WHERE conversa_id = %s AND resumo = ANY(%s) LIMIT 1",
+                       (conversa["id"], list(resumos))).fetchone() is not None
 
 
 def _fechar(con, conversa, situacao: str) -> None:
@@ -183,13 +201,15 @@ def _receber_pdf(con, saida: Saida, e, conversa, agora: datetime) -> None:
 
 
 def _pedir_de_novo(con, saida, pessoa, conversa, vaga) -> None:
-    """Fora da lista: a pergunta da vaga de novo (nunca "tente de novo")."""
+    """Fora da lista: o pedido do PDF de novo, curto (nunca "tente de novo" nem os requisitos outra
+    vez); a pergunta do menu ainda sem resposta volta inteira."""
     from .motor import _registrar
-    if conversa["vaga_declarou"] or vaga is None:
-        w = saida.texto(pessoa.para, _texto(con, "pedir_pdf" if vaga else "sem_vaga", vaga))
+    if _ja_mandou(con, conversa, PEDIU_PDF):
+        w = saida.texto(pessoa.para, _texto(con, "so_pdf", vaga))
         _registrar(con, conversa["id"], pessoa.para, "texto", "vaga: de novo o pdf", w)
     else:
-        abrir(con, saida, pessoa, conversa, vaga, None)
+        abrir(con, saida, pessoa, conversa, vaga, None,
+              pelo_menu=_ja_mandou(con, conversa, ("vaga: pergunta do menu",)))
 
 
 def _responder_texto(con, saida: Saida, ia, pessoa, conversa, texto: str) -> None:
@@ -234,7 +254,7 @@ def _responder_texto(con, saida: Saida, ia, pessoa, conversa, texto: str) -> Non
         w = saida.texto(pessoa.para, _texto(con, chave, vaga))
         _registrar(con, conversa["id"], pessoa.para, "texto", "vaga: %s" % chave, w)
         return
-    if _ultima_candidatura(con, pessoa) and conversa["vaga_declarou"] is None:
+    if _ultima_candidatura(con, pessoa) and not _ja_mandou(con, conversa, PEDIU_PDF + ("vaga: pergunta do menu",)):
         # quem ja mandou o curriculo e voltou com outra coisa: o "recebemos" e a saida para o menu
         c = _ultima_candidatura(con, pessoa)
         data = c["recebida_em"].astimezone(_fuso()).strftime("%d/%m")
@@ -280,19 +300,21 @@ def tratar(con, saida: Saida, ia, e, agora: datetime) -> bool:
 
     if e.toque == OUTRO:
         _sair_da_vaga(con, saida, p, conversa)
-    elif e.toque in (TODOS, NEM_TODOS):
-        con.execute("UPDATE atendimento.conversas SET vaga_declarou = %s WHERE id = %s",
-                    ("todos" if e.toque == TODOS else "nem_todos", conversa["id"]))
-        if e.toque == TODOS:
-            w = saida.texto(p.para, _texto(con, "pedir_pdf", vaga))
-            _registrar(con, conversa["id"], p.para, "texto", "vaga: pedir pdf", w)
-        else:
-            w = saida.botoes(p.para, _texto(con, "nao_atende", vaga),
-                             [Opcao(MANDAR, "Mandar currículo"), Opcao(ENCERRAR, "Encerrar")])
-            _registrar(con, conversa["id"], p.para, "botoes", "vaga: nao atende", w)
-    elif e.toque == MANDAR:
-        # quem disse que nao atende a todos e quis mandar assim mesmo: "Grato!", nao "Otimo!" (dono, 22/10)
-        w = saida.texto(p.para, _texto(con, "pedir_pdf_assim" if _resposta(con, "pedir_pdf_assim") else "pedir_pdf", vaga))
+    elif e.toque == ESTA:
+        abrir(con, saida, p, conversa, vaga or vaga_aberta(con), agora)
+    elif e.toque == OUTRAS:
+        # outras areas: banco de curriculos, sem vaga e por isso sem triagem contra requisitos que nao
+        # sao os dele
+        conversa = con.execute("UPDATE atendimento.conversas SET vaga_id = NULL WHERE id = %s RETURNING *",
+                               (conversa["id"],)).fetchone()
+        w = saida.texto(p.para, _texto(con, "pedir_pdf_banco"))
+        _registrar(con, conversa["id"], p.para, "texto", "vaga: banco", w)
+    elif e.toque in (TODOS, NEM_TODOS, MANDAR):
+        # os botoes da pergunta que saiu (029): quem ainda os tem na tela recebe o pedido do PDF
+        if e.toque != MANDAR:
+            con.execute("UPDATE atendimento.conversas SET vaga_declarou = %s WHERE id = %s",
+                        ("todos" if e.toque == TODOS else "nem_todos", conversa["id"]))
+        w = saida.texto(p.para, _texto(con, "pedir_pdf_assim" if e.toque != TODOS else "pedir_pdf", vaga))
         _registrar(con, conversa["id"], p.para, "texto", "vaga: pedir pdf", w)
     elif e.toque == ENCERRAR:
         from .motor import _ajuste
@@ -370,7 +392,7 @@ def variaveis(con, c) -> list[str]:
         resumo = "%s · Escreveu: %s" % (resumo, c["texto"])
     nome = _cortar((c["nome_perfil"] or "sem nome no perfil").strip(), 60)
     vs = [_uma_linha(x) for x in (
-        vaga["titulo"] if vaga else "Banco de currículos (sem vaga aberta)",
+        vaga["titulo"] if vaga else "Banco de currículos",
         "%s (%s)" % (nome, numero_bonito(c["wa_id"])),
         DECLAROU.get(c["declarou"], DECLAROU[None]),
         *[_cortar(x, LINHA_ATE) for x in linhas], _cortar(resumo, RESUMO_ATE))]
@@ -402,9 +424,13 @@ def _cortar(t: str, ate: int) -> str:
     return (corte or t[:ate - 1]) + "…"
 
 
-def corpo_do_modelo(con, variaveis_: list[str]) -> str:
+def corpo_do_modelo(con, variaveis_: list[str], sem_botoes: bool = False) -> str:
+    """O corpo do modelo com as variaveis. `sem_botoes`: sem a linha "Disse nos botoes" (a pergunta
+    saiu na 029); so na mensagem comum, porque o texto do modelo aprovado na Meta nao muda."""
     m = con.execute("SELECT texto FROM atendimento.modelos WHERE uso = 'curriculo' AND ativo LIMIT 1").fetchone()
     t = m["texto"] if m else ""
+    if sem_botoes:
+        t = "\n".join(linha for linha in t.split("\n") if "{{3}}" not in linha)
     for i, v in enumerate(variaveis_, 1):
         t = t.replace("{{%d}}" % i, v)
     return t
@@ -414,7 +440,7 @@ def _triar(con, ia, c) -> None:
     vaga = _vaga(con, c["vaga_id"])
     erro, t = "", None
     if vaga is None:
-        erro = "sem vaga aberta"
+        erro = "banco de currículos, sem vaga"
     elif not vaga["triagem_ligada"]:
         erro = "pré-triagem desligada"
     elif ia is None or not hasattr(ia, "triar"):
@@ -458,7 +484,8 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
         ultima = max(ultimas) if ultimas else None
         try:
             if ultima is not None and agora - ultima < timedelta(hours=24):
-                w = saida.documento(d["whatsapp"], pdf[0], pdf[1], corpo_do_modelo(con, vs),
+                w = saida.documento(d["whatsapp"], pdf[0], pdf[1],
+                                    corpo_do_modelo(con, vs, sem_botoes=c["declarou"] is None),
                                     [Opcao("vaga:certa:%d" % c["id"], "Triagem certa"),
                                      Opcao("vaga:errada:%d" % c["id"], "Triagem errada"),
                                      Opcao("vaga:falar:%d" % c["id"], "Conversar")])

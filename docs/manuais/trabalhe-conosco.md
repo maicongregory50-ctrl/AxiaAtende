@@ -18,18 +18,21 @@ em PDF e entrega cada um à Fran já com uma pré-triagem. A decisão sobre o ca
 ## 3. O caminho comum
 
 **O candidato:**
-1. Quem vem pelo anúncio cai direto na vaga, sem o menu: vê os quatro requisitos e três botões —
-   *Sim, atendo todos*, *Não atendo todos* e *Era outro assunto*.
-2. *Sim, atendo todos*: o atendimento pede o currículo **em PDF**, com o aviso de que ele é guardado
-   e lido por uma ferramenta de análise, e que a decisão é de uma pessoa.
-3. *Não atendo todos*: pode mandar assim mesmo (o currículo fica para as próximas vagas) ou encerrar.
-4. Mandou o PDF: recebe *"Recebemos o seu currículo ✅"*, com o aviso da pré-triagem e de que os
+1. Quem vem pelo anúncio cai direto na vaga, sem o menu: vê os quatro requisitos e o pedido do
+   currículo **em PDF**, com o aviso de que ele é guardado e lido por uma ferramenta de análise, e
+   que a decisão é de uma pessoa. Há um botão só, *Era outro assunto*. **O candidato não é perguntado
+   se atende aos requisitos:** quem analisa é a pré-triagem e a Fran (dono, 22/10/2026).
+2. Quem toca *Trabalhe conosco* no menu escolhe antes: **a vaga aberta** (*Vaga Comercial*), que segue
+   como no item 1, ou **Outras áreas**: o atendimento pede o PDF e avisa que ele fica guardado para as
+   próximas vagas. Esse currículo vai à Fran como *Banco de currículos*, sem pré-triagem.
+3. Mandou o PDF: recebe *"Recebemos o seu currículo ✅"*, com o aviso da pré-triagem e de que os
    pré-selecionados recebem retorno por ali.
-5. Se escrever em vez de tocar, o atendimento responde com um dos textos aprovados: a região da vaga,
+4. Se escrever em vez de mandar, o atendimento responde com um dos textos aprovados: a região da vaga,
    salário e benefícios, prazo de retorno, "vocês receberam?", "não tenho PDF", falar com uma pessoa
-   (o cartão da Fran). Fora disso, volta à pergunta da vaga. *Era outro assunto*, ou escrever *menu*,
-   leva ao menu de sempre.
-6. Quem volta em até 30 dias perguntando se o currículo chegou ouve *"Recebemos, sim ✅ (em 22/10)"*.
+   (o cartão da Fran). Fora disso, pede de novo o PDF, curto, sem repetir os requisitos (ou repete a
+   pergunta do menu, se ela ainda não foi respondida). *Era outro assunto*, ou escrever *menu*, leva
+   ao menu de sempre.
+5. Quem volta em até 30 dias perguntando se o currículo chegou ouve *"Recebemos, sim ✅ (em 22/10)"*.
 
 **A Fran:**
 1. Chega uma mensagem **"Novo currículo · Vaga Comercial"**, com o PDF anexado.
@@ -52,13 +55,14 @@ Na tabela dos motivos, a pessoa de *Trabalhe conosco* é quem recebe os currícu
 | *consta* | o currículo mostra o requisito, e a linha diz onde |
 | *não* | o currículo mostra o contrário (ex.: mora em outra cidade) |
 | *não consta no currículo* | o currículo **não fala** disso. Não quer dizer que a pessoa não tenha |
-| "Disse nos botões: não atende a todos os requisitos" | o próprio candidato declarou, e quis mandar mesmo assim |
-| "Disse nos botões: não respondeu" | mandou o PDF sem tocar nos botões |
-| "Sem pré-triagem (pré-triagem desligada / a IA não respondeu / sem vaga aberta)" | o currículo chegou igual, sem a leitura da IA, pelo motivo entre parênteses |
+| "Disse nos botões: não foi perguntado" | só na mensagem que chega pelo modelo: a pergunta saiu em 22/10, mas o texto aprovado na Meta ainda tem a linha. Na mensagem comum a linha não aparece |
+| "Disse nos botões: (não) atende a todos os requisitos" | currículo de quem respondeu à pergunta antiga, antes de 22/10 |
+| **Banco de currículos** no título | o candidato escolheu *Outras áreas* no menu, ou não havia vaga aberta |
+| "Sem pré-triagem (pré-triagem desligada / a IA não respondeu / banco de currículos, sem vaga)" | o currículo chegou igual, sem a leitura da IA, pelo motivo entre parênteses |
 | "Não consegui ler o arquivo" | o PDF é imagem ruim ou está protegido; abra e leia você |
 | "Escreveu: …" no resumo | o que o candidato escreveu na conversa antes de mandar o PDF |
 | Na Recepção, **currículo recebido** | o PDF chegou e vai à Fran |
-| Na Recepção, **sem currículo** | a pessoa conversou, ou tocou Encerrar, e não mandou PDF |
+| Na Recepção, **sem currículo** | a pessoa conversou e não mandou PDF |
 
 **O currículo que não chegou à Fran ainda:** enquanto a Meta não aprovar o modelo da mensagem, ele só
 sai quando a Fran tiver escrito para o número da empresa nas últimas 24 horas. Os outros esperam na
@@ -67,6 +71,8 @@ fila, tentando uma vez por hora, e não se perdem.
 ## 5. O que NÃO faz
 
 - **Não aprova, não reprova e não dá nota:** quem decide é a Fran.
+- **Não pergunta ao candidato se ele atende aos requisitos:** quem confere é a pré-triagem.
+- **Não faz pré-triagem do banco de currículos** (*Outras áreas*): não há requisitos contra os quais ler.
 - **Não responde ao candidato o resultado:** o retorno é da Fran.
 - **Não aceita foto, Word ou texto como currículo:** só PDF.
 - **Não inventa resposta:** a cada pergunta escolhe um texto aprovado pelo dono; o que não está na

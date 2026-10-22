@@ -74,8 +74,9 @@ def test_quem_vem_do_anuncio_cai_direto_na_vaga_sem_menu(ligado):
     tipo, para, corpo, opcoes = passo(ligado, s, do_anuncio("w1"))
     assert tipo == "botoes" and para == CANDIDATO
     assert corpo.startswith("Olá, Gabriel!") and "*Vaga Comercial*" in corpo
-    assert "• Morar em Maravilha (SC) ou cidade vizinha" in corpo and corpo.endswith("requisitos?")
-    assert [o[1] for o in opcoes] == ["Sim, atendo todos", "Não atendo todos", "Era outro assunto"]
+    assert "• Morar em Maravilha (SC) ou cidade vizinha" in corpo and "Mande aqui o seu *currículo em PDF*." in corpo
+    assert corpo.endswith("a decisão é sempre de uma pessoa da equipe.") and "Você atende" not in corpo
+    assert [o[1] for o in opcoes] == ["Era outro assunto"]   # sem a autoavaliacao (029, dono 22/10)
     assert len(s.enviadas) == 1                       # nada de boas-vindas nem menu antes
     c = conversa(ligado)
     assert c["trabalhe"] and c["vaga_id"]
@@ -90,11 +91,41 @@ def test_anuncio_de_vaga_fechada_cai_no_menu_de_sempre(ligado):
     assert not conversa(ligado)["trabalhe"]
 
 
-def test_o_no_trabalhe_conosco_do_menu_abre_a_vaga(ligado):
+def test_o_no_trabalhe_conosco_do_menu_pergunta_se_e_a_vaga_ou_outras_areas(ligado):
     s = SaidaFalsa()
     passo(ligado, s, texto("w1", "oi", numero=CANDIDATO))
     tipo, _, corpo, opcoes = passo(ligado, s, toque("w2", "menu:trabalhe", lista=True, numero=CANDIDATO))
-    assert tipo == "botoes" and "O anúncio pede" in corpo and opcoes[0][0] == V.TODOS
+    assert tipo == "botoes" and corpo.startswith("Olá, Gabriel! Obrigado pelo interesse em trabalhar")
+    assert "temos aberta a *Vaga Comercial*" in corpo and "O anúncio pede" not in corpo
+    assert [o[1] for o in opcoes] == ["Vaga Comercial", "Outras áreas", "Era outro assunto"]
+    tipo, _, corpo, _ = passo(ligado, s, toque("w3", V.ESTA, numero=CANDIDATO))
+    assert tipo == "botoes" and "O anúncio pede" in corpo and "*currículo em PDF*" in corpo
+    passo(ligado, s, doc("w4"))
+    assert candidaturas(ligado)[0]["vaga_id"]
+
+
+def test_outras_areas_vai_ao_banco_sem_triagem(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, texto("w1", "oi", numero=CANDIDATO))
+    passo(ligado, s, toque("w2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    tipo, _, corpo, _ = passo(ligado, s, toque("w3", V.OUTRAS, numero=CANDIDATO))
+    assert tipo == "texto" and corpo.startswith("Mande aqui o seu *currículo em PDF*: ele fica guardado")
+    passo(ligado, s, doc("w4"))
+    c = candidaturas(ligado)
+    assert len(c) == 1 and c[0]["vaga_id"] is None
+    ia = IAFalsa()
+    ia.triagem = TRIAGEM
+    _rodar_minuto(ligado, s, ia)
+    m = s.modelos[-1]
+    assert m["corpo"][0] == "Banco de currículos" and m["corpo"][3] == "Sem pré-triagem (banco de currículos, sem vaga)"
+
+
+def test_pelo_menu_quem_escreve_sem_escolher_ve_a_pergunta_de_novo(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, texto("w1", "oi", numero=CANDIDATO))
+    passo(ligado, s, toque("w2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    tipo, _, corpo, _ = passo(ligado, s, texto("w3", "tem vaga de motorista?", numero=CANDIDATO), ia=IAFalsa(resposta=None))
+    assert tipo == "botoes" and "O seu currículo é para ela ou para outras áreas?" in corpo
 
 
 def test_sem_vaga_aberta_o_no_pede_o_pdf_para_as_proximas(ligado):
@@ -111,34 +142,32 @@ def test_sem_vaga_aberta_o_no_pede_o_pdf_para_as_proximas(ligado):
 
 # ── a conversa (as tres telas da maquete) ───────────────────────────────────
 
-def test_tela_1_atende_e_manda_o_pdf(ligado):
+def test_tela_1_manda_o_pdf(ligado):
     s = SaidaFalsa()
     passo(ligado, s, do_anuncio("w1"))
-    _, _, corpo, _ = passo(ligado, s, toque("w2", V.TODOS, numero=CANDIDATO))
-    assert "*currículo em PDF*" in corpo and "decisão é sempre de uma pessoa da equipe" in corpo
-    _, _, corpo, _ = passo(ligado, s, doc("w3"))
+    _, _, corpo, _ = passo(ligado, s, doc("w2"))
     assert corpo.startswith("Recebemos o seu currículo ✅") and "pré-triagem" in corpo
     c = candidaturas(ligado)[0]
-    assert bytes(c["pdf"]) == b"MIDIA:mid-w3" and c["declarou"] == "todos" and c["pdf_nome"] == "Curriculo - Gabriel.pdf"
+    assert bytes(c["pdf"]) == b"MIDIA:mid-w2" and c["declarou"] is None and c["pdf_nome"] == "Curriculo - Gabriel.pdf"
     assert c["apagar_em"] - c["recebida_em"] == timedelta(days=365)
     assert conversa(ligado)["situacao"] == "curriculo_recebido"
 
 
-def test_tela_2_nao_atende_e_manda_assim_mesmo(ligado):
+@pytest.mark.parametrize("botao,comeca,declarou", [(V.TODOS, "Ótimo!", "todos"), (V.NEM_TODOS, "Grato!", "nem_todos"),
+                                                   (V.MANDAR, "Grato!", None)])
+def test_os_botoes_da_pergunta_antiga_ainda_pedem_o_pdf(ligado, botao, comeca, declarou):
+    """A mensagem de antes da 029 pode estar na tela de alguem: o toque nela ainda serve."""
     s = SaidaFalsa()
     passo(ligado, s, do_anuncio("w1"))
-    tipo, _, corpo, opcoes = passo(ligado, s, toque("w2", V.NEM_TODOS, numero=CANDIDATO))
-    assert tipo == "botoes" and "fica guardado para as próximas vagas" in corpo
-    assert [o[1] for o in opcoes] == ["Mandar currículo", "Encerrar"]
-    passo(ligado, s, toque("w3", V.MANDAR, numero=CANDIDATO))
-    passo(ligado, s, doc("w4"))
-    assert candidaturas(ligado)[0]["declarou"] == "nem_todos"
+    tipo, _, corpo, _ = passo(ligado, s, toque("w2", botao, numero=CANDIDATO))
+    assert tipo == "texto" and corpo.startswith(comeca + " Mande aqui o seu *currículo em PDF*.")
+    passo(ligado, s, doc("w3"))
+    assert candidaturas(ligado)[0]["declarou"] == declarou
 
 
-def test_tela_2_encerrar_termina_sem_curriculo(ligado):
+def test_encerrar_da_mensagem_antiga_termina_sem_curriculo(ligado):
     s = SaidaFalsa()
     passo(ligado, s, do_anuncio("w1"))
-    passo(ligado, s, toque("w2", V.NEM_TODOS, numero=CANDIDATO))
     passo(ligado, s, toque("w3", V.ENCERRAR, numero=CANDIDATO))
     assert conversa(ligado)["situacao"] == "sem_curriculo"
 
@@ -147,7 +176,6 @@ def test_tela_3_escreve_em_vez_de_mandar_e_leva_um_lembrete_so(ligado):
     s = SaidaFalsa()
     ia = IAFalsa(resposta="apresentacao")
     passo(ligado, s, do_anuncio("w1"), ia=ia)
-    passo(ligado, s, toque("w2", V.TODOS, numero=CANDIDATO), ia=ia)
     _, _, corpo, _ = passo(ligado, s, texto("w3", "Sou agrônomo formado em 2019", numero=CANDIDATO), ia=ia)
     assert corpo.startswith("Anotei 👍")
     n = len(s.enviadas)
@@ -161,7 +189,6 @@ def test_tela_3_escreve_em_vez_de_mandar_e_leva_um_lembrete_so(ligado):
 def test_so_pdf_foto_e_word_nao_servem(ligado, mensagem):
     s = SaidaFalsa()
     passo(ligado, s, do_anuncio("w1"))
-    passo(ligado, s, toque("w2", V.TODOS, numero=CANDIDATO))
     tipo, _, corpo, _ = passo(ligado, s, mensagem)
     assert tipo == "texto" and corpo.startswith("Precisamos do seu currículo em PDF")
     assert not candidaturas(ligado)
@@ -215,7 +242,7 @@ def test_outro_assunto_vai_ao_menu_e_fora_da_lista_repergunta(ligado, resposta):
     if resposta == "outro_assunto":
         assert tipo == "lista" and not conversa(ligado)["trabalhe"]
     else:
-        assert tipo == "botoes" and "O anúncio pede" in corpo   # o menu da vaga de novo
+        assert tipo == "texto" and corpo.startswith("Precisamos do seu currículo em PDF")   # curto, sem os requisitos
 
 
 def test_era_outro_assunto_vai_ao_menu_principal(ligado):
@@ -258,7 +285,6 @@ def test_pdf_fora_da_conversa_de_vaga_segue_o_caminho_de_hoje(ligado):
 
 def _um_curriculo(cfg, s):
     passo(cfg, s, do_anuncio("w1"))
-    passo(cfg, s, toque("w2", V.TODOS, numero=CANDIDATO))
     passo(cfg, s, doc("w3"))
 
 
@@ -277,7 +303,7 @@ def test_fora_da_janela_vai_o_modelo_com_o_pdf_e_a_triagem(ligado):
     assert m["nome"] == "curriculo_para_fran" and m["para"] == fran(ligado)["whatsapp"]
     assert m["documento"] == (b"MIDIA:mid-w3", "Curriculo - Gabriel.pdf")
     assert m["corpo"][0] == "Vaga Comercial" and m["corpo"][1] == "Gabriel Rodrigues (49 9 8888-7777)"
-    assert m["corpo"][2] == "atende a todos os requisitos"
+    assert m["corpo"][2] == "não foi perguntado"     # o modelo aprovado na Meta ainda tem a linha
     assert m["corpo"][3] == "Formação em Agronomia, com pós-graduação: consta (Agronomia UFSC)"
     assert m["corpo"][4] == "Ao menos 2 anos de experiência com sementes: não consta no currículo"
     assert m["corpo"][6] == "Morar em Maravilha (SC) ou cidade vizinha: não (Cascavel, PR)"
@@ -301,6 +327,7 @@ def test_dentro_da_janela_da_fran_vai_o_pdf_com_os_botoes(ligado):
     tipo, para, legenda, opcoes = s.enviadas[-1]
     assert tipo == "documento" and legenda.startswith("Novo currículo · Vaga Comercial")
     assert "Pré-triagem (IA):\nFormação em Agronomia" in legenda
+    assert "Disse nos botões" not in legenda           # na mensagem comum a linha sai (029)
     assert [o[1] for o in opcoes] == ["Triagem certa", "Triagem errada", "Conversar"]
 
 
@@ -426,13 +453,12 @@ def test_a_fran_recebe_so_o_que_o_candidato_escreveu(ligado):
     assert candidaturas(ligado)[0]["texto"] == "Sou técnico agrícola"
 
 
-def test_quem_manda_assim_mesmo_ouve_grato_e_nao_otimo(ligado):
-    s = SaidaFalsa()
-    passo(ligado, s, do_anuncio("w1"))
-    passo(ligado, s, toque("w2", V.NEM_TODOS, numero=CANDIDATO))
-    _, _, corpo, _ = passo(ligado, s, toque("w3", V.MANDAR, numero=CANDIDATO))
-    assert corpo.startswith("Grato! Mande aqui o seu *currículo em PDF*.")
-    s2 = s   # a mesma saida: os wamids falsos nao se repetem
-    passo(ligado, s2, do_anuncio("x1"), numero="5549911112222", bsuid="BR.cand.2")
-    _, _, corpo, _ = passo(ligado, s2, toque("x2", V.TODOS, numero="5549911112222"), numero="5549911112222", bsuid="BR.cand.2")
-    assert corpo.startswith("Ótimo!")
+def test_a_volta_da_029_devolve_a_pergunta(ligado):
+    from pathlib import Path
+    volta = Path(__file__).resolve().parents[1] / "backend" / "migracoes" / "029_vaga_sem_autoavaliacao_VOLTA.sql"
+    with conexao(ligado) as con:
+        con.execute(volta.read_text(encoding="utf-8").replace("BEGIN;", "").replace("COMMIT;", ""))
+        r = con.execute("SELECT texto FROM atendimento.respostas_da_vaga WHERE chave = 'abertura'").fetchone()
+        assert r["texto"].endswith("Você atende a esses requisitos?")
+        assert not con.execute("""SELECT 1 FROM atendimento.respostas_da_vaga
+                                   WHERE chave IN ('pergunta_menu', 'pedir_pdf_banco')""").fetchone()
