@@ -66,6 +66,10 @@ class CanalDeCampo(BaseModel):
     ligado: bool
 
 
+class Triagem(BaseModel):
+    ligada: bool
+
+
 def rotas(cfg, usuario) -> APIRouter:
     r = APIRouter(dependencies=[Depends(usuario)])
 
@@ -118,7 +122,9 @@ def rotas(cfg, usuario) -> APIRouter:
                           else "perguntado" if l["pergunta_da"] == l["id"]
                           else "coberta" if l["pergunta_da"] else "sem_pergunta")
             else:
-                estado = {"parou_no_meio": "parou", "encerrada": "encerrou"}.get(l["situacao"], "em_curso")
+                # #1098: a conversa de vaga termina com ou sem curriculo, nunca "parou no meio"
+                estado = {"parou_no_meio": "parou", "encerrada": "encerrou", "curriculo_recebido": "curriculo",
+                          "sem_curriculo": "sem_curriculo"}.get(l["situacao"], "em_curso")
             if situacao and estado != situacao:
                 continue
             saida.append({"quando": l["iniciada_em"].isoformat(),
@@ -213,12 +219,17 @@ def rotas(cfg, usuario) -> APIRouter:
                            c.caminho || m.rotulo, c.perguntas || c.pergunta, c.ord || m.ordem
                       FROM atendimento.menu m JOIN c ON m.pai_id = c.id WHERE m.ativo)
                 SELECT c.id, c.chave, c.caminho, c.perguntas, c.destino_id, c.texto_antes
-                  FROM c WHERE c.acao = 'destino' ORDER BY c.ord""").fetchall()
+                  FROM c WHERE c.acao IN ('destino', 'vaga') ORDER BY c.ord""").fetchall()
+            vagas = con.execute("""SELECT id, titulo, aberta, triagem_ligada, fechada_em,
+                                          (SELECT count(*) FROM atendimento.candidaturas k WHERE k.vaga_id = v.id) AS curriculos
+                                     FROM atendimento.vagas v ORDER BY aberta DESC, id DESC LIMIT 5""").fetchall()
             ds = con.execute("SELECT id, nome, whatsapp, ativo FROM atendimento.destinos ORDER BY nome").fetchall()
             aj = {a["chave"]: a["valor"] for a in con.execute("SELECT chave, valor FROM atendimento.ajustes")}
         return {"opcoes": [dict(f) for f in folhas], "destinos": [dict(d) for d in ds],
                 "horario": aj.get("horario"), "avisado_no_nao": aj.get("avisado_no_nao"),
-                "campo_ligado": aj.get("campo.ligado") is True}   # #970: o canal de campo
+                "campo_ligado": aj.get("campo.ligado") is True,   # #970: o canal de campo
+                "vagas": [dict(v, fechada_em=v["fechada_em"].isoformat() if v["fechada_em"] else None)
+                          for v in vagas]}   # #1098: a vaga aberta e o interruptor da pre-triagem
 
     def _destino_valido(d: Destino) -> tuple[str, str]:
         numero = re.sub(r"\D", "", d.whatsapp or "")
@@ -253,7 +264,7 @@ def rotas(cfg, usuario) -> APIRouter:
             if not con.execute("SELECT 1 FROM atendimento.destinos WHERE id = %s AND ativo", (dados.destino_id,)).fetchone():
                 raise HTTPException(status_code=422, detail="destino não existe")
             n = con.execute("""UPDATE atendimento.menu SET destino_id = %s
-                                WHERE id = %s AND acao = 'destino'""", (dados.destino_id, menu_id)).rowcount
+                                WHERE id = %s AND acao IN ('destino', 'vaga')""", (dados.destino_id, menu_id)).rowcount
         if not n:
             raise HTTPException(status_code=404, detail="opção não encontrada")
         return {"ok": True}
@@ -279,6 +290,27 @@ def rotas(cfg, usuario) -> APIRouter:
                            ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now()""",
                         ("true" if dados.ligado else "false",))
         return {"campo_ligado": dados.ligado}
+
+    @r.post("/vagas/{vaga_id}/fechar")
+    def fechar_vaga(vaga_id: int):
+        """#1098: fechada, o anuncio cai no menu de sempre e o "Trabalhe conosco" diz que nao ha vaga
+        aberta (e aceita o PDF para as proximas). Nada se apaga."""
+        with conexao(cfg) as con:
+            n = con.execute("""UPDATE atendimento.vagas SET aberta = false, fechada_em = now()
+                                WHERE id = %s AND aberta""", (vaga_id,)).rowcount
+        if not n:
+            raise HTTPException(status_code=422, detail="esta vaga não está aberta")
+        return {"fechada": vaga_id}
+
+    @r.put("/vagas/{vaga_id}/triagem")
+    def triagem(vaga_id: int, dados: Triagem):
+        """#1098: o interruptor da pre-triagem. Desligada, o curriculo vai a Fran igual, sem a leitura da IA."""
+        with conexao(cfg) as con:
+            n = con.execute("UPDATE atendimento.vagas SET triagem_ligada = %s WHERE id = %s",
+                            (dados.ligada, vaga_id)).rowcount
+        if not n:
+            raise HTTPException(status_code=404, detail="vaga não encontrada")
+        return {"triagem_ligada": dados.ligada}
 
     @r.put("/ajustes/avisado")
     def avisado(a: Avisado):

@@ -157,3 +157,19 @@ INSERT INTO atendimento.modelos (nome, categoria, uso, cabecalho_imagem, cabecal
     ('curriculo_para_fran', 'UTILITY', 'curriculo', false, true,
      ARRAY['vaga', 'candidato', 'declarou', 'req1', 'req2', 'req3', 'req4', 'resumo'], 'triagem',
      E'Novo currículo · {{1}}\nCandidato: {{2}}\nDisse nos botões: {{3}}\n\nPré-triagem (IA):\n{{4}}\n{{5}}\n{{6}}\n{{7}}\nResumo: {{8}}\n\nA decisão é sua. A triagem acertou?');
+
+-- A leitura da sessao (`axiaatende_ro`, #981) recebe toda tabela nova pelo privilegio padrao do
+-- schema. Do curriculo ela le tudo MENOS o arquivo: o PDF e dado pessoal com finalidade unica (a
+-- pre-triagem), e ninguem precisa dele fora do recepcionista e da Fran. No banco de teste o papel
+-- nao existe, e o bloco nao faz nada.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'axiaatende_ro') THEN
+        REVOKE SELECT ON atendimento.candidaturas FROM axiaatende_ro;
+        GRANT SELECT (id, vaga_id, conversa_id, bsuid, wa_id, nome_perfil, declarou, texto, wamid,
+                      pdf_nome, pdf_sha256, pdf_bytes, recebida_em, triagem, triagem_em, triagem_erro,
+                      fran_para, fran_wamid, fran_em, fran_erro, fran_tentativa_em, feedback, feedback_texto,
+                      feedback_em, espera_comentario, apagar_em, apagada_em)
+            ON atendimento.candidaturas TO axiaatende_ro;
+    END IF;
+END $$;

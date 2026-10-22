@@ -55,6 +55,7 @@ const ESTADO = {
   pergunta_marcada: ['pergunta às', ''], parou: ['parou no meio', 'a'], encerrou: ['encerrou', ''],
   em_curso: ['escolhendo agora', ''], coberta: ['já perguntado hoje, em outra conversa', ''],
   sem_pergunta: ['não perguntado (mais de 24h sem mensagem)', ''],
+  curriculo: ['currículo recebido', 'v'], sem_curriculo: ['sem currículo', ''],   // #1098, o Trabalhe conosco
 }
 
 // a nota da pesquisa, em tres botoes (#969, 11/10/2026): o Ruim tambem avisa o gestor
@@ -89,6 +90,7 @@ export default function Recepcao() {
         </select>
         <select value={situacao} onChange={(e) => setSituacao(e.target.value)}>
           <option value="">Toda situação</option><option value="parou">Parou no meio</option>
+          <option value="curriculo">Currículo recebido</option><option value="sem_curriculo">Sem currículo</option>
           <option value="nao">Disse que não foi atendido</option><option value="sim">Disse que foi atendido</option>
         </select>
         <select value={quem} onChange={(e) => setQuem(e.target.value)}>

@@ -116,3 +116,30 @@ def test_destinos_trocar_numero_ligar_opcao_e_horario(ligado, tela):
     assert tela.get("/api/destinos").json()["campo_ligado"] is False
     assert tela.put("/api/ajustes/campo", json={"ligado": True}).json() == {"campo_ligado": True}
     assert tela.get("/api/destinos").json()["campo_ligado"] is True
+
+
+def test_recepcao_conversa_de_vaga_nao_e_parou_no_meio(ligado, tela):
+    """#1098: quem chegou pelo anuncio e nao mandou o PDF termina "sem curriculo", fora das paradas."""
+    s = SaidaFalsa()
+    m = texto("w1", "Olá! Posso ter mais informações sobre isso?", numero="5549988887777")
+    m["referral"] = {"source_type": "ad", "source_id": "120249624037810192"}
+    R.gravar(ligado, aviso([m], numero="5549988887777", bsuid="BR.2"))
+    R.processar_pendentes(ligado, s, None, agora=AGORA - timedelta(hours=1))
+    R.rotina_do_minuto(ligado, s, agora=AGORA)
+    d = tela.get("/api/recepcao", params={"dias": 7}).json()
+    assert d["cartoes"]["pararam_no_meio"] == 0
+    assert [l["estado"] for l in d["linhas"]] == ["sem_curriculo"]
+
+
+def test_destinos_mostra_a_vaga_fecha_e_desliga_a_triagem(ligado, tela):
+    d = tela.get("/api/destinos").json()
+    trabalhe = next(o for o in d["opcoes"] if o["chave"] == "trabalhe")   # a Fran continua trocavel
+    assert trabalhe["destino_id"]
+    assert tela.put("/api/opcoes/%d" % trabalhe["id"], json={"destino_id": trabalhe["destino_id"]}).json() == {"ok": True}
+    v = d["vagas"][0]
+    assert v["titulo"] == "Vaga Comercial" and v["aberta"] and v["triagem_ligada"] and v["curriculos"] == 0
+    assert tela.put("/api/vagas/%d/triagem" % v["id"], json={"ligada": False}).json() == {"triagem_ligada": False}
+    assert tela.post("/api/vagas/%d/fechar" % v["id"]).status_code == 200
+    assert tela.post("/api/vagas/%d/fechar" % v["id"]).status_code == 422   # ja fechada
+    v = tela.get("/api/destinos").json()["vagas"][0]
+    assert not v["aberta"] and not v["triagem_ligada"] and v["fechada_em"]

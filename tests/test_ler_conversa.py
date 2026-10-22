@@ -90,3 +90,19 @@ def test_descrever_entrada():
     assert L.descrever_entrada({"msg": {"type": "reaction", "reaction": {"emoji": "👍"}}}) == "[reação 👍]"
     assert L.descrever_entrada({"msg": {"type": "interactive", "interactive": {"list_reply": {"id": "x:1", "title": "Um"}}}}) == "[lista] Um (x:1)"
     assert L.descrever_entrada({}) == "[?]"
+
+
+def test_a_candidatura_aparece_sem_o_conteudo_do_pdf(cfg, capsys, tmp_path):
+    """#1098: a leitura mostra que o curriculo chegou, a triagem e a Fran; o PDF, nunca."""
+    from dataclasses import replace
+    from tests.test_vaga import CANDIDATO, do_anuncio, doc
+    from tests.saida_falsa import SaidaFalsa
+    c = replace(cfg, responde=True)
+    s = SaidaFalsa()
+    R.gravar(c, aviso([do_anuncio("w1")], numero=CANDIDATO, bsuid="BR.cand.1"))
+    R.gravar(c, aviso([doc("w2")], numero=CANDIDATO, bsuid="BR.cand.1"))
+    R.processar_pendentes(c, s, None, agora=AGORA)
+    assert L.main(["--numero", CANDIDATO, "--dsn", c.dsn(), "--log", str(tmp_path / "l.jsonl")]) == 0
+    saida = capsys.readouterr().out
+    assert "[vaga] currículo #1 'Curriculo - Gabriel.pdf'" in saida and "na fila" in saida
+    assert "MIDIA:" not in saida

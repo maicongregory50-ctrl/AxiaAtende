@@ -143,6 +143,19 @@ def conversa(con, wa_id: str | None = None, bsuid: str | None = None, desde: dat
             m["tipo"], m["id"], m["grupo_id"], m["legenda"] or "", list(m["perguntas_feitas"] or []) or "-",
             classe or "a classificar", m["data_dita"] or "-", " (presumida)" if m["data_presumida"] else "",
             estado, (", %s" % m["atv"]) if m["atv"] else "")))
+    # #1098: a candidatura do Trabalhe conosco -- quando chegou, se teve triagem, se foi a Fran e o
+    # retorno dela. NUNCA o conteudo do PDF (o papel de leitura nem tem a coluna).
+    for k in con.execute("""SELECT id, recebida_em, pdf_nome, pdf_bytes, declarou, triagem_em, triagem_erro,
+                                   fran_em, fran_erro, feedback, feedback_texto, apagada_em
+                              FROM atendimento.candidaturas WHERE (wa_id = %s OR bsuid = ANY(%s)) AND recebida_em >= %s
+                             ORDER BY id""", (wa_id or "", bsuids, desde)).fetchall():
+        triagem = "sem triagem (%s)" % k["triagem_erro"] if k["triagem_erro"] else ("triada" if k["triagem_em"] else "na fila")
+        fran = ("na Fran" if k["fran_em"] else ("não foi: %s" % k["fran_erro"] if k["fran_erro"] else "a mandar"))
+        retorno = (", Fran: triagem %s%s" % (k["feedback"], (" (%r)" % k["feedback_texto"]) if k["feedback_texto"] else "")
+                   if k["feedback"] else "")
+        itens.append((k["recebida_em"], "  [vaga] currículo #%s %r (%s KB, declarou %s): %s; %s%s%s" % (
+            k["id"], k["pdf_nome"], (k["pdf_bytes"] or 0) // 1024, k["declarou"] or "-", triagem, fran, retorno,
+            "; apagado em %s" % _hora(k["apagada_em"]) if k["apagada_em"] else "")))
     for f in con.execute("""SELECT recebido_em, texto, usada_em FROM atendimento.campo_frases
                              WHERE wa_id = %s AND recebido_em >= %s ORDER BY id""", (wa_id or "", desde)).fetchall():
         itens.append((f["recebido_em"], "  [campo] frase guardada %r%s" % (f["texto"], " (usada)" if f["usada_em"] else "")))

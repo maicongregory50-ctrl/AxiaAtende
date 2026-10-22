@@ -131,6 +131,25 @@ export default function Destinos() {
             </div>
           </Secao>
 
+          <Secao titulo="Trabalhe conosco" ajuda="Quem chega pelo anúncio da vaga, ou toca Trabalhe conosco, vê os requisitos e manda o currículo em PDF. Cada currículo vai sozinho ao WhatsApp de quem está em Trabalhe conosco, com a pré-triagem da IA. Manual: trabalhe-conosco.">
+            {(d.vagas || []).filter((v) => v.aberta).map((v) => (
+              <div key={v.id} className="linha-ajuste">
+                <span className="estado ok">Vaga aberta</span>
+                <span>{v.titulo} <span className="leve">· {v.curriculos} currículo{v.curriculos === 1 ? '' : 's'}</span></span>
+                <span className={'estado ' + (v.triagem_ligada ? 'ok' : 'off')}>{v.triagem_ligada ? 'Pré-triagem ligada' : 'Pré-triagem desligada'}</span>
+                <button className={(v.triagem_ligada ? 'perigo' : 'primario') + ' pequeno'}
+                        onClick={() => fazer('PUT', `/vagas/${v.id}/triagem`, { ligada: !v.triagem_ligada }, v.triagem_ligada ? 'Pré-triagem desligada.' : 'Pré-triagem ligada.')}>
+                  {v.triagem_ligada ? 'Desligar pré-triagem' : 'Ligar pré-triagem'}
+                </button>
+                <button className="perigo pequeno" onClick={() => fazer('POST', `/vagas/${v.id}/fechar`, {}, 'Vaga fechada.')}>Fechar vaga</button>
+              </div>
+            ))}
+            {!(d.vagas || []).some((v) => v.aberta) && (
+              <div className="linha-ajuste"><span className="estado off">Nenhuma vaga aberta</span>
+                <span className="leve">Quem toca Trabalhe conosco ouve que não há vaga aberta e pode mandar o PDF para as próximas.</span></div>
+            )}
+          </Secao>
+
           <Secao titulo="Quem é avisado quando alguém diz que não foi atendido" ajuda="Recebe um aviso no WhatsApp quando a pessoa responde que não foi atendida, ou dá a nota Ruim.">
             <div className="linha-ajuste">
               <select value={d.avisado_no_nao || ''} onChange={(e) => fazer('PUT', '/ajustes/avisado', { destino_id: Number(e.target.value) }, 'Avisado trocado.')}>
