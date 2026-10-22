@@ -121,7 +121,7 @@ def test_ia_sem_resposta_valida_ou_com_erro_cai_no_menu_e_nunca_em_tente_de_novo
 
 def test_pergunta_das_4h30_sim_e_nota(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H)
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H)
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=10))
     assert s.ultima[0] == "contato"                       # ainda nao: so depois de 4h30
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=31))
@@ -216,7 +216,7 @@ def _todas(cfg):
 
 def test_tres_conversas_no_dia_levam_uma_pergunta_so_contada_da_ultima_mensagem(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H - timedelta(hours=2))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H - timedelta(hours=2))
     passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=QUINTA_10H - timedelta(hours=1))
     passo(ligado, s, toque("wamid.3", "menu:financeiro.boleto", lista=True), agora=QUINTA_10H)
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=10))
@@ -233,7 +233,7 @@ def test_tres_conversas_no_dia_levam_uma_pergunta_so_contada_da_ultima_mensagem(
 
 def test_mensagem_depois_do_link_empurra_a_pergunta(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H - timedelta(hours=1))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H - timedelta(hours=1))
     passo(ligado, s, texto("wamid.2", "obrigado"), agora=QUINTA_10H)
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(minutes=10))
     assert _perguntas(s) == []
@@ -243,7 +243,7 @@ def test_mensagem_depois_do_link_empurra_a_pergunta(ligado):
 
 def test_fora_da_janela_a_pergunta_espera_a_proxima_faixa(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True))           # quinta 14:00: 18:30 e fora
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True))           # quinta 14:00: 18:30 e fora
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H + timedelta(hours=5))
     R.rotina_do_minuto(ligado, s, agora=SEXTA_8H - timedelta(minutes=1))
     assert _perguntas(s) == []
@@ -253,7 +253,7 @@ def test_fora_da_janela_a_pergunta_espera_a_proxima_faixa(ligado):
 
 def test_servico_fora_na_hora_certa_nao_pergunta_fora_da_faixa(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H - timedelta(hours=6))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H - timedelta(hours=6))
     R.rotina_do_minuto(ligado, s, agora=QUINTA_10H + timedelta(hours=2))     # 12:00: entre as faixas
     assert _perguntas(s) == []
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H)
@@ -265,7 +265,7 @@ def test_sexta_a_tarde_pergunta_no_sabado_e_sabado_a_tarde_nao_pergunta(ligado):
     with conexao(ligado) as con:
         assert motor.hora_da_pergunta(con, SEXTA_8H + timedelta(hours=8)) == SABADO_10H - timedelta(hours=2)
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=SABADO_10H + timedelta(hours=5))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=SABADO_10H + timedelta(hours=5))
     segunda_8h = SABADO_10H + timedelta(days=2, hours=-2)
     R.rotina_do_minuto(ligado, s, agora=segunda_8h)                          # 41h depois: a Meta nao deixa
     assert _perguntas(s) == []
@@ -275,7 +275,7 @@ def test_sexta_a_tarde_pergunta_no_sabado_e_sabado_a_tarde_nao_pergunta(ligado):
 
 def test_ja_perguntado_no_dia_a_conversa_nova_fica_coberta_sem_mensagem(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H - timedelta(hours=1))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H - timedelta(hours=1))
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H)        # 14:00: a pergunta da manha sai
     assert len(_perguntas(s)) == 1
     passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=QUINTA_14H + timedelta(minutes=10))
@@ -287,7 +287,7 @@ def test_ja_perguntado_no_dia_a_conversa_nova_fica_coberta_sem_mensagem(ligado):
 
 def test_no_dia_seguinte_a_pergunta_volta(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H - timedelta(hours=1))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H - timedelta(hours=1))
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H)
     sexta_9h = SEXTA_8H + timedelta(hours=1)
     passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=sexta_9h)
@@ -297,7 +297,7 @@ def test_no_dia_seguinte_a_pergunta_volta(ligado):
 
 def test_o_nao_avisa_com_todos_os_assuntos_do_dia(ligado):
     s = SaidaFalsa()
-    passo(ligado, s, toque("wamid.1", "menu:trabalhe", lista=True), agora=QUINTA_10H - timedelta(hours=1))
+    passo(ligado, s, toque("wamid.1", "menu:qualidade", lista=True), agora=QUINTA_10H - timedelta(hours=1))
     passo(ligado, s, toque("wamid.2", "menu:fretes", lista=True), agora=QUINTA_10H - timedelta(minutes=55))
     R.rotina_do_minuto(ligado, s, agora=QUINTA_14H)
     passo(ligado, s, toque("wamid.3", "pos:nao"), agora=QUINTA_14H)

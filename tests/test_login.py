@@ -59,4 +59,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                             "018_menu_interno.sql", "019_direcao_do_pedido.sql",
                             "020_pelo_nome_e_a_logo.sql",
                             "021_ele_sabe_que_e_da_equipe.sql", "022_bastidores_em_cadastro.sql",
-                                "023_logos_puxadas.sql", "024_aviso_do_plano.sql"]
+                                "023_logos_puxadas.sql", "024_aviso_do_plano.sql",
+                                "025_trabalhe_conosco.sql"]

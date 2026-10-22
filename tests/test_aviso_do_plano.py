@@ -81,6 +81,9 @@ def test_a_024_vai_volta_e_vai(ligado):
     with conexao(ligado) as con:
         con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
                        VALUES ('plano_sem_registro', 'X', '5549991505565', '7|14/10')""")
+        # a ordem das voltas e a inversa da das idas: a 025 (#1098) mexe nos mesmos CHECKs de modelos
+        volta_025 = (pasta / "025_trabalhe_conosco_VOLTA.sql").read_text(encoding="utf-8")
+        con.execute(volta_025.replace("BEGIN;", "").replace("COMMIT;", ""))
         con.execute(volta)
         assert con.execute("SELECT count(*) AS n FROM atendimento.avisos WHERE tipo = 'plano_sem_registro'"
                            ).fetchone()["n"] == 0

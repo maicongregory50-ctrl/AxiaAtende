@@ -2,6 +2,7 @@
 
     python -m backend.modelos_meta --ver                      so leitura: os nossos modelos na Meta e a situacao
     python -m backend.modelos_meta --propor --imagem capa.jpg manda para aprovacao os do cadastro que a Meta ainda nao tem
+    python -m backend.modelos_meta --propor --documento exemplo.pdf   o mesmo, para o modelo com PDF no cabecalho (#1098)
 
 Roda em janela elevada, com AXIAATENDE_AMBIENTE=producao e AXIAATENDE_PROCESSO=recepcionista (le o
 token do .env.recepcionista; o token nunca e impresso). `--imagem` e o exemplo de cabecalho que a
@@ -27,6 +28,10 @@ from .banco import conexao
 #: `payload` do envio, nunca pelo texto, entao mudar o texto aqui nao muda o que o toque faz.
 BOTOES_CONVITE = ("Quero receber", "Não quero receber")
 BOTAO_FALAR = "Falar com meu atendimento"
+#: #1098: o modelo da Fran. As duas respostas voltam com a carga do envio (vaga:certa:<id>); o
+#: terceiro e o link para conversar com o candidato, pelo NOSSO endereco (/falar/v<id>-<assinatura>).
+BOTOES_TRIAGEM = ("Triagem certa", "Triagem errada")
+BOTAO_CANDIDATO = "Conversar com o candidato"
 #: O endereco publico do recepcionista (Funnel 443). O botao da direta termina em {{1}} = o codigo.
 ENDERECO_FALAR = "https://serverrenascer.taild57672.ts.net/falar/"
 LIMITE_BOTAO = 25
@@ -35,6 +40,14 @@ LIMITE_BOTAO = 25
 EXEMPLOS = {
     "primeiro_nome": "João", "nome": "Agro Exemplo", "assunto": "soja", "peca": "a peça da semana",
     "n_imagens": "6", "responsavel": "o Maicon",
+    # #1098: o curriculo para a Fran (candidato ficticio, o mesmo da maquete)
+    "vaga": "Vaga Comercial", "candidato": "João Exemplo (49 9 0000-0000)",
+    "declarou": "atende a todos os requisitos",
+    "req1": "Agronomia com pós: consta (Agronomia UFSC, pós em Produção Vegetal)",
+    "req2": "2 anos com sementes: não consta no currículo",
+    "req3": "Vivência comercial: consta (3 anos em revenda de insumos)",
+    "req4": "Mora em Maravilha ou vizinha: não (Cascavel, PR)",
+    "resumo": "perfil comercial e técnico; o currículo não mostra experiência com sementes.",
 }
 EXEMPLOS_AVISO = {
     "aviso_recusa": ["Agro Exemplo", "5475 · Chapecó", "https://wa.me/5549999999999"],
@@ -61,7 +74,7 @@ def cadastro(cfg) -> list[dict]:
             "SELECT * FROM atendimento.modelos WHERE ativo ORDER BY id").fetchall()]
 
 
-def componentes(m: dict, cabecalho: str | None = None) -> list[dict]:
+def componentes(m: dict, cabecalho: str | None = None, documento: str | None = None) -> list[dict]:
     """O modelo do cadastro na forma da Meta (POST message_templates)."""
     if m["texto"].strip().startswith("{{") or m["texto"].strip().endswith("}}"):
         raise ValueError("%s: a Meta recusa corpo que comeca ou termina numa variavel" % m["nome"])
@@ -72,6 +85,10 @@ def componentes(m: dict, cabecalho: str | None = None) -> list[dict]:
         if not cabecalho:
             raise ValueError("%s tem imagem no cabecalho: passe --imagem" % m["nome"])
         saida.append({"type": "HEADER", "format": "IMAGE", "example": {"header_handle": [cabecalho]}})
+    if m.get("cabecalho_documento"):
+        if not documento:
+            raise ValueError("%s tem documento no cabecalho: passe --documento" % m["nome"])
+        saida.append({"type": "HEADER", "format": "DOCUMENT", "example": {"header_handle": [documento]}})
     corpo = {"type": "BODY", "text": m["texto"]}
     if exemplos:
         corpo["example"] = {"body_text": [exemplos]}
@@ -83,6 +100,10 @@ def componentes(m: dict, cabecalho: str | None = None) -> list[dict]:
         saida.append({"type": "BUTTONS", "buttons": [{
             "type": "URL", "text": BOTAO_FALAR, "url": ENDERECO_FALAR + "{{1}}",
             "example": [ENDERECO_FALAR + "1-0a1b2c3d4e5f6a7b"]}]})
+    elif m["botao"] == "triagem":
+        saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t} for t in BOTOES_TRIAGEM] + [{
+            "type": "URL", "text": BOTAO_CANDIDATO, "url": ENDERECO_FALAR + "{{1}}",
+            "example": [ENDERECO_FALAR + "v1-0a1b2c3d4e5f6a7b"]}]})
     for b in (c for c in saida if c["type"] == "BUTTONS"):
         for botao in b["buttons"]:
             assert len(botao["text"]) <= LIMITE_BOTAO, botao["text"]
@@ -102,7 +123,8 @@ def ver(cfg, http=None) -> list[dict]:
 
 
 def _subir_exemplo(c: httpx.Client, cfg, imagem: Path) -> str:
-    """O exemplo de cabecalho vai pelo envio em partes da Meta e volta como `h`."""
+    """O exemplo de cabecalho (a imagem, ou o PDF do #1098) vai pelo envio em partes da Meta e
+    volta como `h`."""
     app = c.get("/app", params={"fields": "id"}).json()["id"]
     tipo = mimetypes.guess_type(imagem.name)[0] or "image/jpeg"
     dados = imagem.read_bytes()
@@ -113,7 +135,7 @@ def _subir_exemplo(c: httpx.Client, cfg, imagem: Path) -> str:
     return r["h"]
 
 
-def propor(cfg, imagem: Path | None = None, http=None) -> list[dict]:
+def propor(cfg, imagem: Path | None = None, http=None, documento: Path | None = None) -> list[dict]:
     """Manda para aprovacao os modelos do cadastro que a Meta ainda nao tem. Devolve o que fez."""
     feitos = []
     with (http or _cliente(cfg)) as c:
@@ -124,9 +146,14 @@ def propor(cfg, imagem: Path | None = None, http=None) -> list[dict]:
             if not imagem:
                 raise SystemExit("um dos modelos tem imagem no cabecalho: passe --imagem <arquivo.jpg>")
             cabecalho = _subir_exemplo(c, cfg, imagem)
+        exemplo_pdf = None
+        if any(m.get("cabecalho_documento") for m in faltam):
+            if not documento:
+                raise SystemExit("um dos modelos tem documento no cabecalho: passe --documento <arquivo.pdf>")
+            exemplo_pdf = _subir_exemplo(c, cfg, documento)
         for m in faltam:
             corpo = {"name": m["nome"], "language": m["idioma"], "category": m["categoria"],
-                     "components": componentes(m, cabecalho)}
+                     "components": componentes(m, cabecalho, exemplo_pdf)}
             r = c.post("/%s/message_templates" % cfg.meta_conta_wa, json=corpo).json()
             feitos.append({"nome": m["nome"], "resposta": r})
     return feitos
@@ -138,6 +165,7 @@ def main(argv=None) -> int:
     g.add_argument("--ver", action="store_true")
     g.add_argument("--propor", action="store_true")
     ap.add_argument("--imagem", type=Path)
+    ap.add_argument("--documento", type=Path)
     a = ap.parse_args(argv)
     cfg = config.carregar()
     migracoes.aplicar(cfg)   # o texto do cadastro pode ter sido acertado por mudanca nova
@@ -145,7 +173,7 @@ def main(argv=None) -> int:
         nossos = {m["nome"] for m in cadastro(cfg)}
         r = [t for t in ver(cfg) if t["name"] in nossos]
     else:
-        r = propor(cfg, a.imagem)
+        r = propor(cfg, a.imagem, documento=a.documento)
     print(json.dumps(r, ensure_ascii=False, indent=2))
     return 0
 

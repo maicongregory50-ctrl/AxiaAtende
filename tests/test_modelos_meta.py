@@ -47,14 +47,17 @@ def test_corpo_que_comeca_por_variavel_e_recusado_antes_de_ir(cfg):
 def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
     imagem = tmp_path / "capa.jpg"
     imagem.write_bytes(b"\xff\xd8\xff")
+    pdf = tmp_path / "exemplo.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
     pedidos = []
     feitos = modelos_meta.propor(replace(cfg, meta_token="t"), imagem,
-                                 http=cliente_falso(pedidos, ja_tem=["aviso_recusa"]))
+                                 http=cliente_falso(pedidos, ja_tem=["aviso_recusa"]), documento=pdf)
     assert sorted(f["nome"] for f in feitos) == ["aviso_avaliacao_ruim", "aviso_endereco_fora",
                                                  "aviso_endereco_voltou", "aviso_plano_sem_registro",
-                                                 "aviso_sem_atendimento", "epoca_de_plantio", "pecas_da_revenda"]
+                                                 "aviso_sem_atendimento", "curriculo_para_fran",
+                                                 "epoca_de_plantio", "pecas_da_revenda"]
     criados = [p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]
-    assert len(criados) == 7
+    assert len(criados) == 8
     assert all(p.method in ("GET", "POST") for p in pedidos)      # nada de DELETE
     assert not any("/register" in p.url.path or "/deregister" in p.url.path for p in pedidos)
 
@@ -62,3 +65,26 @@ def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
 def test_propor_com_imagem_no_cabecalho_exige_o_exemplo(cfg):
     with pytest.raises(SystemExit):
         modelos_meta.propor(replace(cfg, meta_token="t"), None, http=cliente_falso([]))
+
+
+def test_o_modelo_da_fran_leva_o_pdf_e_os_tres_botoes(cfg):
+    """#1098: PDF no cabecalho, corpo sem variavel no comeco nem no fim, 2 respostas + 1 link."""
+    m = {x["nome"]: x for x in modelos_meta.cadastro(cfg)}["curriculo_para_fran"]
+    assert m["categoria"] == "UTILITY"
+    c = modelos_meta.componentes(m, None, "4::pdf")
+    assert c[0] == {"type": "HEADER", "format": "DOCUMENT", "example": {"header_handle": ["4::pdf"]}}
+    assert c[1]["text"].startswith("Novo currículo") and c[1]["text"].endswith("acertou?")
+    assert len(c[1]["example"]["body_text"][0]) == 8
+    assert all("\n" not in v for v in c[1]["example"]["body_text"][0])   # a Meta recusa quebra em variavel
+    botoes = c[2]["buttons"]
+    assert [b["type"] for b in botoes] == ["QUICK_REPLY", "QUICK_REPLY", "URL"]
+    assert botoes[2]["url"].endswith("/falar/{{1}}") and "wa.me" not in botoes[2]["url"]
+    with pytest.raises(ValueError):
+        modelos_meta.componentes(m)                       # sem o exemplo de PDF, nao vai
+
+
+def test_propor_o_modelo_com_pdf_exige_o_exemplo(cfg, tmp_path):
+    imagem = tmp_path / "capa.jpg"
+    imagem.write_bytes(b"\xff\xd8\xff")
+    with pytest.raises(SystemExit):
+        modelos_meta.propor(replace(cfg, meta_token="t"), imagem, http=cliente_falso([]))
