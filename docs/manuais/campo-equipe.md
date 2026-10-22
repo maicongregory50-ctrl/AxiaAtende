@@ -35,8 +35,8 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 > dentro das 24 h da sua última mensagem. Se você não responder as perguntas, a logo vai assim mesmo
 > depois de 24 h, sem cliente, e o dono resolve.
 1. Mande a foto ou o vídeo para o **WhatsApp da Renascer (49 3664 0121)**, com uma frase dizendo o
-   que é e de que produto (*"colheita do centeio IPR 89 no campo do Jair"*). A frase pode ir antes
-   ou junto da foto.
+   que é e de que produto (*"colheita do centeio IPR 89 no campo do Jair"*). A frase pode ir antes,
+   junto ou **logo depois** da foto (até um minuto depois da última foto) — #1099, 22/10/2026.
 2. A OlivIA responde **"Recebi."** Ela lê a sua frase e, um ou dois minutos depois, pergunta **só o
    que faltou**, uma coisa por vez, em conversa: o que a foto mostra, de que produto é (o nome como
    está na embalagem), em que fase está a lavoura, e — **só se você não disse a data na frase** —
@@ -61,8 +61,12 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 > OlivIA perguntava *"É de hoje?"* mesmo quando você já tinha escrito "hoje" — era o defeito deste
 > chamado. Ela ainda **não adivinha**: só *hoje*, *ontem*, *anteontem*, uma data escrita e a safra;
 > qualquer outra coisa continua levando à pergunta.
-3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida, são **uma
-   conversa só**: as respostas valem para todas. Enquanto uma pergunta estiver sem resposta, a foto
+3. Pronto: **"Anotado. Obrigado!"** Várias fotos do mesmo lugar, mandadas em seguida (**até um
+   minuto** entre uma e a outra, contado pela hora em que **você mandou**), são **uma conversa só**:
+   as respostas valem para todas. Esperou mais que isso e a conversa anterior já fechou? As próximas
+   são outro lote — e, se você não escrever nada, a OlivIA pergunta **"É do mesmo assunto da
+   anterior?"**: **Sim** repete o título, a classe e a data do anterior; **Outra coisa** abre as
+   perguntas de sempre. Enquanto uma pergunta estiver sem resposta, a foto
    que chegar entra nessa mesma conversa, mesmo meia hora depois. Escreveu algo a mais no meio
    ("foto da safra 2025")? Fica anotado na foto.
 4. Fechada a conversa, a foto entra no catálogo e você recebe **"Sua foto entrou no catálogo da
@@ -80,21 +84,29 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 | **"Parece entrega. É isso?"** | o palpite do sistema pela imagem, quando você não escreveu nada; toque **Sim** ou **Outra coisa** (e aí ela pergunta o que é) |
 | **"De que produto é?"** | a foto é de campo ou de colheita e faltou o produto: escreva o nome da embalagem |
 | **"Em que fase está a lavoura?"** | só para foto de campo de sementes: recém-nascida, verde, florindo, madura ou já em semente, com as suas palavras |
+| **"É do mesmo assunto da anterior (…)?"** | você mandou fotos sem frase logo depois de outro lote que já fechou: **Sim** repete o título e a data do anterior, **Outra coisa** abre as perguntas (#1099) |
 | **"É de hoje?"** | a data da foto; sem resposta, vale o dia do envio. "safra 2025" vale como resposta: a foto entra sem dia, com a safra (1º de julho a 30 de junho) |
 | **"Ainda sobre a foto de há pouco: ..."** | a lembrança, duas horas depois; é a última vez que ela pergunta |
 | **"Anotado. Obrigado!"** | fechou |
+| **"Recebi."** duas vezes seguidas | são dois lotes |
 | **"Não achei esse produto na lista"** | o nome não bateu com o portfólio; o marketing confere |
 | **"Entrou no catálogo"** | o marketing guardou a foto |
 | **"Virou o Stories do dia"** | foi ao ar no Instagram |
 | Nenhum aviso até o dia seguinte | a foto pode ter entrado mesmo assim: o aviso só vai nas primeiras 24 horas depois da sua última mensagem |
 
 **Escreveu antes de mandar a foto?** Vale do mesmo jeito: a frase fica guardada e vira a legenda da
-foto que chegar nos dez minutos seguintes. Por isso, quem é da equipe **não recebe o menu de
+foto mandada nos dez minutos seguintes. **Os minutos contam da hora em que você mandou, e não da hora
+em que chegou** (#1099): celular sem sinal entrega tudo atrasado e às vezes fora de ordem, e a frase
+encontra as fotos dela mesmo assim. Por isso, quem é da equipe **não recebe o menu de
 atendimento** ao escrever; para falar com alguém da empresa pelo caminho normal, escreva **menu**.
 
 ## 5. O que NÃO faz
 
 - **Não publica nada sozinho:** quem decide é o marketing, e quem aprova é o dono.
+- **Não separa** um lote que você manda enquanto ela ainda espera uma resposta sua: ele entra na
+  mesma conversa. Responda primeiro e depois mande o próximo.
+- **Não corrige** foto que já entrou no catálogo com o título errado: isso é na Caixa do marketing.
+- **Não olha a foto para decidir o lote:** quem decide é a hora em que você mandou.
 - **Não faz mais de três perguntas** sobre a mesma foto (fora a data), **nem repete a mesma
   pergunta**: o que ela não entendeu fica escrito na foto e o marketing classifica.
 - **Não manda lista para você escolher:** a conversa é em texto; a classificação é do sistema.

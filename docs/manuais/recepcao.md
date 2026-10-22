@@ -66,6 +66,7 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | No menu principal, **"Comercial"** diz *comprar* e **"Fornecedores"** diz *vender para a Renascer* | mudou em 15/10/2026 (#1027). Antes "Comercial" dizia só "Cotar sementes", e quem escrevia *"posso te fazer uma cotação"* querendo **vender** caía no Comercial — foi o caso de uma empresa de embalagens naquela manhã |
 | *"Recebi o arquivo, mas não consigo abrir arquivo por aqui…"* | alguém mandou **PDF, áudio ou vídeo** fora da conversa da vaga. A frase diz por que não serve e abre caminho (escrever em uma linha, ou *menu*). Dentro da conversa do Trabalhe conosco, o PDF é o currículo e vai à Fran |
 | **"currículo recebido"** | conversa do Trabalhe conosco: o candidato mandou o PDF, e ele vai à Fran com a pré-triagem (manual `trabalhe-conosco.md`) |
+| Canal de campo: **o lote** | as fotos da equipe são agrupadas pela **hora em que foram mandadas** (até um minuto entre uma e outra), não pela hora em que chegaram; "Recebi." duas vezes seguidas são dois lotes (#1099) |
 | **"imagem recebida"** | alguém da equipe tocou **📸 Foto do campo** e a foto (ou o vídeo) chegou; ela segue para o catálogo do marketing |
 | **"logo recebida"** | alguém da equipe tocou **📸 Foto do campo** e mandou a logo de um cliente |
 | **"parou no meio"** de alguém da equipe, depois de **Foto do campo** | tocou e não mandou nada em 30 minutos. A OlivIA não tenta retomar essa conversa |

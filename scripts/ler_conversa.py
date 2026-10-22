@@ -120,6 +120,13 @@ def conversa(con, wa_id: str | None = None, bsuid: str | None = None, desde: dat
                                AND (corpo->'msg'->>'from' = %s OR bsuid = ANY(%s)) ORDER BY id""",
                          (desde, wa_id or "", bsuids)).fetchall():
         texto = descrever_entrada(e["corpo"])
+        # #1099: o celular sem rede entrega com atraso (ate 33 h medidas) e fora de ordem; o canal de
+        # campo agrupa pela hora de ENVIO, entao a leitura a mostra quando difere da chegada
+        ts = str(((e["corpo"] or {}).get("msg") or {}).get("timestamp") or "")
+        if ts.isdigit():
+            mandada = datetime.fromtimestamp(int(ts), tz=timezone.utc)
+            if abs((e["recebido_em"] - mandada).total_seconds()) > 60:
+                texto += " (mandada %s)" % _hora(mandada)
         erro = (" !! %s" % e["erro"]) if e["erro"] else ""
         itens.append((e["recebido_em"], "→ %s%s" % (texto, erro)))
     for s in con.execute("""SELECT enviada_em, tipo, resumo, status, erro FROM atendimento.enviadas

@@ -86,6 +86,7 @@ class Entrada:
     midia: Midia | None = None    # #970: foto ou video (so o canal de campo a usa)
     documento: Documento | None = None   # #1036: a logo de cliente; #1098: o curriculo em PDF
     anuncio: str | None = None    # #1098: o `referral.source_id` de quem chegou por um anuncio
+    enviado_em: datetime | None = None   # #1099: a hora em que a pessoa MANDOU (`msg.timestamp`)
     tipo: str = ""                # o `type` da Meta: text, interactive, button, image, reaction, sticker...
 
 
@@ -101,6 +102,9 @@ def ler_mensagem(valor: dict, msg: dict) -> Entrada:
     pessoa = Pessoa(bsuid=bsuid, wa_id=wa_id, nome=(contato.get("profile") or {}).get("name", ""))
     e = Entrada(wamid=msg["id"], pessoa=pessoa, contexto=(msg.get("context") or {}).get("id"),
                 anuncio=(msg.get("referral") or {}).get("source_id") or None)
+    if str(msg.get("timestamp") or "").isdigit():
+        from datetime import timezone
+        e.enviado_em = datetime.fromtimestamp(int(msg["timestamp"]), tz=timezone.utc)
     tipo = msg.get("type")
     e.tipo = tipo or ""
     if tipo == "interactive":

@@ -29,3 +29,12 @@ def toque(wamid, id_opcao, titulo="x", numero=NUMERO, lista=False):
 
 def status(wamid, situacao, numero=NUMERO):
     return {"id": wamid, "status": situacao, "timestamp": "1760040000", "recipient_id": numero}
+
+
+def na_hora(mensagem: dict, agora) -> dict:
+    """#1099: a mensagem MANDADA no instante do passo. O canal de campo agrupa pela hora de envio
+    (`msg.timestamp`), e o valor fixo dos ajudantes poria toda foto de teste "no mesmo segundo, um
+    ano antes". Mensagem com outra hora de proposito (o celular sem rede) passa `"timestamp"` proprio."""
+    if mensagem.get("timestamp") in (None, "1760040000"):
+        mensagem = dict(mensagem, timestamp=str(int(agora.timestamp())))
+    return mensagem

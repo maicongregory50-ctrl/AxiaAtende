@@ -44,6 +44,13 @@ RODADA = timedelta(minutes=10)         # midias do mesmo numero dentro deste tem
 ESPERA_PALPITE = timedelta(minutes=2)  # a primeira pergunta espera o palpite do marketing ate aqui
 RETOMADA = timedelta(hours=2)          # sem resposta, lembra uma vez depois disto
 JANELA = timedelta(hours=24)           # a janela da Meta para mensagem de sessao
+# #1099: o lote e a frase pela hora de ENVIO (a da Meta), nao a de chegada (o celular sem rede entrega
+# com ate 33 h de atraso, e fora de ordem). Chave `campo.lote_pelo_envio`; desligada, a regra de antes.
+LOTE = timedelta(seconds=60)           # fotos mandadas ate 60 s uma da outra sao o mesmo lote
+FRASE_ANTES = timedelta(minutes=10)    # a frase mandada ate 10 min antes da foto e dela
+FRASE_DEPOIS = timedelta(seconds=60)   # ... ou ate 60 s depois (o gesto do dono: foto primeiro)
+MESMO_ATE = timedelta(minutes=10)      # lote sem frase ate 10 min depois de outro fechado: pergunta
+FUTURO = timedelta(minutes=5)          # hora de envio mais no futuro que isto: relogio errado, vale a chegada
 MAX_PERGUNTAS = 3                      # perguntas de classificacao por grupo (a data nao conta)
 EXTENSOES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
              "video/mp4": ".mp4", "video/3gpp": ".3gp", "video/quicktime": ".mov"}
@@ -80,6 +87,7 @@ PERGUNTA_PRODUTO = "De que produto é? (o nome como está na embalagem)"
 PERGUNTA_FASE = "Em que fase está a lavoura? (recém-nascida, verde, florindo, madura ou já em semente)"
 PERGUNTA_DATA = "É de hoje?"
 PERGUNTA_QUAL_DIA = "Qual dia? (ex.: 09/10)"
+PERGUNTA_MESMO = "É do mesmo assunto da anterior (%s)?"
 RETOMANDO = "Ainda sobre a foto de há pouco: "
 ANOTADO = "Anotado. Obrigado!"
 NAO_ENTENDI_DATA = "Não entendi a data; vale o dia do envio."
@@ -101,6 +109,18 @@ PEDE_MENU = internos.PEDE_MENU
 def ligado(con) -> bool:
     r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = 'campo.ligado'").fetchone()
     return bool(r and r["valor"] is True)
+
+
+def lote_pelo_envio(con) -> bool:
+    r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = 'campo.lote_pelo_envio'").fetchone()
+    return bool(r and r["valor"] is True)
+
+
+def hora_de_envio(e, agora: datetime) -> datetime:
+    """A hora da Meta quando existe e e plausivel; senao, a chegada (#1099). Atraso para tras nao tem
+    teto (33 h medidas); para a frente, mais de 5 min e relogio errado do aparelho."""
+    t = getattr(e, "enviado_em", None)
+    return t if t is not None and t <= agora + FUTURO else agora
 
 
 def produtos(con) -> list[str]:
@@ -221,7 +241,9 @@ class Campo:
         quem = quem_e(con, e.pessoa.wa_id)
         if not quem:
             return False
-        lider = self._lider(con, e.pessoa.wa_id, agora)
+        envio = hora_de_envio(e, agora)
+        pelo_envio = lote_pelo_envio(con)
+        lider = self._lider(con, e.pessoa.wa_id, agora, envio if pelo_envio else None)
         arquivo, erro = None, ""
         try:
             ext = EXTENSOES.get((m.mime or "").split(";")[0].strip(), ".mp4" if m.tipo == "video" else ".jpg")
@@ -231,7 +253,21 @@ class Campo:
         except Exception as falha:  # noqa: BLE001 -- a midia fica em eventos_meta; a linha diz o erro
             erro = ("%s: %s" % (type(falha).__name__, falha))[:300]
         legenda = (m.legenda or "").strip() or (lider["legenda"] if lider else "")
-        if not legenda:   # a frase escrita ANTES da foto (decisao 13)
+        if not legenda and pelo_envio:
+            # #1099: a frase pela hora de ENVIO -- ate 10 min antes da foto, ou ate 60 s depois; havendo
+            # as duas, a de antes (o jeito de quem escreve primeiro). A que chegou antes da foto dela
+            # (celular sem rede) e achada aqui, quando a foto chega.
+            frase = con.execute("""SELECT id, texto FROM atendimento.campo_frases
+                                    WHERE wa_id = %s AND usada_em IS NULL
+                                      AND coalesce(enviado_em, recebido_em) BETWEEN %s AND %s
+                                    ORDER BY (coalesce(enviado_em, recebido_em) > %s),
+                                             abs(extract(epoch FROM coalesce(enviado_em, recebido_em) - %s))
+                                    LIMIT 1""",
+                                (e.pessoa.wa_id, envio - FRASE_ANTES, envio + FRASE_DEPOIS, envio, envio)).fetchone()
+            if frase:
+                legenda = frase["texto"]
+                con.execute("UPDATE atendimento.campo_frases SET usada_em = %s WHERE id = %s", (agora, frase["id"]))
+        elif not legenda:   # a frase escrita ANTES da foto (decisao 13), pela chegada (a regra de antes)
             frase = con.execute("""SELECT id, texto FROM atendimento.campo_frases
                                     WHERE wa_id = %s AND usada_em IS NULL AND recebido_em > %s
                                     ORDER BY id DESC LIMIT 1""", (e.pessoa.wa_id, agora - RODADA)).fetchone()
@@ -246,14 +282,15 @@ class Campo:
         linha = con.execute("""INSERT INTO atendimento.material_de_campo
                    (bsuid, wa_id, erp_codigo, erp_papel, erp_nome, wamid, tipo, mime, arquivo, legenda, recebido_em, erro,
                     classe_bastidor, classe_produto, classe_fase, data_dita, data_presumida, lida_em, perguntas_em, fechado_em,
-                    grupo_id, safra_dita)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    grupo_id, safra_dita, enviado_em)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                    ON CONFLICT (wamid) DO NOTHING RETURNING id""",
                             (e.pessoa.bsuid, e.pessoa.wa_id, quem["codigo"], quem["papel"], quem["nome"],
                              e.wamid, m.tipo, m.mime or "", arquivo, legenda, agora, erro,
                              herda["classe_bastidor"], herda["classe_produto"], herda["classe_fase"], herda["data_dita"],
                              bool(lider and lider["data_presumida"]), herda["lida_em"], herda["perguntas_em"],
-                             herda["fechado_em"], lider["grupo_id"] if lider else 0, herda["safra_dita"])).fetchone()
+                             herda["fechado_em"], lider["grupo_id"] if lider else 0, herda["safra_dita"],
+                             envio)).fetchone()
         if not linha:
             return True   # o mesmo aviso de novo: ja esta aqui
         if not lider:   # a primeira do grupo: o grupo e ela
@@ -273,17 +310,27 @@ class Campo:
         # imagem chegar (ate 2 min) e de mais fotos do mesmo grupo entrarem
         return True
 
-    def _lider(self, con, wa_id, agora):
+    def _lider(self, con, wa_id, agora, envio: datetime | None = None):
         """O lider da conversa em curso deste numero: UMA conversa aberta por pessoa (12/10/2026, 14:25:
         cinco lembrancas de uma vez, uma por grupo de 10 min). Primeiro a conversa ABERTA (sem fechar,
         dentro das 24 h), mesmo que a ultima foto tenha mais de 10 min; senao, o grupo dos ultimos 10
-        minutos (fechado: a foto entra com ele)."""
+        minutos (fechado: a foto entra com ele).
+
+        #1099, com `envio` (a chave `campo.lote_pelo_envio` ligada): sem conversa aberta, so a foto
+        MANDADA a ate 60 s de outra e do mesmo lote -- e ai entra no grupo dela mesmo fechado, porque e
+        a mesma remessa que chegou atrasada. Grupo fechado nao recebe lote novo (o album das 10:25 de
+        22/10 entrou no grupo 58, fechado 1 min antes, e herdou o titulo dele)."""
         aberta = con.execute("""SELECT l.* FROM atendimento.material_de_campo l
                                  WHERE l.wa_id = %s AND l.id = l.grupo_id AND l.fechado_em IS NULL
                                    AND l.desistiu_em IS NULL AND l.recebido_em > %s
                                  ORDER BY l.id DESC LIMIT 1""", (wa_id, agora - JANELA)).fetchone()
         if aberta:
             return aberta
+        if envio is not None:
+            r = con.execute("""SELECT grupo_id FROM atendimento.material_de_campo
+                                WHERE wa_id = %s AND coalesce(enviado_em, recebido_em) BETWEEN %s AND %s
+                                ORDER BY id DESC LIMIT 1""", (wa_id, envio - LOTE, envio + LOTE)).fetchone()
+            return self._linha(con, r["grupo_id"]) if r else None
         r = con.execute("""SELECT * FROM atendimento.material_de_campo
                             WHERE wa_id = %s AND recebido_em > %s ORDER BY id LIMIT 1""",
                         (wa_id, agora - RODADA)).fetchone()
@@ -416,6 +463,9 @@ class Campo:
         data. Entra porque o dono pediu, informado disso, e porque custa uma linha.
         """
         r = self._linha(con, r["id"]) or r
+        if self._pede_mesmo(con, r):
+            self._perguntar(con, saida, r, agora, "mesmo")
+            return True
         falta = self._falta(r, rotulos_de_bastidor(con))
         if falta and falta != "data" and r["pergunta_n"] >= MAX_PERGUNTAS:
             falta = "data" if r["data_dita"] is None else None   # estourou: so a data ainda vale
@@ -430,10 +480,44 @@ class Campo:
         self._perguntar(con, saida, r, agora, falta)
         return True
 
+    # ── #1099: "e do mesmo assunto da anterior?" ─────────────────────────────
+
+    def _anterior(self, con, r):
+        """O lote fechado do mesmo numero cujo ultimo envio foi ate 10 min antes do primeiro envio
+        deste. None: nenhum (e a pergunta nao se faz)."""
+        inicio = con.execute("""SELECT min(coalesce(enviado_em, recebido_em)) AS t FROM atendimento.material_de_campo
+                                 WHERE grupo_id = %s""", (r["grupo_id"],)).fetchone()["t"]
+        if inicio is None:
+            return None
+        a = con.execute("""SELECT grupo_id FROM atendimento.material_de_campo
+                            WHERE wa_id = %s AND grupo_id <> %s AND fechado_em IS NOT NULL AND desistiu_em IS NULL
+                              AND coalesce(enviado_em, recebido_em) BETWEEN %s AND %s
+                            ORDER BY coalesce(enviado_em, recebido_em) DESC LIMIT 1""",
+                        (r["wa_id"], r["grupo_id"], inicio - MESMO_ATE, inicio)).fetchone()
+        return self._linha(con, a["grupo_id"]) if a else None
+
+    def _pede_mesmo(self, con, r) -> bool:
+        """A primeira pergunta do lote sem frase logo depois de outro fechado (decisao 4 do #1099)."""
+        if not lote_pelo_envio(con) or (r["legenda"] or "").strip() or r["classe_bastidor"] is not None:
+            return False
+        if "mesmo" in (r["perguntas_feitas"] or []):
+            return False
+        return self._anterior(con, r) is not None
+
+    @staticmethod
+    def _titulo_curto(con, a) -> str:
+        t = (a["legenda"] or "").strip() or rotulos_de_bastidor(con).get(a["classe_bastidor"] or "", "") or "sem título"
+        return t if len(t) <= 40 else t[:39].rsplit(" ", 1)[0] + "…"
+
     def _perguntar(self, con, saida, r, agora: datetime, qual: str, retomando: bool = False) -> None:
         para = r["wa_id"] or r["bsuid"]
         prefixo = RETOMANDO if retomando else ""
-        if qual == "legenda":
+        if qual == "mesmo":
+            a = self._anterior(con, r)
+            titulo = self._titulo_curto(con, a) if a else "a anterior"
+            self._botoes(con, saida, para, prefixo + PERGUNTA_MESMO % titulo,
+                         [Opcao("campo:mesmo:sim", "Sim"), Opcao("campo:mesmo:outra", "Outra coisa")])
+        elif qual == "legenda":
             self._texto(con, saida, para, prefixo + PERGUNTA_LEGENDA)
         elif qual == "bastidor":
             rotulos = rotulos_de_bastidor(con)
@@ -450,7 +534,7 @@ class Campo:
             self._botoes(con, saida, para, prefixo + PERGUNTA_DATA, [Opcao("campo:hoje:sim", "Sim"), Opcao("campo:hoje:outra", "Outra data")])
         elif qual == "qual_dia":
             self._texto(con, saida, para, prefixo + PERGUNTA_QUAL_DIA)
-        n = r["pergunta_n"] + (0 if retomando or qual in ("data", "qual_dia") else 1)
+        n = r["pergunta_n"] + (0 if retomando or qual in ("data", "qual_dia", "mesmo") else 1)
         con.execute("""UPDATE atendimento.material_de_campo
                           SET pergunta_pendente = %s, perguntas_em = coalesce(perguntas_em, %s), pergunta_n = %s,
                               retomar_em = %s, retomada = %s,
@@ -554,6 +638,32 @@ class Campo:
                     return True
             return toque.startswith("campo:")   # botao velho: engole, sem levar ao menu
         q = r["pergunta_pendente"]
+        if q == "mesmo":
+            if toque == "campo:mesmo:sim":
+                a = self._anterior(con, r)
+                if a is None:   # o anterior sumiu: segue o roteiro de sempre
+                    self._perguntar_proxima(con, saida, self._gravar(con, r), agora)
+                    return True
+                r = self._gravar(con, r, legenda=a["legenda"] or "", classe_bastidor=a["classe_bastidor"],
+                                 classe_produto=a["classe_produto"], classe_fase=a["classe_fase"],
+                                 data_dita=a["data_dita"], safra_dita=a["safra_dita"],
+                                 data_presumida=bool(a["data_presumida"]))
+                self._texto(con, saida, e.pessoa.para, ANOTADO)
+                self._fechar(con, r, agora)
+                return True
+            if toque == "campo:mesmo:outra":
+                self._perguntar_proxima(con, saida, self._gravar(con, r), agora)
+                return True
+            if texto:   # escreveu em vez de tocar: e a legenda deste lote
+                ids = self._grupo_de(con, r)
+                con.execute("UPDATE atendimento.material_de_campo SET legenda = %s WHERE id = ANY(%s) AND legenda = ''",
+                            (texto[:500], ids))
+                r = self._gravar(con, r)
+                self._ler(con, r["id"], texto, agora)
+                self._data_da_frase(con, r, texto, agora)
+                self._perguntar_proxima(con, saida, self._linha(con, r["id"]), agora)
+                return True
+            return toque.startswith("campo:")
         if q == "legenda":
             if not texto:
                 return toque.startswith("campo:")
@@ -685,8 +795,9 @@ class Campo:
         avisado = con.execute("""SELECT 1 FROM atendimento.campo_frases
                                   WHERE wa_id = %s AND avisado AND recebido_em > %s""",
                               (e.pessoa.wa_id, agora - JANELA)).fetchone() is not None
-        con.execute("""INSERT INTO atendimento.campo_frases (wa_id, texto, recebido_em, avisado)
-                       VALUES (%s, %s, %s, %s)""", (e.pessoa.wa_id, texto[:500], agora, not avisado))
+        con.execute("""INSERT INTO atendimento.campo_frases (wa_id, texto, recebido_em, avisado, enviado_em)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (e.pessoa.wa_id, texto[:500], agora, not avisado, hora_de_envio(e, agora)))
         if not avisado:
             self._texto(con, saida, e.pessoa.para, ANOTADO_FRASE)
         return True

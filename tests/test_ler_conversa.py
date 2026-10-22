@@ -106,3 +106,14 @@ def test_a_candidatura_aparece_sem_o_conteudo_do_pdf(cfg, capsys, tmp_path):
     saida = capsys.readouterr().out
     assert "[vaga] currículo #1 'Curriculo - Gabriel.pdf'" in saida and "na fila" in saida
     assert "MIDIA:" not in saida
+
+
+def test_a_mensagem_atrasada_mostra_quando_foi_mandada(cfg, capsys, tmp_path):
+    """#1099: a frase das 08:55 de 22/10 chegou as 09:39; a leitura diz as duas horas."""
+    from dataclasses import replace
+    c = replace(cfg, responde=True)
+    m = texto("wamid.atraso", "Qualidade, amostrando Nabo", numero=EQUIPE)
+    m["timestamp"] = str(int((AGORA - timedelta(minutes=44)).timestamp()))
+    R.gravar(c, aviso([m], numero=EQUIPE, bsuid="BR.equipe"))
+    assert L.main(["--numero", EQUIPE, "--dsn", c.dsn(), "--log", str(tmp_path / "l.jsonl")]) == 0
+    assert "Qualidade, amostrando Nabo (mandada " in capsys.readouterr().out

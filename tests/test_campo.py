@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from backend import agenda, campo, recepcionista as R
 from backend.banco import conexao
 from backend.main import criar_app
-from tests.avisos_meta import aviso, texto, toque
+from tests.avisos_meta import na_hora, aviso, texto, toque
 from tests.saida_falsa import IAFalsa, SaidaFalsa
 
 EQUIPE = "5549991505565"      # Maicon, equipe + representante (agenda de teste)
@@ -52,7 +52,7 @@ def ligar(cfg, valor=True):
 
 
 def passo(cfg, s, mensagem, agora=AGORA, numero=EQUIPE, bsuid="BR.equipe", ia=None):
-    R.gravar(cfg, aviso([mensagem], numero=numero, bsuid=bsuid))
+    R.gravar(cfg, aviso([na_hora(mensagem, agora)], numero=numero, bsuid=bsuid))
     R.processar_pendentes(cfg, s, ia, agora=agora, campo=campo.Campo(cfg.campo_pasta, ia))
 
 
