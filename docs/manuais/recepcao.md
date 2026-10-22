@@ -49,7 +49,7 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 |---|---|
 | **Chegaram** | quantas conversas começaram no período |
 | **Receberam o link** | chegaram ao fim do menu e receberam o WhatsApp de quem atende |
-| **Pararam no meio** | começaram a escolher e ficaram 30 minutos sem tocar em nada, sem chegar ao link |
+| **Pararam no meio** | começaram a escolher e ficaram 30 minutos sem tocar em nada, sem chegar ao link. A conversa do **Trabalhe conosco** não entra aqui: ela termina como *currículo recebido* ou *sem currículo* (#1098) |
 | **Disseram que foram atendidos / que não** | a resposta à pergunta "recebeu o atendimento?". Ela vai **uma vez por dia** para cada pessoa, 4h30 depois da **última** mensagem dela, e só em horário comercial (segunda a sábado, das 8h às 11h e das 14h às 17h: fora disso, espera a próxima faixa). Logo depois do "Sim" vem a nota, em três botões na própria mensagem (Bom, Normal, Ruim); se no mesmo dia ela foi mandada a mais de um atendente, a resposta vale para todas as conversas do dia (e cada uma conta no cartão) |
 | **IA acertou / errou** | quem escreveu em vez de tocar recebeu a proposta da IA ("Entendi que você quer… É isso?"): **Sim** é acerto, **Ver todas as opções** é erro |
 | **Do nosso cadastro** | quantos dos que chegaram no período estão no cadastro do ERP |
@@ -64,7 +64,9 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **Quem só com o número, sem etiqueta** | a conversa chegou antes de o cadastro ser lido pela primeira vez |
 | **"Cadastro lido em 09/10 06:00 (884 números)"** | o cadastro é lido uma vez por dia, às 06:00: quem foi cadastrado hoje é reconhecido amanhã. Se a leitura falhar, a frase diz o motivo e fica valendo a do dia anterior |
 | No menu principal, **"Comercial"** diz *comprar* e **"Fornecedores"** diz *vender para a Renascer* | mudou em 15/10/2026 (#1027). Antes "Comercial" dizia só "Cotar sementes", e quem escrevia *"posso te fazer uma cotação"* querendo **vender** caía no Comercial — foi o caso de uma empresa de embalagens naquela manhã |
-| *"Recebi o arquivo, mas não consigo abrir arquivo por aqui…"* | alguém mandou **PDF, áudio ou vídeo**. A frase diz por que não serve e abre caminho (escrever em uma linha, ou *menu*) |
+| *"Recebi o arquivo, mas não consigo abrir arquivo por aqui…"* | alguém mandou **PDF, áudio ou vídeo** fora da conversa da vaga. A frase diz por que não serve e abre caminho (escrever em uma linha, ou *menu*). Dentro da conversa do Trabalhe conosco, o PDF é o currículo e vai à Fran |
+| **"currículo recebido"** | conversa do Trabalhe conosco: o candidato mandou o PDF, e ele vai à Fran com a pré-triagem (manual `trabalhe-conosco.md`) |
+| **"sem currículo"** | conversa do Trabalhe conosco em que a pessoa conversou, ou tocou **Encerrar**, e não mandou o PDF |
 | *"Recebi, mas por aqui eu entendo texto e os botões"* | continua valendo para **figurinha, localização e contato** — o que não é arquivo |
 | **Caminho** | o que a pessoa tocou, na ordem ("Comercial › Produtor rural › PR › Cascavel") |
 | **"— só chegou"** | mandou mensagem e ainda não escolheu nada |

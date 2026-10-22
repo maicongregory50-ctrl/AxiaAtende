@@ -35,6 +35,8 @@ pessoa recebe os outros avisos internos: o endereço público fora do ar e, desd
 marketing parado há 7, 14, 21... dias sem registro (às 08:00, pedido pelo marketing). Trocar a
 pessoa aqui troca também quem recebe esses.
 
+**Trabalhe conosco (#1098):** o motivo *Trabalhe conosco* não manda direto o cartão: abre a conversa da vaga (requisitos, currículo só em PDF). A pessoa escolhida na tabela dos motivos é quem **recebe cada currículo** com a pré-triagem e o cartão de quem pede para falar com alguém. No cartão *Trabalhe conosco*: **Desligar pré-triagem** (os currículos continuam chegando, sem a leitura da IA) e **Fechar vaga** (quem vem pelo anúncio cai no menu de sempre, e quem toca *Trabalhe conosco* ouve que não há vaga aberta e pode mandar o PDF para as próximas). Detalhes em `trabalhe-conosco.md`.
+
 **Canal de campo (#970):** a chave *ligado*. Ligada, a foto ou o vídeo que um colaborador ou
 representante do cadastro manda ao WhatsApp da Renascer é guardado, a OlivIA pergunta o que é e se é
 de hoje, e o marketing busca para a Caixa dele. Desligada, a foto da equipe é só guardada, como
@@ -50,10 +52,13 @@ o dono, depois de o marketing também ligar a chave dele (`AXIAMKT_CAMPO`).
 | **Resposta** | a combinação de respostas que leva àquela pessoa |
 | **"(antes vai um texto)"** | antes do link vai uma mensagem fixa (por exemplo, o link da Fretebras no Frete) |
 | **Horário** | fora dele, o link vai do mesmo jeito, com o aviso de que o retorno vem no próximo horário |
+| **Vaga aberta · Vaga Comercial · 3 currículos** | a vaga que o atendimento oferece hoje e quantos PDFs já chegaram para ela |
+| **Pré-triagem ligada / desligada** | ligada, a IA lê cada currículo e confere os requisitos antes de ele ir à Fran; desligada, vai sem essa leitura, dizendo "Sem pré-triagem" |
+| **Nenhuma vaga aberta** | a vaga foi fechada; abrir outra é chamado |
 
 ## 5. O que a tela NÃO faz
 
-- **Não muda o texto do menu nem cria motivo novo:** isso é chamado.
+- **Não muda o texto do menu nem cria motivo novo:** isso é chamado. Também não abre vaga nova nem muda os requisitos ou as respostas da vaga.
 - **Não confere se o WhatsApp digitado existe:** confira com a pessoa antes de salvar.
 - **Não muda o responsável dos clientes da carteira:** esse é o canal comercial do cadastro do cliente,
   no ERP. Destinos vale para quem chama no WhatsApp e não é da carteira.
