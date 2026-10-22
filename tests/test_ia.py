@@ -136,3 +136,43 @@ def test_sem_cadastro_o_campo_cai_nas_cinco_originais():
     enum = c.pedidos[-1]["output_config"]["format"]["schema"]["properties"]["bastidor"]["enum"]
     assert enum == ["campo-de-sementes", "colheita", "beneficiamento", "controle-de-qualidade",
                     "entrega", "nenhum"]
+
+
+# ── #1098: a pre-triagem do curriculo ────────────────────────────────────────
+
+VAGA = {"titulo": "Vaga Comercial", "requisitos": ["Agronomia com pós", "2 anos com sementes",
+                                                    "Vivência comercial", "Morar em Maravilha"]}
+
+
+def test_triar_manda_o_pdf_e_o_esquema_e_le_um_por_requisito():
+    c = ClienteFalso(resposta(json.dumps({"requisitos": [
+        {"situacao": "consta", "fonte": "Agronomia UFSC"}, {"situacao": "nao_consta", "fonte": ""},
+        {"situacao": "consta", "fonte": "revenda"}, {"situacao": "nao", "fonte": "Cascavel, PR"}],
+        "resumo": "perfil comercial", "legivel": True})))
+    t = IAmod.IA(cliente=c).triar(b"%PDF-1.4", VAGA)
+    assert [r["situacao"] for r in t["requisitos"]] == ["consta", "nao_consta", "consta", "nao"]
+    assert t["legivel"] is True and t["resumo"] == "perfil comercial"
+    p = c.pedidos[0]
+    assert p["model"] == "claude-haiku-5-5" and "tools" not in p
+    doc = p["messages"][0]["content"][0]
+    assert doc["type"] == "document" and doc["source"]["media_type"] == "application/pdf"
+    assert "AUSÊNCIA NUNCA É" in p["system"] and "religião" in p["system"] and "Morar em Maravilha" in p["system"]
+
+
+def test_triar_completa_o_que_faltou_com_nao_consta_e_nunca_com_nao():
+    c = ClienteFalso(resposta(json.dumps({"requisitos": [{"situacao": "talvez", "fonte": "x\ny"}],
+                                          "resumo": "a\nb", "legivel": True})))
+    t = IAmod.IA(cliente=c).triar(b"%PDF", VAGA)
+    assert [r["situacao"] for r in t["requisitos"]] == ["nao_consta"] * 4
+    assert "\n" not in t["requisitos"][0]["fonte"] and "\n" not in t["resumo"]   # variavel de uma linha
+
+
+@pytest.mark.parametrize("r", [resposta("nao e json"), resposta("{}", stop="refusal"), None])
+def test_triar_sem_resposta_boa_devolve_none(r):
+    c = ClienteFalso(r, erro=TimeoutError("demorou") if r is None else None)
+    assert IAmod.IA(cliente=c).triar(b"%PDF", VAGA) is None
+
+
+def test_triar_sem_pdf_nem_pergunta():
+    c = ClienteFalso(resposta("{}"))
+    assert IAmod.IA(cliente=c).triar(b"", VAGA) is None and not c.pedidos
