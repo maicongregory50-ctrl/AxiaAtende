@@ -412,3 +412,27 @@ def test_a_mensagem_da_fran_cabe_no_teto_da_meta_mesmo_com_triagem_longa(ligado)
         corpo = V.corpo_do_modelo(con, m["corpo"])
     assert len(corpo) <= 1024 and all("\n" not in v for v in m["corpo"])
     assert m["corpo"][3].endswith("…)") and "(200…" not in m["corpo"][3]
+
+
+def test_a_fran_recebe_so_o_que_o_candidato_escreveu(ligado):
+    """22/10/2026: o 1o curriculo real foi com a frase do anuncio e os nomes dos botoes em "Escreveu"."""
+    s = SaidaFalsa()
+    ia = IAFalsa(resposta="apresentacao")
+    passo(ligado, s, do_anuncio("w1"), ia=ia)
+    passo(ligado, s, toque("w2", V.NEM_TODOS, "Não atendo todos", numero=CANDIDATO), ia=ia)
+    passo(ligado, s, texto("w3", "Sou técnico agrícola", numero=CANDIDATO), ia=ia)
+    passo(ligado, s, toque("w4", V.MANDAR, "Mandar currículo", numero=CANDIDATO), ia=ia)
+    passo(ligado, s, doc("w5"), ia=ia)
+    assert candidaturas(ligado)[0]["texto"] == "Sou técnico agrícola"
+
+
+def test_quem_manda_assim_mesmo_ouve_grato_e_nao_otimo(ligado):
+    s = SaidaFalsa()
+    passo(ligado, s, do_anuncio("w1"))
+    passo(ligado, s, toque("w2", V.NEM_TODOS, numero=CANDIDATO))
+    _, _, corpo, _ = passo(ligado, s, toque("w3", V.MANDAR, numero=CANDIDATO))
+    assert corpo.startswith("Grato! Mande aqui o seu *currículo em PDF*.")
+    s2 = s   # a mesma saida: os wamids falsos nao se repetem
+    passo(ligado, s2, do_anuncio("x1"), numero="5549911112222", bsuid="BR.cand.2")
+    _, _, corpo, _ = passo(ligado, s2, toque("x2", V.TODOS, numero="5549911112222"), numero="5549911112222", bsuid="BR.cand.2")
+    assert corpo.startswith("Ótimo!")

@@ -145,8 +145,24 @@ def _ultima_candidatura(con, pessoa):
                            ORDER BY recebida_em DESC LIMIT 1""", (pessoa.bsuid,)).fetchone()
 
 
+def o_que_escreveu(con, conversa) -> str:
+    """So o que o candidato ESCREVEU nesta conversa, para ir a Fran (dono, 22/10/2026: o 1o curriculo
+    real levou "Ola! Posso ter mais informacoes sobre isso? / Nao atendo todos / Mandar curriculo",
+    que nao diz nada a ela). Fica de fora a frase pronta do anuncio (a mensagem com `referral`) e os
+    titulos dos botoes; o resto, em ordem."""
+    partes = []
+    for ev in con.execute("""SELECT corpo FROM atendimento.eventos_meta
+                              WHERE tipo = 'mensagem' AND processado_em >= %s
+                                AND (bsuid = %s OR corpo->'msg'->>'from' = %s) ORDER BY id""",
+                          (conversa["iniciada_em"], conversa["bsuid"], conversa["wa_id"] or "")).fetchall():
+        msg = (ev["corpo"] or {}).get("msg") or {}
+        if msg.get("type") == "text" and not msg.get("referral"):
+            partes.append(((msg.get("text") or {}).get("body") or "").strip())
+    return " / ".join(p for p in partes if p)[:1000]
+
+
 def _receber_pdf(con, saida: Saida, e, conversa, agora: datetime) -> None:
-    from .motor import _o_que_a_pessoa_disse, _registrar
+    from .motor import _registrar
     p = e.pessoa
     if con.execute("SELECT 1 FROM atendimento.candidaturas WHERE wamid = %s", (e.wamid,)).fetchone():
         return   # a Meta reenviou o aviso: o curriculo ja esta guardado
@@ -158,7 +174,7 @@ def _receber_pdf(con, saida: Saida, e, conversa, agora: datetime) -> None:
                        pdf, pdf_nome, pdf_sha256, pdf_bytes, recebida_em, apagar_em)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (conversa["vaga_id"], conversa["id"], p.bsuid, p.wa_id, p.nome or "", conversa["vaga_declarou"],
-                 _o_que_a_pessoa_disse(con, conversa)[:1000], e.wamid, dados,
+                 o_que_escreveu(con, conversa), e.wamid, dados,
                  (e.documento.nome_arquivo or "curriculo.pdf")[:200], hashlib.sha256(dados).hexdigest(),
                  len(dados), agora, agora + DOZE_MESES))
     w = saida.texto(p.para, _texto(con, "recebido"))
@@ -275,7 +291,8 @@ def tratar(con, saida: Saida, ia, e, agora: datetime) -> bool:
                              [Opcao(MANDAR, "Mandar currículo"), Opcao(ENCERRAR, "Encerrar")])
             _registrar(con, conversa["id"], p.para, "botoes", "vaga: nao atende", w)
     elif e.toque == MANDAR:
-        w = saida.texto(p.para, _texto(con, "pedir_pdf", vaga))
+        # quem disse que nao atende a todos e quis mandar assim mesmo: "Grato!", nao "Otimo!" (dono, 22/10)
+        w = saida.texto(p.para, _texto(con, "pedir_pdf_assim" if _resposta(con, "pedir_pdf_assim") else "pedir_pdf", vaga))
         _registrar(con, conversa["id"], p.para, "texto", "vaga: pedir pdf", w)
     elif e.toque == ENCERRAR:
         from .motor import _ajuste
