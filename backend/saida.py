@@ -44,9 +44,19 @@ class Saida:
         raise NotImplementedError
 
     def modelo(self, para: str, nome: str, idioma: str, corpo: list[str],
-               imagem: str | None = None, botoes: list[str] | None = None, url: str | None = None) -> str:
+               imagem: str | None = None, botoes: list[str] | None = None, url: str | None = None,
+               documento: tuple[bytes, str] | None = None) -> str:
         """`botoes`: as cargas dos botoes de resposta rapida; `url`: o final do botao de link
-        (o modelo aprovado termina em {{1}}; aqui vai o numero do responsavel)."""
+        (o modelo aprovado termina em {{1}}; aqui vai o numero do responsavel). O botao de link vem
+        DEPOIS das respostas no modelo, e o indice dele e o numero de respostas (#1098: o modelo da
+        Fran tem duas respostas e o link no indice 2). `documento`: (bytes, nome do arquivo), o PDF
+        do cabecalho (#1098)."""
+        raise NotImplementedError
+
+    def documento(self, para: str, dados: bytes, nome: str, legenda: str = "",
+                  opcoes: list[Opcao] | None = None) -> str:
+        """#1098: um PDF, com a legenda e ate 3 botoes (mensagem interativa com o documento no
+        cabecalho). So dentro da janela de 24 h de quem recebe; fora dela, e modelo."""
         raise NotImplementedError
 
     def baixar(self, media_id: str, destino) -> str:
@@ -137,7 +147,15 @@ class SaidaMeta(Saida):
         self._wa.download_media(url=url, path=str(destino.parent), filename=destino.name)
         return str(destino)
 
-    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
+    def documento(self, para, dados, nome, legenda="", opcoes=None):
+        from pywa.types import Button
+        if opcoes:
+            conferir_botoes(opcoes)
+        return self._wa.send_document(
+            to=para, document=dados, filename=nome, caption=legenda or None, mime_type="application/pdf",
+            buttons=[Button(title=o.titulo, callback_data=o.id) for o in opcoes] if opcoes else None).id
+
+    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None, documento=None):
         # O modelo vai como JSON cru (a forma da Cloud API), sem depender da classe de modelo do
         # PyWa: o que se manda aqui e exatamente o que a documentacao da Meta mostra.
         componentes = []
@@ -145,6 +163,11 @@ class SaidaMeta(Saida):
             midia = self._wa.upload_media(media=imagem, mime_type="image/jpeg")
             componentes.append({"type": "header",
                                 "parameters": [{"type": "image", "image": {"id": midia.id}}]})
+        if documento:
+            dados, arquivo = documento
+            midia = self._wa.upload_media(media=dados, mime_type="application/pdf", filename=arquivo)
+            componentes.append({"type": "header", "parameters": [
+                {"type": "document", "document": {"id": midia.id, "filename": arquivo}}]})
         if corpo:
             componentes.append({"type": "body",
                                 "parameters": [{"type": "text", "text": t} for t in corpo]})
@@ -152,7 +175,7 @@ class SaidaMeta(Saida):
             componentes.append({"type": "button", "sub_type": "quick_reply", "index": str(i),
                                 "parameters": [{"type": "payload", "payload": carga}]})
         if url:
-            componentes.append({"type": "button", "sub_type": "url", "index": "0",
+            componentes.append({"type": "button", "sub_type": "url", "index": str(len(botoes or [])),
                                 "parameters": [{"type": "text", "text": url}]})
         from pywa.types.templates import TemplateLanguage   # o PyWa pede o idioma no tipo dele
         return self._wa.send_template(to=para, name=nome, language=TemplateLanguage(idioma),

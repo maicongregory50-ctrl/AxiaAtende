@@ -138,3 +138,34 @@ def test_botao_de_link_do_responsavel(meta):
     comps = _corpo(pedidos[-1])["template"]["components"]
     assert comps[-1] == {"type": "button", "sub_type": "url", "index": "0",
                          "parameters": [{"type": "text", "text": "5549999567572"}]}
+
+
+def test_curriculo_vai_como_documento_com_os_botoes_da_triagem(meta):
+    """#1098: dentro da janela da Fran, o PDF sobe e vai com a triagem na legenda e os 3 botoes."""
+    s, pedidos = meta
+    w = s.documento("5549999990000", b"%PDF-1.4 joao", "Curriculo - Joao.pdf", "Novo currículo",
+                    [Opcao("vaga:certa:7", "Triagem certa"), Opcao("vaga:errada:7", "Triagem errada")])
+    assert w.startswith("wamid.meta.")
+    subida = [p for p in pedidos if p.url.path.endswith("/media")]
+    assert subida, "o PDF sobe antes de ir"
+    corpo = _corpo(pedidos[-1])
+    i = corpo["interactive"]
+    assert i["type"] == "button" and i["header"]["type"] == "document"
+    assert i["header"]["document"]["filename"] == "Curriculo - Joao.pdf"
+    assert i["body"]["text"] == "Novo currículo"
+    assert [b["reply"]["id"] for b in i["action"]["buttons"]] == ["vaga:certa:7", "vaga:errada:7"]
+
+
+def test_modelo_da_fran_leva_o_pdf_e_o_link_depois_das_respostas(meta):
+    """#1098: cabecalho de documento; o botao de link fica no indice 2, depois das duas respostas."""
+    s, pedidos = meta
+    s.modelo("5549999990000", "curriculo_para_fran", "pt_BR", ["Vaga Comercial"] * 8,
+             botoes=["vaga:certa:7", "vaga:errada:7"], url="v7-0a1b2c3d4e5f6a7b",
+             documento=(b"%PDF-1.4", "Curriculo.pdf"))
+    comps = _corpo(pedidos[-1])["template"]["components"]
+    assert comps[0]["type"] == "header"
+    assert comps[0]["parameters"][0]["type"] == "document"
+    assert comps[0]["parameters"][0]["document"]["filename"] == "Curriculo.pdf"
+    assert [c.get("index") for c in comps if c["type"] == "button"] == ["0", "1", "2"]
+    assert comps[-1] == {"type": "button", "sub_type": "url", "index": "2",
+                         "parameters": [{"type": "text", "text": "v7-0a1b2c3d4e5f6a7b"}]}

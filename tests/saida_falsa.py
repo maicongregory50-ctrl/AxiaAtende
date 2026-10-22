@@ -45,10 +45,19 @@ class SaidaFalsa(Saida):
         self.baixadas = getattr(self, "baixadas", []) + [(media_id, str(destino))]
         return str(destino)
 
-    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None):
+    def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None, documento=None):
+        if getattr(self, "modelo_falha", None):
+            raise RuntimeError(self.modelo_falha)
         self.enviadas.append(("modelo", para, nome, list(corpo)))
         self.modelos.append({"para": para, "nome": nome, "corpo": list(corpo), "imagem": imagem,
-                             "botoes": botoes, "url": url})
+                             "botoes": botoes, "url": url, "documento": documento})
+        return self._id()
+
+    def documento(self, para, dados, nome, legenda="", opcoes=None):
+        if opcoes:
+            conferir_botoes(opcoes)
+        self.enviadas.append(("documento", para, legenda, [(o.id, o.titulo) for o in opcoes or []]))
+        self.documentos = getattr(self, "documentos", []) + [(para, dados, nome)]
         return self._id()
 
     @property

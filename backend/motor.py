@@ -84,7 +84,8 @@ class Entrada:
     texto: str | None = None      # o que ela escreveu (ou None para audio, foto...)
     contexto: str | None = None   # a mensagem nossa a que ela respondeu
     midia: Midia | None = None    # #970: foto ou video (so o canal de campo a usa)
-    documento: Documento | None = None   # #1036: so o caminho da logo o usa
+    documento: Documento | None = None   # #1036: a logo de cliente; #1098: o curriculo em PDF
+    anuncio: str | None = None    # #1098: o `referral.source_id` de quem chegou por um anuncio
     tipo: str = ""                # o `type` da Meta: text, interactive, button, image, reaction, sticker...
 
 
@@ -98,7 +99,8 @@ def ler_mensagem(valor: dict, msg: dict) -> Entrada:
     bsuid = contato.get("user_id") or msg.get("from_user_id") or msg.get("from") or ""
     wa_id = contato.get("wa_id") or msg.get("from") or None
     pessoa = Pessoa(bsuid=bsuid, wa_id=wa_id, nome=(contato.get("profile") or {}).get("name", ""))
-    e = Entrada(wamid=msg["id"], pessoa=pessoa, contexto=(msg.get("context") or {}).get("id"))
+    e = Entrada(wamid=msg["id"], pessoa=pessoa, contexto=(msg.get("context") or {}).get("id"),
+                anuncio=(msg.get("referral") or {}).get("source_id") or None)
     tipo = msg.get("type")
     e.tipo = tipo or ""
     if tipo == "interactive":
