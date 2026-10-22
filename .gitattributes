@@ -1,0 +1,3 @@
+# #1098: PDF e binario -- com core.autocrlf=true, um PDF so de texto ganharia CRLF no checkout e
+# os enderecos internos dele (xref) deixariam de bater.
+*.pdf binary
