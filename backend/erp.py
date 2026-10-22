@@ -47,3 +47,24 @@ def agenda(cfg) -> list[dict]:
         raise ErpIndisponivel("o ERP não respondeu") from None
     except (KeyError, ValueError, TypeError):
         raise ErpIndisponivel("o ERP respondeu algo que não é a agenda") from None
+
+
+def empurrar_eventos(cfg, eventos: list[dict]) -> dict:
+    """#1090: empurra ao Relacionamento do ERP o estado de cada mensagem enviada a um cliente, pelo
+    MESMO agente e o MESMO segredo da agenda (CRM.EVT.W, fase575). O ERP e idempotente: o mesmo lote
+    duas vezes nao duplica, e o estado so avanca. Fora do ar ou recusa: `ErpIndisponivel`."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        token = _pedir(base + "/auth/agente", {"agente": cfg.erp_agente, "segredo": cfg.erp_segredo,
+                                               "minutos": 5})["access_token"]
+        return _pedir(base + "/relacionamento/eventos-envio", {"eventos": eventos}, token=token)
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão CRM.EVT.W",
+                  404: "o ERP ainda não tem o Relacionamento"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None

@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agenda, config, migracoes, seguranca
+from . import agenda, config, eventos_erp, migracoes, seguranca
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -52,11 +52,24 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             if parar.wait((agenda.proxima_leitura(agora) - agora).total_seconds()):
                 return
 
+    def empurrar_os_eventos():
+        """#1090: o estado das mensagens enviadas a clientes vai ao Relacionamento do ERP, a cada 15 min."""
+        while True:
+            try:
+                r = eventos_erp.empurrar(cfg)
+                if "erro" in r:
+                    print("eventos ao ERP: %s" % r["erro"], flush=True)
+            except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
+                print("eventos ao ERP: %s" % type(falha).__name__, flush=True)
+            if parar.wait(eventos_erp.INTERVALO_SEGUNDOS):
+                return
+
     @asynccontextmanager
     async def vida(app: FastAPI):
         migracoes.aplicar(cfg)
         if cfg.erp_segredo:
             threading.Thread(target=ler_o_cadastro, name="agenda", daemon=True).start()
+            threading.Thread(target=empurrar_os_eventos, name="eventos-erp", daemon=True).start()
         yield
         parar.set()
 
