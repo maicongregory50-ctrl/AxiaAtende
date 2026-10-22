@@ -533,6 +533,20 @@ def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas
     _registrar(con, conversa["id"], pessoa.para, "botoes", "ia propos %s" % no["chave"], w)
 
 
+def fechar_do_menu_interno(con, pessoa: Pessoa, agora: datetime, situacao: str) -> None:
+    """#1097: a foto ou a logo chegou depois de "Foto do campo" (opcao `texto` do menu da casa): a
+    conversa termina com o que chegou, e nao "parou no meio". So a ultima conversa da pessoa nas 24 h,
+    em curso ou parada, cuja ultima escolha foi uma opcao `texto`; a segunda foto do lote ja nao acha
+    nenhuma e nao muda nada. Conversa de cliente nunca passa por esse no."""
+    con.execute("""UPDATE atendimento.conversas c SET situacao = %s
+                    WHERE c.id = (SELECT c2.id FROM atendimento.conversas c2
+                                    JOIN atendimento.menu n ON n.id = c2.no_atual_id AND n.acao = 'texto'
+                                   WHERE c2.bsuid = %s AND c2.situacao IN ('em_curso', 'parou_no_meio')
+                                     AND c2.iniciada_em > %s
+                                   ORDER BY c2.id DESC LIMIT 1)""",
+                (situacao, pessoa.bsuid, agora - timedelta(hours=24)))
+
+
 def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo=None) -> None:
     """Uma mensagem que chegou. `envio` trata as respostas ao convite da carteira (Fase E);
     `campo` (#970) toma a foto ou o video de equipe/representante e as respostas as perguntas dele,
@@ -551,10 +565,12 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         return
     if campo is not None:
         if e.midia is not None and campo.receber(con, saida, e, agora):
+            fechar_do_menu_interno(con, p, agora, "imagem_recebida")
             return
         # #1036: a LOGO DE CLIENTE, ao lado do campo.receber e nao dentro dele -- logo nao e material
         # de campo. E ANTES do ramo que cala para quem e da casa, que e onde ela se perdia.
         if e.documento is not None and logos.receber(con, saida, e, agora, campo.pasta):
+            fechar_do_menu_interno(con, p, agora, "logo_recebida")
             return
         if campo.responder(con, saida, e, agora):
             return
@@ -909,6 +925,13 @@ def retomar_paradas(con, saida: Saida, ia, agora: datetime) -> int:
         return 0   # a IA fora nao gasta a tentativa: a conversa espera o minuto em que ela voltar
     for c in paradas:
         motivo = None
+        no = _no_atual(con, c)
+        if no is not None and no["acao"] == "texto":
+            # #1097: "Foto do campo" e o canal da equipe -- o que vem depois e a foto, nao uma opcao do
+            # menu. A IA nao e gasta aqui (as 5 de antes deram "sem opcao").
+            con.execute("UPDATE atendimento.conversas SET retomada_em = %s, retomada_chave = 'canal interno' WHERE id = %s",
+                        (agora, c["id"]))
+            continue
         ultima = ultima_mensagem_de(con, c["wa_id"])
         if ultima is None or agora - ultima >= JANELA_DA_META:
             motivo = "fora da janela"

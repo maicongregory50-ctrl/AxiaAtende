@@ -49,7 +49,7 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 |---|---|
 | **Chegaram** | quantas conversas começaram no período |
 | **Receberam o link** | chegaram ao fim do menu e receberam o WhatsApp de quem atende |
-| **Pararam no meio** | começaram a escolher e ficaram 30 minutos sem tocar em nada, sem chegar ao link. A conversa do **Trabalhe conosco** não entra aqui: ela termina como *currículo recebido* ou *sem currículo* (#1098) |
+| **Pararam no meio** | começaram a escolher e ficaram 30 minutos sem tocar em nada, sem chegar ao link. A conversa do **Trabalhe conosco** não entra aqui: ela termina como *currículo recebido* ou *sem currículo* (#1098). A da equipe que tocou **📸 Foto do campo** e mandou a foto ou a logo também não: termina como *imagem recebida* ou *logo recebida* (#1097) |
 | **Disseram que foram atendidos / que não** | a resposta à pergunta "recebeu o atendimento?". Ela vai **uma vez por dia** para cada pessoa, 4h30 depois da **última** mensagem dela, e só em horário comercial (segunda a sábado, das 8h às 11h e das 14h às 17h: fora disso, espera a próxima faixa). Logo depois do "Sim" vem a nota, em três botões na própria mensagem (Bom, Normal, Ruim); se no mesmo dia ela foi mandada a mais de um atendente, a resposta vale para todas as conversas do dia (e cada uma conta no cartão) |
 | **IA acertou / errou** | quem escreveu em vez de tocar recebeu a proposta da IA ("Entendi que você quer… É isso?"): **Sim** é acerto, **Ver todas as opções** é erro |
 | **Do nosso cadastro** | quantos dos que chegaram no período estão no cadastro do ERP |
@@ -66,6 +66,9 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | No menu principal, **"Comercial"** diz *comprar* e **"Fornecedores"** diz *vender para a Renascer* | mudou em 15/10/2026 (#1027). Antes "Comercial" dizia só "Cotar sementes", e quem escrevia *"posso te fazer uma cotação"* querendo **vender** caía no Comercial — foi o caso de uma empresa de embalagens naquela manhã |
 | *"Recebi o arquivo, mas não consigo abrir arquivo por aqui…"* | alguém mandou **PDF, áudio ou vídeo** fora da conversa da vaga. A frase diz por que não serve e abre caminho (escrever em uma linha, ou *menu*). Dentro da conversa do Trabalhe conosco, o PDF é o currículo e vai à Fran |
 | **"currículo recebido"** | conversa do Trabalhe conosco: o candidato mandou o PDF, e ele vai à Fran com a pré-triagem (manual `trabalhe-conosco.md`) |
+| **"imagem recebida"** | alguém da equipe tocou **📸 Foto do campo** e a foto (ou o vídeo) chegou; ela segue para o catálogo do marketing |
+| **"logo recebida"** | alguém da equipe tocou **📸 Foto do campo** e mandou a logo de um cliente |
+| **"parou no meio"** de alguém da equipe, depois de **Foto do campo** | tocou e não mandou nada em 30 minutos. A OlivIA não tenta retomar essa conversa |
 | **"sem currículo"** | conversa do Trabalhe conosco em que a pessoa conversou, ou tocou **Encerrar**, e não mandou o PDF |
 | *"Recebi, mas por aqui eu entendo texto e os botões"* | continua valendo para **figurinha, localização e contato** — o que não é arquivo |
 | **Caminho** | o que a pessoa tocou, na ordem ("Comercial › Produtor rural › PR › Cascavel") |

@@ -124,7 +124,9 @@ def rotas(cfg, usuario) -> APIRouter:
             else:
                 # #1098: a conversa de vaga termina com ou sem curriculo, nunca "parou no meio"
                 estado = {"parou_no_meio": "parou", "encerrada": "encerrou", "curriculo_recebido": "curriculo",
-                          "sem_curriculo": "sem_curriculo"}.get(l["situacao"], "em_curso")
+                          "sem_curriculo": "sem_curriculo",
+                          # #1097: a equipe tocou "Foto do campo" e a foto (ou a logo) chegou
+                          "imagem_recebida": "imagem", "logo_recebida": "logo"}.get(l["situacao"], "em_curso")
             if situacao and estado != situacao:
                 continue
             saida.append({"quando": l["iniciada_em"].isoformat(),
