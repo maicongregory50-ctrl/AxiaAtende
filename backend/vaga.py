@@ -340,7 +340,7 @@ def variaveis(con, c) -> list[str]:
     reqs = list(vaga["requisitos"]) if vaga else []
     if t and t.get("requisitos"):
         for req, r in zip(reqs, t["requisitos"]):
-            fonte = (" (%s)" % r["fonte"]) if r.get("fonte") and r["situacao"] != "nao_consta" else ""
+            fonte = (" (%s)" % _cortar(r["fonte"], FONTE_ATE)) if r.get("fonte") and r["situacao"] != "nao_consta" else ""
             linhas.append("%s: %s%s" % (req, SITUACAO.get(r["situacao"], "não consta no currículo"), fonte))
     else:
         motivo = (c["triagem_erro"] or "sem pré-triagem")
@@ -351,16 +351,38 @@ def variaveis(con, c) -> list[str]:
         resumo = "Não consegui ler o arquivo; abra o PDF e leia você."
     if c["texto"]:
         resumo = "%s · Escreveu: %s" % (resumo, c["texto"])
-    nome = (c["nome_perfil"] or "sem nome no perfil").strip()
-    return [_uma_linha(x)[:300] for x in (
+    nome = _cortar((c["nome_perfil"] or "sem nome no perfil").strip(), 60)
+    vs = [_uma_linha(x) for x in (
         vaga["titulo"] if vaga else "Banco de currículos (sem vaga aberta)",
         "%s (%s)" % (nome, numero_bonito(c["wa_id"])),
         DECLAROU.get(c["declarou"], DECLAROU[None]),
-        *linhas, resumo)]
+        *[_cortar(x, LINHA_ATE) for x in linhas], _cortar(resumo, RESUMO_ATE))]
+    # o corpo do modelo, ja com as variaveis, tem teto na Meta (1024; 22/10/2026, o 2o curriculo real
+    # foi recusado com 131009 "Body text length invalid"): o resumo encolhe ate caber
+    base = len(corpo_do_modelo(con, vs)) - len(vs[-1])
+    vs[-1] = _cortar(vs[-1], max(40, CORPO_ATE - base))
+    return vs
+
+
+# Os tetos da mensagem a Fran. O corpo do modelo (e a legenda do documento) vai ate 1024 caracteres;
+# com o texto fixo (~170), quatro linhas de requisito e o resumo cabem com folga.
+CORPO_ATE = 1000
+LINHA_ATE = 150
+FONTE_ATE = 70
+RESUMO_ATE = 260
 
 
 def _uma_linha(t: str) -> str:
     return " ".join(str(t or "").split())
+
+
+def _cortar(t: str, ate: int) -> str:
+    """No fim de uma palavra, com reticencias: "pos-graduacao em Protecao de Plantas (200" nao serve."""
+    t = _uma_linha(t)
+    if len(t) <= ate:
+        return t
+    corte = t[:ate - 1].rsplit(" ", 1)[0].rstrip(" ,;:(")
+    return (corte or t[:ate - 1]) + "…"
 
 
 def corpo_do_modelo(con, variaveis_: list[str]) -> str:

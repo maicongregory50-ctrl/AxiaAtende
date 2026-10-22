@@ -395,3 +395,20 @@ def test_a_volta_da_025_devolve_o_no_a_fran_e_guarda_os_curriculos(ligado):
     passo(ligado, s2, texto("w9", "oi", numero="5549977776666"), bsuid="BR.outro")
     passo(ligado, s2, toque("w10", "menu:trabalhe", lista=True, numero="5549977776666"), bsuid="BR.outro")
     assert s2.ultima[0] == "contato" and s2.ultima[2] == "Fran"   # como era antes
+
+
+def test_a_mensagem_da_fran_cabe_no_teto_da_meta_mesmo_com_triagem_longa(ligado):
+    """22/10/2026: o 2o curriculo real foi recusado pela Meta (131009, corpo acima de 1024)."""
+    s = SaidaFalsa()
+    _um_curriculo(ligado, s)
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.candidaturas SET texto = %s", ("Sou agrônomo e trabalhei muito " * 40,))
+    ia = IAFalsa()
+    longa = "Graduação em Agronomia (2002-2006), Centro Universitário Integrado; pós-graduação lato sensu em Proteção de Plantas (200"
+    ia.triagem = {"requisitos": [{"situacao": "consta", "fonte": longa}] * 4, "resumo": "perfil " * 100, "legivel": True}
+    _rodar_minuto(ligado, s, ia)
+    m = s.modelos[-1]
+    with conexao(ligado) as con:
+        corpo = V.corpo_do_modelo(con, m["corpo"])
+    assert len(corpo) <= 1024 and all("\n" not in v for v in m["corpo"])
+    assert m["corpo"][3].endswith("…)") and "(200…" not in m["corpo"][3]
