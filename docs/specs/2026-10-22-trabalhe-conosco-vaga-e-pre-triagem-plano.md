@@ -3,6 +3,7 @@
 **Chamado:** #1098
 **Spec de origem:** docs/specs/2026-10-22-trabalhe-conosco-vaga-e-pre-triagem.md
 **Status:** APROVADO
+**Executável pelo agente:** sim
 
 Faixa: aplicação de plano aprovado, **na mesma sessão** (dono, 22/10/2026: o planejador está parado
 e as execuções do #1098 e do #1097 rodam aqui). Esta é a migração **025**; o #1097 (entrega 1) vem
