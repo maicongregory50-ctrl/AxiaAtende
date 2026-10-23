@@ -169,3 +169,14 @@ def test_modelo_da_fran_leva_o_pdf_e_o_link_depois_das_respostas(meta):
     assert [c.get("index") for c in comps if c["type"] == "button"] == ["0", "1", "2"]
     assert comps[-1] == {"type": "button", "sub_type": "url", "index": "2",
                          "parameters": [{"type": "text", "text": "v7-0a1b2c3d4e5f6a7b"}]}
+
+
+def test_link_vai_como_cta_url_e_recusa_rotulo_longo(meta):
+    """#1090 etapa 3: a ficha do cliente com o botao "Chamar ... no WhatsApp" (wa.me)."""
+    s, pedidos = meta
+    s.link("5549999990000", "Cliente 1 de 43", "Chamar Márcio", "https://wa.me/5549988595737")
+    i = _corpo(pedidos[-1])["interactive"]
+    assert i["type"] == "cta_url"
+    assert i["action"]["parameters"] == {"display_text": "Chamar Márcio", "url": "https://wa.me/5549988595737"}
+    with pytest.raises(ValueError):
+        s.link("5549999990000", "x", "Chamar Márcio no WhatsApp", "https://wa.me/1")

@@ -414,6 +414,9 @@ def test_a_volta_da_025_devolve_o_no_a_fran_e_guarda_os_curriculos(ligado):
     _um_curriculo(ligado, s)
     volta = (Path(__file__).resolve().parents[1] / "backend" / "migracoes" / "025_trabalhe_conosco_VOLTA.sql")
     with conexao(ligado) as con:
+        # a 032 (#1090) mexe no mesmo CHECK de acao do menu: as voltas vao na ordem inversa das idas
+        con.execute((volta.parent / "032_clientes_do_dia_VOLTA.sql").read_text(encoding="utf-8")
+                    .replace("BEGIN;", "").replace("COMMIT;", ""))
         con.execute(volta.read_text(encoding="utf-8").replace("BEGIN;", "").replace("COMMIT;", ""))
         assert con.execute("SELECT acao FROM atendimento.menu WHERE chave = 'trabalhe'").fetchone()["acao"] == "destino"
         assert con.execute("SELECT count(*) AS n FROM atendimento.candidaturas").fetchone()["n"] == 1

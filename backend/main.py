@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agenda, config, eventos_erp, migracoes, seguranca
+from . import agenda, clientes_erp, config, eventos_erp, migracoes, seguranca
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -64,12 +64,31 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             if parar.wait(eventos_erp.INTERVALO_SEGUNDOS):
                 return
 
+    def meus_clientes():
+        """#1090 etapa 3: a fila dos consultores do piloto (10 min) e os registros conferidos (1 min)."""
+        voltas = 0
+        while True:
+            for nome, volta in (("fila", clientes_erp.copiar_filas if voltas % (clientes_erp.INTERVALO_FILA // clientes_erp.INTERVALO_ENVIO) == 0 else None),
+                                ("registros", clientes_erp.enviar_registros)):
+                if volta is None:
+                    continue
+                try:
+                    r = volta(cfg)
+                    if "erro" in r:
+                        print("meus clientes (%s): %s" % (nome, r["erro"]), flush=True)
+                except Exception as falha:  # noqa: BLE001 -- nunca derruba as telas
+                    print("meus clientes (%s): %s" % (nome, type(falha).__name__), flush=True)
+            voltas += 1
+            if parar.wait(clientes_erp.INTERVALO_ENVIO):
+                return
+
     @asynccontextmanager
     async def vida(app: FastAPI):
         migracoes.aplicar(cfg)
         if cfg.erp_segredo:
             threading.Thread(target=ler_o_cadastro, name="agenda", daemon=True).start()
             threading.Thread(target=empurrar_os_eventos, name="eventos-erp", daemon=True).start()
+            threading.Thread(target=meus_clientes, name="meus-clientes", daemon=True).start()
         yield
         parar.set()
 

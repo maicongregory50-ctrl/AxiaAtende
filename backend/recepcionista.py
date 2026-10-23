@@ -182,6 +182,15 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
         print("logos: %s" % type(falha).__name__, flush=True)
 
 
+def rotina_dos_clientes(cfg: config.Config, saida, ia=None, agora: datetime | None = None) -> int:
+    """#1090 etapa 3: a cada 5 s, le o que o consultor parou de escrever e avisa gravado/recusado."""
+    if not cfg.responde or saida is None:
+        return 0
+    from . import clientes_do_dia
+    with conexao(cfg) as con:
+        return clientes_do_dia.rodar(con, saida, ia, agora or datetime.now(timezone.utc))
+
+
 def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
               trabalhador: bool = True) -> FastAPI:
     cfg = cfg or config.carregar()
@@ -208,6 +217,11 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 if saida is not None or not cfg.responde:
                     processar_pendentes(cfg, saida, ia, envio)
                 segundos += 1
+                if segundos % 5 == 0:
+                    try:   # #1090 etapa 3: nunca segura o atendimento
+                        rotina_dos_clientes(cfg, saida, ia)
+                    except Exception as falha:  # noqa: BLE001
+                        print("clientes: %s: %s" % (type(falha).__name__, falha), flush=True)
                 if segundos >= 60 and saida is not None:
                     segundos = 0
                     rotina_do_minuto(cfg, saida, envio, perguntar=vigia.confere, ia=ia)

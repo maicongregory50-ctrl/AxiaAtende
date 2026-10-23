@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda, internos, logos, vaga
+from . import agenda, clientes_do_dia, internos, logos, vaga
 from .envio import primeiro_nome
 from .saida import MAX_BOTOES, Opcao, Saida
 
@@ -187,12 +187,13 @@ def lista_recusada(con, para: str) -> bool:
                        (para, ERRO_NAO_ENTREGAVEL + "%")).fetchone() is not None
 
 
-def perguntar(con, saida: Saida, pessoa: Pessoa, no, texto_antes: str = "") -> str | None:
+def perguntar(con, saida: Saida, pessoa: Pessoa, no, texto_antes: str = "", esconder: tuple = ()) -> str | None:
     """Manda a pergunta do no com os filhos como botoes (ate 3) ou lista (mais de 3).
 
     None quando a lista foi calada pelo #1028 -- e `_registrar` nao grava envio que nao aconteceu.
+    `esconder`: chaves de filhos que esta pessoa nao ve (#1090: "Meus clientes" so para o piloto).
     """
-    filhos = _filhos(con, no["id"])
+    filhos = [f for f in _filhos(con, no["id"]) if f["chave"] not in esconder]
     opcoes = [Opcao("menu:%s" % f["chave"], f["rotulo"], f["descricao"]) for f in filhos]
     texto = (texto_antes + "\n\n" if texto_antes else "") + no["pergunta"]
     if len(opcoes) <= MAX_BOTOES:
@@ -364,6 +365,9 @@ def escolher(con, saida: Saida, pessoa: Pessoa, conversa, no, agora: datetime) -
     elif no["acao"] == "vaga":
         # #1098: o Trabalhe conosco abre a conversa da vaga (requisitos, so PDF, a pre-triagem)
         vaga.do_menu(con, saida, pessoa, conversa, no, agora)
+    elif no["acao"] == "clientes":
+        # #1090 etapa 3: um cliente da fila por vez; o consultor conta como foi
+        clientes_do_dia.do_menu(con, saida, pessoa, conversa, no, agora)
     elif no["acao"] == "menu_cliente":
         # #1031: a saida de quem e da casa para o atendimento de cliente -- e por onde falar com um
         # colega continua acontecendo, ja que "falar com um colega" nao e opcao do menu interno.
@@ -403,7 +407,9 @@ def mostrar_menu_interno(con, saida: Saida, pessoa: Pessoa, conversa) -> None:
     quem = internos.quem_e(con, pessoa.wa_id)
     raiz = dict(raiz)
     raiz["pergunta"] = (raiz["pergunta"] or "").replace("{nome}", primeiro_nome((quem or {}).get("nome") or ""))
-    w = perguntar(con, saida, pessoa, raiz)
+    # #1090 etapa 3: "📋 Meus clientes" so para quem esta no piloto
+    esconder = () if clientes_do_dia.consultor(con, pessoa.wa_id) else ("interna.clientes",)
+    w = perguntar(con, saida, pessoa, raiz, esconder=esconder)
     con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], conversa["id"]))
     # "botoes" e nao "lista": sao duas opcoes, e `perguntar` manda botoes com MAX_BOTOES ou menos
     _registrar(con, conversa["id"], pessoa.para, "botoes", "menu da casa", w)
@@ -566,6 +572,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     if vaga.retorno_da_fran(con, saida, e, agora):
         return
     if vaga.tratar(con, saida, ia, e, agora):
+        return
+    # #1090 etapa 3: os toques `cli:` e o texto do consultor que tem um cliente ABERTO. Antes do canal
+    # de campo, que tomaria o texto como a frase da proxima foto; sem cliente aberto, devolve False e o
+    # texto segue para la como sempre.
+    if clientes_do_dia.tratar(con, saida, ia, e, agora):
         return
     if campo is not None:
         if e.midia is not None and campo.receber(con, saida, e, agora):

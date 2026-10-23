@@ -68,3 +68,68 @@ def empurrar_eventos(cfg, eventos: list[dict]) -> dict:
         raise ErpIndisponivel("o ERP não respondeu") from None
     except (KeyError, ValueError, TypeError):
         raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+# ── #1090 etapa 3: "Meus clientes" (CRM.WPP, fase586 do ERP) ──────────────────────────────────────
+
+class ErpRecusou(ValueError):
+    """O ERP leu o registro e recusou, com a frase da tela (422/403/404). Nao adianta mandar de novo."""
+
+
+def _token(cfg) -> str:
+    base = cfg.erp_url.rstrip("/")
+    return _pedir(base + "/auth/agente", {"agente": cfg.erp_agente, "segredo": cfg.erp_segredo,
+                                         "minutos": 5})["access_token"]
+
+
+def _frase(e: urllib.error.HTTPError) -> str:
+    try:
+        d = json.loads(e.read().decode("utf-8")).get("detail")
+        return d if isinstance(d, str) else "o ERP recusou (%d)" % e.code
+    except Exception:   # noqa: BLE001 -- sem corpo legivel, o codigo
+        return "o ERP recusou (%d)" % e.code
+
+
+def fila_do_consultor(cfg, comercial_id: int, limite: int = 60) -> dict:
+    """A fila do consultor com a ficha de cada cliente. Fora do ar ou sem permissao: `ErpIndisponivel`."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        return _pedir(base + "/relacionamento/agente/fila?comercial=%d&limite=%d" % (int(comercial_id), int(limite)),
+                      token=_token(cfg))
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão CRM.WPP",
+                  404: _frase(e)}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+def registrar_contato(cfg, corpo: dict) -> dict:
+    """Grava no Relacionamento o contato que o consultor conferiu. 422/403/404: `ErpRecusou` com a frase;
+    fora do ar, 401 ou sem a permissao: `ErpIndisponivel` (tenta de novo depois)."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        token = _token(cfg)
+    except urllib.error.HTTPError as e:
+        raise ErpIndisponivel("o ERP recusou o agente (%d)" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError, KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    try:
+        return _pedir(base + "/relacionamento/agente/contatos", corpo, token=token)
+    except urllib.error.HTTPError as e:
+        if e.code in (403, 404, 422):
+            frase = _frase(e)
+            if "permiss" in frase.lower() or "atividade" in frase.lower():
+                raise ErpIndisponivel(frase) from None   # "Atividade CRM.WPP nao atribuida": espera o dono
+            raise ErpRecusou(frase) from None
+        raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None

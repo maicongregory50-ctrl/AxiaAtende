@@ -53,6 +53,12 @@ class SaidaFalsa(Saida):
                              "botoes": botoes, "url": url, "documento": documento})
         return self._id()
 
+    def link(self, para, texto, rotulo, url):
+        from backend.saida import LIMITE_LINK
+        assert len(rotulo) <= LIMITE_LINK, rotulo
+        self.enviadas.append(("link", para, texto, [(rotulo, url)]))
+        return self._id()
+
     def documento(self, para, dados, nome, legenda="", opcoes=None):
         if opcoes:
             conferir_botoes(opcoes)
@@ -70,6 +76,16 @@ class IAFalsa:
         self.resposta, self.falha, self.perguntas = resposta, falha, []
         self.campo, self.frases = campo, []   # #970: o que `ler_campo` devolve, e as frases lidas
         self.bastidores_vistos = []           # #1048: as chaves que o cadastro entregou ao modelo
+
+    def ler_visita(self, texto, ficha, motivos, hoje):
+        """#1090 etapa 3: `visita` e o dict devolvido (ou uma lista, um por leitura)."""
+        self.visitas = getattr(self, "visitas", []) + [texto]
+        if self.falha:
+            return None
+        v = getattr(self, "visita", None)
+        if isinstance(v, list):
+            return v.pop(0) if v else None
+        return v
 
     def ler_campo(self, texto, produtos, bastidores=None):
         self.frases.append(texto)

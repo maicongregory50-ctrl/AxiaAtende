@@ -15,6 +15,7 @@ from dataclasses import dataclass
 MAX_BOTOES = 3
 EMPRESA = "Sementes Renascer"
 MAX_LINHAS = 10
+LIMITE_LINK = 20   # #1090: o rotulo do botao de link (cta_url) na Meta
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,11 @@ class Saida:
         DEPOIS das respostas no modelo, e o indice dele e o numero de respostas (#1098: o modelo da
         Fran tem duas respostas e o link no indice 2). `documento`: (bytes, nome do arquivo), o PDF
         do cabecalho (#1098)."""
+        raise NotImplementedError
+
+    def link(self, para: str, texto: str, rotulo: str, url: str) -> str:
+        """#1090 etapa 3: o texto com UM botao de link (mensagem interativa `cta_url`). A Meta nao deixa
+        botao de resposta na mesma mensagem, e o rotulo tem ate 20 caracteres. So dentro das 24 h."""
         raise NotImplementedError
 
     def documento(self, para: str, dados: bytes, nome: str, legenda: str = "",
@@ -121,6 +127,12 @@ class SaidaMeta(Saida):
         return self._wa.send_message(
             to=para, text=texto,
             buttons=SectionList(button_title=botao, sections=[Section(title="Opções", rows=linhas)])).id
+
+    def link(self, para, texto, rotulo, url):
+        from pywa.types import URLButton
+        if len(rotulo) > LIMITE_LINK:
+            raise ValueError("rotulo do link com mais de %d caracteres: %r" % (LIMITE_LINK, rotulo))
+        return self._wa.send_message(to=para, text=texto, buttons=URLButton(title=rotulo, url=url)).id
 
     def contato(self, para, nome, whatsapp, empresa=EMPRESA):
         from pywa.types import Contact

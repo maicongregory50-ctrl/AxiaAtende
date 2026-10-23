@@ -85,7 +85,8 @@ def test_quem_chama_e_reconhecido_mesmo_sem_o_9_e_quem_e_da_casa_tem_menu_propri
     assert c["erp_cadastros"] == 1 and c["erp_codigo"] == 12 and c["erp_papeis"] == ["equipe", "representante"]
     # o menu da casa: duas opcoes (logo, botoes), sem as boas-vindas de cliente
     assert s.ultima[0] == "botoes" and not s.ultima[2].startswith("Seja bem-vindo")
-    assert [t for _, t in s.ultima[3]] == ["📸 Foto do campo", "👤 Menu do cliente"]
+    # #1090 etapa 3: o Maicon esta no piloto do "Meus clientes" (a 032 o poe pela linha dele em Destinos)
+    assert [t for _, t in s.ultima[3]] == ["📸 Foto do campo", "👤 Menu do cliente", "📋 Meus clientes"]
 
 
 def test_fora_do_cadastro_e_numero_em_dois(ligado):

@@ -176,3 +176,36 @@ def test_triar_sem_resposta_boa_devolve_none(r):
 def test_triar_sem_pdf_nem_pergunta():
     c = ClienteFalso(resposta("{}"))
     assert IAmod.IA(cliente=c).triar(b"", VAGA) is None and not c.pedidos
+
+
+# ── #1090 etapa 3: a leitura do registro de visita ─────────────────────────────────────────────
+
+def test_ler_visita_preenche_so_de_dentro_das_listas():
+    from datetime import date
+    motivos = [{"id": 3, "nome": "Preço"}]
+    c = ClienteFalso(resposta(json.dumps({
+        "meio": "ligacao", "quando": "2026-10-23", "ofereceu": "nao", "resposta": "interesse", "motivo": "nenhum",
+        "interesse": "+Palha no inverno", "retomar": "2026-11-05", "pedido": "", "anotacao": "plantando o verão"})))
+    r = IAmod.IA(cliente=c).ler_visita("liguei pro Márcio...", {"nome": "COOPERPASSO", "campanha": None},
+                                       motivos, date(2026, 10, 23))
+    assert r == {"meio": "ligacao", "quando": "2026-10-23", "ofereceu": False, "resposta": "interesse",
+                 "motivo_id": None, "interesse_texto": "+Palha no inverno", "retomar_em": "2026-11-05",
+                 "pedido_numero": "", "anotacao": "plantando o verão"}
+    p = c.pedidos[0]
+    props = p["output_config"]["format"]["schema"]["properties"]
+    assert props["motivo"]["enum"] == ["Preço", "nenhum"] and "nenhum" in props["meio"]["enum"]
+    assert "tools" not in p and "<texto>" in p["messages"][0]["content"] and "2026-10-23" in p["system"]
+    assert "cortesia" in p["system"]
+
+
+def test_ler_visita_com_campanha_motivo_pelo_nome_e_falha_vira_none():
+    from datetime import date
+    motivos = [{"id": 3, "nome": "Preço"}]
+    c = ClienteFalso(resposta(json.dumps({
+        "meio": "visita", "quando": "", "ofereceu": "sim", "resposta": "recusou", "motivo": "Preço",
+        "interesse": "", "retomar": "", "pedido": "", "anotacao": ""})))
+    ficha = {"nome": "X", "campanha": {"nome": "Inverno"}}
+    r = IAmod.IA(cliente=c).ler_visita("ofereci, achou caro", ficha, motivos, date(2026, 10, 23))
+    assert r["ofereceu"] is True and r["motivo_id"] == 3 and "Inverno" in c.pedidos[0]["system"]
+    assert IAmod.IA(cliente=ClienteFalso(erro=TimeoutError())).ler_visita("x", ficha, motivos, date(2026, 10, 23)) is None
+    assert IAmod.IA(cliente=ClienteFalso(resposta("nao e json"))).ler_visita("x", ficha, motivos, date(2026, 10, 23)) is None

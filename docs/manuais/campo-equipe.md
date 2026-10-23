@@ -18,6 +18,9 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 
 0. **Não precisa pedir nada antes — mas se você escrever "oi" primeiro, agora vem o menu da casa**
    (#1031, 15/10/2026), com **📸 Foto do campo** e **👤 Menu do cliente**, e ele te chama pelo nome.
+   Quem está no piloto do Relacionamento vê também **📋 Meus clientes** (#1090, 23/10/2026; manual
+   `meus-clientes.md`). Enquanto um cliente seu estiver aberto ali, o que você escreve é sobre ele, e
+   não a frase da próxima foto; depois do Confere, do Depois ou do Parar, volta a ser.
    A primeira opção só explica o que está escrito abaixo; a segunda mostra o atendimento que o
    cliente recebe, que é por onde se pega o contato de um colega. Antes desta data, um "oi" seu
    trazia o menu de **cliente**.
