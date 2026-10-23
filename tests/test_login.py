@@ -62,4 +62,4 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                                 "023_logos_puxadas.sql", "024_aviso_do_plano.sql",
                                 "025_trabalhe_conosco.sql", "026_imagem_e_logo_recebida.sql",
                                 "027_grato_a_quem_manda_assim_mesmo.sql", "028_lote_pelo_envio.sql",
-                                "029_vaga_sem_autoavaliacao.sql"]
+                                "029_vaga_sem_autoavaliacao.sql", "030_hora_de_envio_das_fotos_antigas.sql"]

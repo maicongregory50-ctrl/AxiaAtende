@@ -153,6 +153,28 @@ def test_hora_de_envio_no_futuro_vale_a_chegada():
     assert campo.hora_de_envio(E(), AGORA) == AGORA - 33 * 60 * MIN
 
 
+def test_a_030_da_hora_de_envio_as_fotos_de_antes_da_028_e_a_atrasada_entra_calada(canal):
+    """22/10, 20:42: a foto mandada 08:54:56 chegou 12 h depois e abriu lote novo, porque o album das
+    08:54 era de antes da 028 e valia pela chegada (10:05)."""
+    from pathlib import Path
+    ligar(canal)
+    ia = IAFalsa(campo=QUALIDADE)
+    s = SaidaFalsa()
+    t0 = AGORA - 70 * MIN
+    passo(canal, s, mandada(foto("f1", "Análise interna de qualidade"), t0), agora=t0 + 70 * MIN, ia=ia)
+    _fechar_com_hoje(canal, s, ia, AGORA + 3 * MIN)
+    with conexao(canal) as con:   # como as linhas de antes da 028
+        con.execute("UPDATE atendimento.material_de_campo SET enviado_em = NULL")
+        con.execute("UPDATE atendimento.campo_frases SET enviado_em = NULL")
+        sql = Path(__file__).resolve().parents[1] / "backend" / "migracoes" / "030_hora_de_envio_das_fotos_antigas.sql"
+        con.execute(sql.read_text(encoding="utf-8"))
+    assert material(canal)[0]["enviado_em"] == t0
+    n = len(s.enviadas)
+    passo(canal, s, mandada(foto("f2"), t0), agora=AGORA + 12 * 60 * MIN, ia=ia)
+    a, b = material(canal)
+    assert b["grupo_id"] == a["grupo_id"] and len(s.enviadas) == n    # nada de "Recebi." de novo
+
+
 def test_a_volta_da_028_limpa_a_pergunta_mesmo(canal):
     from pathlib import Path
     ligar(canal)
