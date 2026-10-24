@@ -25,6 +25,7 @@ para o canal de campo como antes.
 from __future__ import annotations
 
 import json
+import unicodedata
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -52,10 +53,13 @@ RECEBI = "Recebi. Vou montar o registro."
 ANOTADO = "Anotado. Vai ao sistema agora."
 GRAVADO = "Gravado no sistema ✔"
 CORRIGIR = "Tudo bem. Me escreva de novo como foi, completo."
-ATE_LOGO = "Até a próxima. Para voltar, escreva *menu* e toque 📋 Meus clientes."
+ATE_LOGO = "Até a próxima. Para voltar, escreva *meus clientes*."
 SEM_LIBERACAO = "O 📋 Meus clientes ainda não está liberado para você."
 SEM_FILA = "Sua lista ainda não chegou do sistema. Tente de novo em alguns minutos."
 ACABOU = "Acabaram os clientes da sua lista por hoje. 👏"
+# Escrever o nome da opcao tem o efeito do toque (dono, 24/10/2026, no piloto). Comparado sem acento,
+# sem caixa e sem o emoji; vale tambem com cliente aberto, e entao repete a ficha dele.
+PEDE_CLIENTES = {"meus clientes", "meu clientes", "clientes", "proximo cliente", "proximo"}
 
 
 # ── quem e quem ──────────────────────────────────────────────────────────────
@@ -74,6 +78,11 @@ def consultor(con, wa_id: str | None) -> dict | None:
         if com_nove(c["wa_id"]) == n:
             return dict(c)
     return None
+
+
+def pede_clientes(texto: str) -> bool:
+    t = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode().lower()
+    return " ".join(t.strip(" !.?").split()) in PEDE_CLIENTES
 
 
 def _hoje(agora: datetime) -> date:
@@ -194,6 +203,9 @@ def tratar(con, saida, ia, e, agora: datetime) -> bool:
     texto = (e.texto or "").strip()
     if not texto or internos.pede_menu(texto):
         return False
+    if pede_clientes(texto):
+        proximo(con, saida, c, para, agora)
+        return True
     reg = _aberto(con, c["wa_id"], agora)
     if not reg:
         return False

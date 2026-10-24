@@ -172,6 +172,17 @@ def test_texto_de_interno_sem_cliente_aberto_continua_no_canal_de_campo(piloto):
     assert _registros(piloto) == []
 
 
+def test_escrever_meus_clientes_faz_o_mesmo_que_o_toque(piloto):
+    # dono, 24/10/2026, no piloto: pedir por escrito tem de valer o botao, sem passar pelo menu
+    s = SaidaFalsa()
+    passo(piloto, s, texto("w1", "Meus Clientes!", numero=EQUIPE))
+    assert "COOPERPASSO" in s.enviadas[-2][2] and s.ultima[2] == K.ME_CONTE
+    # com o cliente aberto, repete a ficha dele em vez de virar o texto da visita
+    passo(piloto, s, texto("w2", "meus clientes", numero=EQUIPE), agora=AGORA + timedelta(minutes=1))
+    assert "COOPERPASSO" in s.enviadas[-2][2] and _registros(piloto)[0]["textos"] == ""
+    assert K.pede_clientes("próximo") and not K.pede_clientes("os clientes de Tangará")
+
+
 def test_parar_por_hoje_e_o_texto_seguinte_vai_ao_canal_de_campo(piloto):
     s = SaidaFalsa()
     _abrir(piloto, s)

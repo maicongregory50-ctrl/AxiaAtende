@@ -17,8 +17,8 @@ entre uma visita e outra.
 
 ## 3. O caminho comum
 
-1. Escreva *bom dia* (ou *menu*) para o **WhatsApp da Renascer (49 3664 0121)** e toque **📋 Meus
-   clientes**.
+1. Escreva *meus clientes* para o **WhatsApp da Renascer (49 3664 0121)**. Também vale escrever
+   *bom dia* (ou *menu*) e tocar **📋 Meus clientes**.
 2. Vem **um cliente**: nome, cidade, faixa, o contato, os meses em que ele compra, o que comprou na
    última safra e na atual, e se o contato é de **campanha** (com a versão: recompra ou apresentação)
    ou de **cortesia**. Toque **Chamar <nome> no WhatsApp** para abrir a conversa com ele, ou toque no
@@ -32,7 +32,8 @@ entre uma visita e outra.
    **"Gravado no sistema ✔"** e o próximo cliente. Se algo estiver errado, toque **✏️ Corrigir** e
    escreva de novo, completo.
 6. **⏭ Depois** deixa o cliente para amanhã e manda o próximo. **🛑 Parar por hoje** encerra; para
-   voltar, *menu* → **📋 Meus clientes**, e ele continua de onde parou.
+   voltar, escreva *meus clientes* (ou *próximo*), e ele continua de onde parou. Com um cliente
+   aberto, *meus clientes* repete a ficha dele.
 
 ## 4. O que significa cada sinal
 
