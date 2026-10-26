@@ -60,8 +60,10 @@ def test_direta_vai_com_o_texto_e_o_botao_de_link_do_responsavel_e_sem_imagens_d
     assert m["corpo"] == ["Joao", "plantio do Trigo Mourisco", "Djeison de Oliveira"]
     assert m["botoes"] is None and m["imagem"] and m["url"].startswith("1-")
     assert destinatarios(ligado)[1]["imagens_total"] == 0
-    copia = next(x for x in s.modelos if x["para"] == "5549999567572")      # a copia ao responsavel
-    assert copia["corpo"][0] == "Djeison" and copia["url"].startswith("c1-")
+    # #1142: a COPIA ao responsavel acabou -- nada mais vai ao numero dele neste momento. O resumo
+    # do lote (so a representante e corretor) depende de `responsavel_canal`, que este pedido nao
+    # manda: a prova dele esta em test_1142_fila_por_numero.py.
+    assert [x for x in s.modelos if x["para"] == "5549999567572"] == []
 
 
 def test_falar_com_meu_atendimento_anota_e_abre_o_whatsapp_do_responsavel(ligado, imagens):
@@ -70,9 +72,12 @@ def test_falar_com_meu_atendimento_anota_e_abre_o_whatsapp_do_responsavel(ligado
     s, env = SaidaFalsa(), Envio(ler_nota=lambda: "GREEN")
     env.rotina(ligado, s, QUINTA_9H)
     m = next(x for x in s.modelos if x["para"] != "5549999567572")
-    copia = next(x for x in s.modelos if x["para"] == "5549999567572")
+    # #1142: a copia nao sai mais, mas o CODIGO dela continua valendo -- ha mensagens com esse botao
+    # na rua, e o toque delas ainda chega. O codigo e forjado aqui como a copia o montava.
+    from backend.envio import codigo_falar
+    codigo_da_copia = codigo_falar(ligado.meta_app_secret, destinatarios(ligado)[1]["id"], copia=True)
     with TestClient(R.criar_app(ligado, saida=s, trabalhador=False)) as c:
-        assert c.get("/falar/" + copia["url"], follow_redirects=False).headers["location"] == "https://wa.me/5549999567572"
+        assert c.get("/falar/" + codigo_da_copia, follow_redirects=False).headers["location"] == "https://wa.me/5549999567572"
         assert destinatarios(ligado)[1]["resposta"] is None             # o toque da copia nao conta
         r = c.get("/falar/" + m["url"], follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"] == "https://wa.me/5549999567572"

@@ -176,17 +176,23 @@ def receber_pedido(con, pedido: dict) -> int:
             situacao = "nao_e_whatsapp"
         else:
             situacao = "aguardando"
+        # #1142: O CONFLITO E POR NUMERO, e nao por cadastro -- uma pessoa uma vez por envio. Desde
+        # o #1141 o ERP entrega uma linha por CONTATO, e na camada cooperativa o comprador e o
+        # tecnico do mesmo cadastro caem no mesmo envio: pela regra antiga o segundo sumia calado.
+        # O `WHERE whatsapp <> ''` e a mesma condicao do indice parcial da 033: quem nao tem celular
+        # grava vazio, e dois assim no mesmo envio e caso legitimo (`sem_whatsapp`).
         con.execute(
             """INSERT INTO atendimento.envio_destinatarios
                    (envio_id, erp_codigo, nome, cidade, uf, whatsapp, faturamento, posicao,
                     responsavel_nome, responsavel_whatsapp, sugestao_vendedor, situacao,
-                    capa, imagens, aceite_cadastro)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
-               ON CONFLICT (envio_id, erp_codigo) DO NOTHING""",
+                    capa, imagens, aceite_cadastro, papel, responsavel_canal)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+               ON CONFLICT (envio_id, whatsapp) WHERE whatsapp <> '' DO NOTHING""",
             (envio, int(c["erp_codigo"]), c["nome"], c.get("cidade", ""), c.get("uf", ""), numero,
              c.get("faturamento") or 0, pos, c.get("responsavel_nome", ""), resp,
              c.get("sugestao_vendedor", ""), situacao, c.get("capa"),
-             json.dumps(c["imagens"]) if c.get("imagens") else None, aceite_cadastro))
+             json.dumps(c["imagens"]) if c.get("imagens") else None, aceite_cadastro,
+             c.get("papel"), c.get("responsavel_canal")))
     return envio
 
 
@@ -277,7 +283,7 @@ class Envio:
             for d in fila:
                 self._mandar_um(con, saida, e, m, d, lote, agora)
                 mandados += 1
-            self._copias_aos_responsaveis(con, saida, e, m, fila)
+            self._resumo_ao_representante(con, e, fila)
         return mandados
 
     def _mensagem(self, e, m, d, para_nome, numero_resp):
@@ -304,26 +310,35 @@ class Envio:
             con.execute("""UPDATE atendimento.envio_destinatarios SET situacao = 'falhou', lote = %s, erro = %s
                             WHERE id = %s""", (lote, str(falha)[:300], d["id"]))
 
-    def _copias_aos_responsaveis(self, con, saida, e, m, fila):
-        """Uma copia por responsavel por envio: o mesmo que o cliente recebe (a primeira versao)."""
-        vistos = set()
+    #: o canal de quem RECEBE o resumo do lote. O dono e o flutuante ficam de fora: a copia por
+    #: cliente ia ao dono (o marketing o poe como responsavel de toda revenda) e foi assim que as
+    #: artes da Agro Real e da Agro Simil chegaram ao WhatsApp dele em 23/10.
+    CANAIS_DO_RESUMO = ("representante", "corretor")
+
+    def _resumo_ao_representante(self, con, e, fila):
+        """#1142 (dono, 26/10/2026): UM RESUMO POR LOTE ao representante, no lugar de uma copia por
+        cliente ao responsavel.
+
+        A copia era a unica coisa que avisava o representante de que o material saiu para os
+        clientes dele -- e a tela Envios, que seria o outro caminho, roda em 127.0.0.1:8009 e ele
+        nao a alcanca. Entao o aviso continua, com outra forma: uma mensagem por lote, sem imagem e
+        sem botao, que o manda olhar o Relacionamento no ERP, que e a tela dele.
+
+        NAO MANDA NADA AQUI: so enfileira em `atendimento.avisos`, e quem manda e `mandar_avisos`,
+        pelo modelo `aviso_lote_do_representante` (UTILITY). Sem o modelo aprovado na Meta o aviso
+        fica com `erro` preenchido -- ninguem recebe, e nada se perde."""
+        por_responsavel: dict = {}
         for d in fila:
-            numero = d["responsavel_whatsapp"]
-            if numero in vistos:
+            if d["responsavel_canal"] not in self.CANAIS_DO_RESUMO or not d["responsavel_whatsapp"]:
                 continue
-            vistos.add(numero)
-            if con.execute("SELECT 1 FROM atendimento.enviadas WHERE para = %s AND resumo = %s",
-                           (numero, "copia %d" % e["id"])).fetchone():
-                continue
-            corpo, capa, botoes, url, _ = self._mensagem(e, m, d, d["responsavel_nome"], numero)
-            if botoes:
-                botoes = ["envio:%d:copia" % e["id"]] * len(botoes)   # o toque do responsavel nao vale
-            try:
-                w = saida.modelo(numero, m["nome"], m["idioma"], corpo, imagem=capa, botoes=botoes, url=url)
-                con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'modelo', %s)",
-                            (w, numero, "copia %d" % e["id"]))
-            except Exception:  # noqa: BLE001 -- a copia nunca trava o envio
-                pass
+            por_responsavel.setdefault(d["responsavel_whatsapp"], []).append(d)
+        for numero, dele in por_responsavel.items():
+            quantos = ("1 cliente seu" if len(dele) == 1 else "%d clientes seus" % len(dele))
+            sobre = "|".join((primeiro_nome(dele[0]["responsavel_nome"]), quantos,
+                              e["assunto"] or e["peca"] or "a nossa campanha"))
+            con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
+                           VALUES ('lote_do_representante', %s, %s, %s)""",
+                        (dele[0]["responsavel_nome"], numero, sobre))
 
     # -- as respostas ao convite --
     def tratar_toque(self, con, saida: Saida, entrada, agora: datetime) -> None:
@@ -334,6 +349,9 @@ class Envio:
         numero = com_nove(entrada.pessoa.wa_id)
         d = con.execute("""SELECT * FROM atendimento.envio_destinatarios
                             WHERE envio_id = %s AND whatsapp = %s""", (envio_id, numero)).fetchone()
+        # O guarda de `copia` FICA, mesmo depois de a copia acabar (#1142): ha mensagens com esse
+        # botao na rua, e um toque delas ainda chega. Tirar o guarda nao ganharia nada e deixaria o
+        # toque cair nos ramos de baixo.
         if acao == "copia" or not d or d["resposta"] in ("quero", "nao_quero"):
             return   # o toque do responsavel na copia, de quem nao estava na lista, ou o segundo toque
         tipo = "aceite" if acao == "quero" else "recusa" if acao == "nao_quero" else None

@@ -24,7 +24,7 @@ INTERVALO_SEGUNDOS = 15 * 60
 def montar(con, agora: datetime | None = None) -> list[dict]:
     agora = agora or datetime.now(timezone.utc)
     linhas = con.execute(
-        """SELECT d.id, d.erp_codigo, d.situacao, d.convite_em, d.entregue_em, d.lido_em,
+        """SELECT d.id, d.erp_codigo, d.papel, d.situacao, d.convite_em, d.entregue_em, d.lido_em,
                   d.resposta, d.resposta_em, d.resposta_texto, e.campanha, e.tipo, e.peca
              FROM atendimento.envio_destinatarios d
              JOIN atendimento.envios e ON e.id = d.envio_id
@@ -33,7 +33,11 @@ def montar(con, agora: datetime | None = None) -> list[dict]:
             ORDER BY d.id""", (agora - timedelta(days=DIAS),)).fetchall()
     def iso(v):
         return v.isoformat() if v else None
-    return [{"destinatario_id": l["id"], "erp_codigo": l["erp_codigo"], "campanha": l["campanha"] or None,
+    # #1142: o `papel` diz a QUEM do cadastro foi o envio (comprador ou tecnico). O ERP ja o aceita
+    # (EventoEnvio.papel, #1141) e o grava em rel_contatos.envio_papel; nulo enquanto o pedido do
+    # marketing nao o manda, e o ERP devolve o nulo em vez de inventar.
+    return [{"destinatario_id": l["id"], "erp_codigo": l["erp_codigo"], "papel": l["papel"],
+             "campanha": l["campanha"] or None,
              "tipo": l["tipo"], "peca": l["peca"], "situacao": l["situacao"], "convite_em": iso(l["convite_em"]),
              "entregue_em": iso(l["entregue_em"]), "lido_em": iso(l["lido_em"]), "resposta": l["resposta"],
              "resposta_em": iso(l["resposta_em"]), "resposta_texto": (l["resposta_texto"] or None) and l["resposta_texto"][:500]}

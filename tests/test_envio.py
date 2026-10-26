@@ -77,22 +77,25 @@ def test_pedido_classifica_cada_cliente_e_copia_as_imagens(ligado, imagens):
     assert pedir(ligado, pedido(imagens, [cliente(1, 500)])).json()["envio_id"] == r.json()["envio_id"]  # repetido
 
 
-def test_lote_de_20_por_dia_so_com_nota_verde_e_copia_ao_responsavel(ligado, imagens):
+def test_lote_de_20_por_dia_so_com_nota_verde_e_nada_ao_responsavel(ligado, imagens):
+    """#1142: a COPIA de cada convite ao responsavel ACABOU (dono, 26/10/2026). Aqui o responsavel e
+    o dono (`cliente()` o poe como padrao), e o resumo do lote nunca vai a ele -- o que vai, e so a
+    representante e corretor, esta em test_1142_fila_por_numero.py."""
     pedir(ligado, pedido(imagens, [cliente(i, 1000 - i) for i in range(1, 46)]))
     s = SaidaFalsa()
     env = Envio(ler_nota=lambda: "GREEN")
     env.rotina(ligado, s, QUINTA_9H)
     convites = [x for x in s.enviadas if x[0] == "modelo" and x[1] != "5549991505565"]
-    copias = [x for x in s.enviadas if x[0] == "modelo" and x[1] == "5549991505565"]
-    assert len(convites) == 20 and len(copias) == 1
+    ao_responsavel = [x for x in s.enviadas if x[0] == "modelo" and x[1] == "5549991505565"]
+    assert len(convites) == 20 and ao_responsavel == []
     d = destinatarios(ligado)
     assert {k for k, v in d.items() if v["situacao"] == "convidado"} == set(range(1, 21))   # o Top 20
     env.rotina(ligado, s, QUINTA_9H + timedelta(hours=3))
-    assert len([x for x in s.enviadas if x[0] == "modelo"]) == 21                          # nada a mais no dia
+    assert len([x for x in s.enviadas if x[0] == "modelo"]) == 20                          # nada a mais no dia
     env.rotina(ligado, s, QUINTA_9H + timedelta(days=1))
     d = destinatarios(ligado)
     assert sum(1 for v in d.values() if v["situacao"] == "convidado") == 40
-    assert d[21]["lote"] == 2 and len([x for x in s.enviadas if x[1] == "5549991505565"]) == 1   # copia so uma vez
+    assert d[21]["lote"] == 2 and [x for x in s.enviadas if x[1] == "5549991505565"] == []
 
 
 @pytest.mark.parametrize("nota, parado", [("YELLOW", True), ("RED", True), (None, False)])

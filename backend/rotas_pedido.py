@@ -39,6 +39,11 @@ class Cliente(BaseModel):
     aceite_cadastro: bool | None = None    # o aceite do cadastro (#952): True, False (recusou) ou None
     capa: str | None = None                # a versao deste cliente (a peca da revenda com a logo dela)
     imagens: list[str] | None = None
+    # #1142: quem e este contato no cliente (#1141, uma linha por contato), e o CANAL do responsavel
+    # no ERP -- e por ele que o resumo do lote vai so a representante e corretor, porque este projeto
+    # nao sabe qual numero e o do dono. Ausentes no pedido de antes, e ai ficam nulos.
+    papel: Literal["comprador", "tecnico"] | None = None
+    responsavel_canal: Literal["representante", "corretor", "dono", "flutuante"] | None = None
 
 
 class Pedido(BaseModel):
