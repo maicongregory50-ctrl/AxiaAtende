@@ -77,9 +77,13 @@ COMMENT ON INDEX atendimento.envio_dest_um_por_numero IS
     'Uma pessoa uma vez por envio (#1142). PARCIAL de proposito: quem nao tem celular valido grava '
     'whatsapp vazio, e dois desses no mesmo envio e caso legitimo (situacao sem_whatsapp).';
 
+-- Os dois CHECKs sao REESCRITOS INTEIROS, e por isso carregam tudo o que ja existia: a lista de
+-- tipos vem da 024 (seis), e a de usos da 025 (nove). Lista reescrita curta nao da erro ao aplicar
+-- -- ela passa, e o proximo aviso de endereco e recusado na hora de gravar.
 ALTER TABLE atendimento.avisos DROP CONSTRAINT avisos_tipo;
 ALTER TABLE atendimento.avisos ADD CONSTRAINT avisos_tipo
-    CHECK (tipo IN ('recusa', 'sem_atendimento', 'lote_do_representante'));
+    CHECK (tipo IN ('recusa', 'sem_atendimento', 'avaliacao_ruim', 'endereco_fora', 'endereco_voltou',
+                    'plano_sem_registro', 'lote_do_representante'));
 
 ALTER TABLE atendimento.modelos DROP CONSTRAINT modelos_uso;
 ALTER TABLE atendimento.modelos ADD CONSTRAINT modelos_uso
@@ -115,6 +119,18 @@ BEGIN
     END IF;
     IF (SELECT count(*) FROM atendimento.modelos WHERE uso = 'aviso_lote_do_representante') <> 1 THEN
         RAISE EXCEPTION '033: esperava UM modelo do resumo.';
+    END IF;
+    -- O PORTAO do erro que esta migracao cometeu antes de ser aplicada: reescrever a lista de tipos
+    -- deixando de fora os avisos que a 024 ja tinha. O CHECK aceita a lista curta sem reclamar.
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'avisos_tipo'
+                    AND pg_get_constraintdef(oid) LIKE '%endereco_voltou%'
+                    AND pg_get_constraintdef(oid) LIKE '%avaliacao_ruim%'
+                    AND pg_get_constraintdef(oid) LIKE '%plano_sem_registro%') THEN
+        RAISE EXCEPTION '033: o CHECK de tipo do aviso perdeu os tipos que ja existiam.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'modelos_uso'
+                    AND pg_get_constraintdef(oid) LIKE '%curriculo%') THEN
+        RAISE EXCEPTION '033: o CHECK de uso do modelo perdeu os usos que ja existiam.';
     END IF;
     RAISE NOTICE '033 OK: papel e responsavel_canal (nulos), a unicidade por numero (parcial), e o '
                  'modelo aviso_lote_do_representante.';

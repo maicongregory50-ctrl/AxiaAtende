@@ -49,7 +49,8 @@ ALTER TABLE atendimento.modelos ADD CONSTRAINT modelos_uso
 
 ALTER TABLE atendimento.avisos DROP CONSTRAINT avisos_tipo;
 ALTER TABLE atendimento.avisos ADD CONSTRAINT avisos_tipo
-    CHECK (tipo IN ('recusa', 'sem_atendimento'));
+    CHECK (tipo IN ('recusa', 'sem_atendimento', 'avaliacao_ruim', 'endereco_fora', 'endereco_voltou',
+                    'plano_sem_registro'));   -- a lista da 024, inteira
 
 DROP INDEX atendimento.envio_dest_um_por_numero;
 ALTER TABLE atendimento.envio_destinatarios

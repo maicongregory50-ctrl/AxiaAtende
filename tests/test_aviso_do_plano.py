@@ -81,7 +81,10 @@ def test_a_024_vai_volta_e_vai(ligado):
     with conexao(ligado) as con:
         con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
                        VALUES ('plano_sem_registro', 'X', '5549991505565', '7|14/10')""")
-        # a ordem das voltas e a inversa da das idas: a 032 (#1090) e a 025 (#1098) mexem nos mesmos CHECKs
+        # a ordem das voltas e a inversa da das idas: a 033 (#1142), a 032 (#1090) e a 025 (#1098)
+        # mexem nos mesmos CHECKs
+        volta_033 = (pasta / "033_fila_por_numero_e_resumo_VOLTA.sql").read_text(encoding="utf-8")
+        con.execute(volta_033.replace("BEGIN;", "").replace("COMMIT;", ""))
         volta_032 = (pasta / "032_clientes_do_dia_VOLTA.sql").read_text(encoding="utf-8")
         con.execute(volta_032.replace("BEGIN;", "").replace("COMMIT;", ""))
         volta_025 = (pasta / "025_trabalhe_conosco_VOLTA.sql").read_text(encoding="utf-8")

@@ -41,6 +41,8 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **Tocou em falar** (só na comunicação direta) | tocou "Falar com meu atendimento" e foi levado ao WhatsApp do responsável. Se ele mandou mensagem, isso acontece no WhatsApp do responsável: esta tela não vê |
 | **Não entregues** | a Meta recusou, em geral porque o número não é WhatsApp; o cadastro do cliente precisa de correção no ERP |
 | **Sem responsável** | o canal comercial do cadastro do cliente no ERP está vazio: ele **não recebe** até alguém preencher. A linha mostra o vendedor do último pedido como sugestão |
+| **Comprador / Técnico** na linha (desde 26/10/2026, #1142) | **quem** é a pessoa no cliente: o comprador decide a compra; o técnico vai ao produtor e recomenda. Os dois podem estar no mesmo envio (é o caso da cooperativa, que recebe os dois materiais na mesma semana), e cada um conta como um destinatário, com o lote e a resposta dele |
+| **O mesmo número não aparece duas vezes** | uma pessoa recebe **uma vez por envio**, mesmo sendo contato de vários cadastros. O banco recusa a segunda, e quem monta o pedido já junta por número antes |
 | **Sem aceite** (só na comunicação direta) | o cliente nunca aceitou: precisa tocar "Quero receber" num material antes |
 | **Na fila** | ainda vai receber, num dos próximos lotes |
 | **Custo US$** | o valor estimado das mensagens pagas deste envio (cerca de US$ 0,07 cada) |
@@ -54,11 +56,27 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 **Os lotes:** saem até 20 clientes por dia, na ordem do ranking de faturamento (Top 20, depois o 21º
 ao 40º…), e só com a nota verde.
 
+**O resumo ao representante** (desde 26/10/2026, #1142). Depois de cada lote, o **representante** (ou
+o corretor) recebe **uma** mensagem no WhatsApp: quantos clientes dele receberam, o que receberam, e
+o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP — que é a tela dele.
+
+- **Uma por lote, não uma por cliente.** Cinco clientes num lote são uma mensagem, não cinco.
+- **Nunca vai ao dono nem ao flutuante.** Até 23/10/2026 saía uma **cópia de cada convite** ao
+  responsável, e no material às revendas o responsável é o dono — foi assim que as artes da Agro
+  Real e da Agro Símil chegaram ao WhatsApp dele. A cópia acabou.
+- **Se o resumo não chegar:** o modelo `aviso_lote_do_representante` precisa estar aprovado na Meta,
+  na categoria **Utilidade**. Sem ele o aviso fica guardado com o erro escrito e **ninguém recebe** —
+  nada se perde, e sai quando o modelo entrar.
+
 ## 5. O que a tela NÃO faz
 
 - **Não cria nem aprova envio:** o envio nasce e é aprovado em Publicações, no AxiaMarketing.
 - **Não reenvia imagem depois de 24 horas** do "Quero receber": a Meta só deixa mensagem grátis
   dentro dessa janela.
-- **Não avisa o responsável de quem quis receber:** só de quem recusou.
+- **Não avisa o responsável de quem quis receber:** só de quem recusou — e o **resumo do lote**, que
+  diz quantos receberam, sem dizer quem respondeu o quê. *(Até 26/10/2026 o código mandava uma cópia
+  de cada convite ao responsável, contra o que esta linha já dizia; o #1142 fez o código cumprir o
+  manual.)*
+- **Não manda nada ao dono:** o resumo é só de representante e corretor.
 - **Não manda comunicação direta a quem nunca aceitou.**
 - **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão).
