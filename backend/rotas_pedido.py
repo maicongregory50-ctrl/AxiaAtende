@@ -129,6 +129,17 @@ def rotas(cfg) -> APIRouter:
                     WHERE whatsapp = ANY(%s) ORDER BY whatsapp, em DESC, id DESC""", (numeros,)).fetchall()
         return {"aceites": {l["whatsapp"]: l["tipo"] for l in linhas}}
 
+    @r.post("/pedido/teto")
+    def teto(pedido: Numeros, x_axiaatende_chave: str | None = Header(default=None)):
+        """#1163: quantas mensagens de envio cada numero recebeu no MES de agora (Sao Paulo), e o teto
+        do comprador. E a previa da tela Publicacoes, antes de o dono agendar: quem decide de verdade
+        e o laco do lote, na hora de sair. A chave do resultado e o numero como veio."""
+        conferir(x_axiaatende_chave)
+        agora = datetime.now(E.FUSO)
+        with conexao(cfg) as con:
+            no_mes = {n: E.Envio.recebidas_no_mes(con, E.so_digitos(n), agora) for n in dict.fromkeys(pedido.numeros) if n}
+        return {"teto": E.TETO_DO_COMPRADOR, "no_mes": no_mes}
+
     @r.get("/pedido/resumo")
     def resumo(desde: datetime, ate: datetime, x_axiaatende_chave: str | None = Header(default=None)):
         """O KR2: no periodo, quantos clientes receberam convite, quantos responderam (tocaram ou

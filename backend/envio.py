@@ -26,6 +26,8 @@ AS REGRAS QUE VALEM PARA OS DOIS (spec, "Cuidado com a Meta"):
   proximo lote so sai com a nota do numero em GREEN; em YELLOW ou RED o envio para sozinho.
 - **Ninguem recebe o mesmo envio duas vezes**; quem recusou nao recebe mais nada; numero que a
   Meta recusou como "nao e WhatsApp" nao e tentado de novo.
+- **O comprador recebe no maximo duas por mes** (#1163): o que ja recebeu duas no mes do calendario
+  fica `teto_do_mes` naquele envio, decidido no laco do lote, e volta a receber no mes seguinte.
 - **O responsavel recebe copia** do que os clientes dele recebem (uma por envio).
 - **Quem recusa** e o responsavel dele e avisado (modelo de uso `aviso_recusa`, Utilidade).
 
@@ -47,6 +49,9 @@ from .banco import conexao
 from .saida import Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
+#: #1163 (o #1103, spec de 26/10, linha 27): "Teto de duas mensagens por mes por comprador". Conta o
+#: convite e a peca. So o comprador: o tecnico tem a regua dele, e o contato sem papel fica como esta.
+TETO_DO_COMPRADOR = 2
 JANELA = timedelta(hours=24)
 NAO_E_WHATSAPP = {"131026"}   # codigo da Meta: mensagem nao entregavel (numero sem WhatsApp)
 CELULAR = re.compile(r"^55[1-9][0-9]9[0-9]{8}$")
@@ -280,11 +285,29 @@ class Envio:
             ultimo = con.execute("SELECT coalesce(max(lote), 0) AS m FROM atendimento.envio_destinatarios WHERE envio_id = %s",
                                  (e["id"],)).fetchone()["m"]
             lote = ultimo if ja_hoje else ultimo + 1
+            saiu = []
             for d in fila:
+                # #1163: o teto do comprador, decidido AQUI, na hora de sair -- e quando se sabe o mes
+                if d["papel"] == "comprador" and self.recebidas_no_mes(con, d["whatsapp"], agora) >= TETO_DO_COMPRADOR:
+                    con.execute("UPDATE atendimento.envio_destinatarios SET situacao = 'teto_do_mes' WHERE id = %s",
+                                (d["id"],))
+                    continue
                 self._mandar_um(con, saida, e, m, d, lote, agora)
+                saiu.append(d)
                 mandados += 1
-            self._resumo_ao_representante(con, e, fila)
+            self._resumo_ao_representante(con, e, saiu)
         return mandados
+
+    @staticmethod
+    def recebidas_no_mes(con, numero: str, agora: datetime) -> int:
+        """#1163: quantas mensagens de envio (convite ou peca, o que a Meta ACEITOU mandar: so essas
+        tem `convite_em`) o numero recebeu no mes do calendario de `agora`, em Sao Paulo."""
+        local = agora.astimezone(FUSO)
+        ini = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        fim = (ini + timedelta(days=32)).replace(day=1)
+        return con.execute("""SELECT count(*) AS n FROM atendimento.envio_destinatarios
+                               WHERE whatsapp = %s AND convite_em >= %s AND convite_em < %s""",
+                           (numero, ini, fim)).fetchone()["n"]
 
     def _mensagem(self, e, m, d, para_nome, numero_resp):
         imagens = d["imagens"] if d["imagens"] is not None else e["imagens"]

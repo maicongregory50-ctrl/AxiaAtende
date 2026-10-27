@@ -8,6 +8,8 @@ const SITUACAO = {
   aguardando: ['na fila', ''], convidado: ['enviado', ''], sem_responsavel: ['sem responsável no cadastro', 'a'],
   sem_whatsapp: ['sem WhatsApp', ''], sem_aceite: ['sem aceite', 'a'], recusou_antes: ['recusou antes', 'r'],
   ja_recebeu: ['já recebeu esta peça', ''], falhou: ['não entregue', 'r'], nao_e_whatsapp: ['número não é WhatsApp', 'a'],
+  // #1163: o comprador que ja recebeu duas mensagens nossas no mes; volta a receber no mes seguinte
+  teto_do_mes: ['fora: teto do mês (já recebeu duas)', 'a'],
 }
 const TIPO = { material: 'Material para cliente', direta: 'Comunicação direta' }
 const ESTADO = { ativo: 'enviando', parado_nota: 'PARADO pela nota do número', concluido: 'concluído', suspenso: 'suspenso' }
