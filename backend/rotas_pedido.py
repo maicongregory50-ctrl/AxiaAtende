@@ -58,6 +58,7 @@ class Pedido(BaseModel):
     aprovado_por: str
     aprovado_em: datetime
     lote_tamanho: int = 20
+    passa_do_teto: bool = False            # #1175: a peca a mais, que o dono manda alem do teto do mes
     clientes: list[Cliente] = Field(min_length=1)
 
 

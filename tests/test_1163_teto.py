@@ -92,3 +92,23 @@ def test_a_rota_da_previa(ligado, imagens):
         r = c.post("/pedido/teto", json={"numeros": ["5547991110001", "5547999999999"]}, headers=CHAVE)
     assert r.status_code == 200, r.text
     assert r.json() == {"teto": 2, "no_mes": {"5547991110001": 1, "5547999999999": 0}}
+
+
+# ── #1175: a peca a mais (dono, 27/10/2026: "precisa permitir") ─────────────────────────────────
+
+def test_a_peca_a_mais_passa_do_teto_e_a_comum_continua_segurada(ligado, imagens):
+    env, s = Envio(ler_nota=lambda: "GREEN"), SaidaFalsa()
+    gente = [_com_papel(1, "comprador", "47991110001")]
+    for n, dia in ((1, DIA_5), (2, DIA_5 + timedelta(days=1))):
+        pedir(ligado, pedido(imagens, gente, ref="pub-%d" % n, peca="Peca %d" % n))
+        env.rotina(ligado, s, dia)
+    a_mais = dict(pedido(imagens, gente, ref="pub-3", peca="Peca 3"), passa_do_teto=True)
+    assert pedir(ligado, a_mais).status_code == 200
+    pedir(ligado, pedido(imagens, gente, ref="pub-4", peca="Peca 4"))
+    env.rotina(ligado, s, DIA_5 + timedelta(days=2))
+    assert _situacao(ligado, "pub-3", 1) == "convidado"           # o dono mandou alem do teto
+    assert _situacao(ligado, "pub-4", 1) == "teto_do_mes"         # a comum continua segurada
+    with conexao(ligado) as con:
+        marcas = {r["pedido_ref"]: r["passa_do_teto"] for r in con.execute(
+            "SELECT pedido_ref, passa_do_teto FROM atendimento.envios").fetchall()}
+    assert marcas == {"pub-1": False, "pub-2": False, "pub-3": True, "pub-4": False}

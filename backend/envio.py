@@ -155,11 +155,11 @@ def receber_pedido(con, pedido: dict) -> int:
         raise PedidoInvalido("o modelo %r não existe ou não serve para envio %s" % (pedido["modelo"], tipo))
     envio = con.execute(
         """INSERT INTO atendimento.envios (pedido_ref, tipo, campanha, peca, assunto, modelo, capa, imagens,
-                                           aprovado_por, aprovado_em, lote_tamanho)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s) RETURNING id""",
+                                           aprovado_por, aprovado_em, lote_tamanho, passa_do_teto)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s) RETURNING id""",
         (pedido["pedido_ref"], tipo, pedido["campanha"], pedido["peca"], pedido.get("assunto", ""), m["nome"],
          pedido["capa"], json.dumps(pedido.get("imagens") or []), pedido["aprovado_por"], pedido["aprovado_em"],
-         min(int(pedido.get("lote_tamanho", 20)), 20))).fetchone()["id"]
+         min(int(pedido.get("lote_tamanho", 20)), 20), pedido.get("passa_do_teto") is True)).fetchone()["id"]
 
     ordenados = sorted(pedido["clientes"], key=lambda c: -float(c.get("faturamento") or 0))
     for pos, c in enumerate(ordenados, start=1):
@@ -288,7 +288,9 @@ class Envio:
             saiu = []
             for d in fila:
                 # #1163: o teto do comprador, decidido AQUI, na hora de sair -- e quando se sabe o mes
-                if d["papel"] == "comprador" and self.recebidas_no_mes(con, d["whatsapp"], agora) >= TETO_DO_COMPRADOR:
+                # #1175: a peca a mais (o dono marcou, no marketing) passa do teto
+                if (not e["passa_do_teto"] and d["papel"] == "comprador"
+                        and self.recebidas_no_mes(con, d["whatsapp"], agora) >= TETO_DO_COMPRADOR):
                     con.execute("UPDATE atendimento.envio_destinatarios SET situacao = 'teto_do_mes' WHERE id = %s",
                                 (d["id"],))
                     continue

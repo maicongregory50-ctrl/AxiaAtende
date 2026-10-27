@@ -64,4 +64,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                                 "027_grato_a_quem_manda_assim_mesmo.sql", "028_lote_pelo_envio.sql",
                                 "029_vaga_sem_autoavaliacao.sql", "030_hora_de_envio_das_fotos_antigas.sql",
                                 "032_clientes_do_dia.sql",
-                              "033_fila_por_numero_e_resumo.sql", "034_teto_do_comprador.sql"]
+                              "033_fila_por_numero_e_resumo.sql", "034_teto_do_comprador.sql",
+                              "035_peca_a_mais.sql"]
