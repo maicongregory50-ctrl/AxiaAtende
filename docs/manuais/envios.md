@@ -48,7 +48,7 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **Custo US$** | o valor estimado das mensagens pagas deste envio (cerca de US$ 0,07 cada) |
 | **"sem WhatsApp"** | o cadastro não tem celular válido |
 | **"recusou antes" / "já recebeu esta peça"** | não recebe de novo |
-| **"fora: teto do mês (já recebeu duas)"** (#1163) | o **comprador** já recebeu duas mensagens nossas neste mês (convite ou peça, de qualquer envio). Ele não recebe esta, e volta a receber no mês seguinte. O mês é o do calendário, em Brasília, e a conta é feita na hora em que o lote sai. O técnico e o contato sem papel não entram no teto |
+| **"fora: teto do mês (já recebeu duas)"** (#1163) | o **comprador** já recebeu duas mensagens nossas neste mês. Conta **um por envio recebido** (o convite do material ou a mensagem da direta, de qualquer envio); as imagens depois do "Quero receber" são parte do mesmo envio e não contam de novo. Ele não recebe esta, e volta a receber no mês seguinte. O mês é o do calendário, em Brasília, e a conta é feita na hora em que o lote sai. O técnico e o contato sem papel não entram no teto |
 | **Imagens "3 de 3"** | todas as imagens chegaram a quem quis |
 | **"—"** | ainda não aconteceu (não é zero) |
 | **Nota do número: verde / amarela / vermelha** | a nota de qualidade que a Meta dá ao número da empresa. Só sai lote com verde |
