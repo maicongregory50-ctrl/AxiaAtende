@@ -48,6 +48,7 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **Custo US$** | o valor estimado das mensagens pagas deste envio (cerca de US$ 0,07 cada) |
 | **"sem WhatsApp"** | o cadastro não tem celular válido |
 | **"recusou antes" / "já recebeu esta peça"** | não recebe de novo |
+| **"fora: teto do mês (já recebeu duas)"** (#1163) | o **comprador** já recebeu duas mensagens nossas neste mês (convite ou peça, de qualquer envio). Ele não recebe esta, e volta a receber no mês seguinte. O mês é o do calendário, em Brasília, e a conta é feita na hora em que o lote sai. O técnico e o contato sem papel não entram no teto |
 | **Imagens "3 de 3"** | todas as imagens chegaram a quem quis |
 | **"—"** | ainda não aconteceu (não é zero) |
 | **Nota do número: verde / amarela / vermelha** | a nota de qualidade que a Meta dá ao número da empresa. Só sai lote com verde |
@@ -55,6 +56,11 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 
 **Os lotes:** saem até 20 clientes por dia, na ordem do ranking de faturamento (Top 20, depois o 21º
 ao 40º…), e só com a nota verde.
+
+**O teto do comprador** (desde 27/10/2026, #1163): nenhum comprador recebe mais de **duas**
+mensagens nossas no mês. Quem já recebeu duas fica **"fora: teto do mês"** naquele envio — com o
+motivo escrito na linha — e o lote segue com os próximos da fila. A tela Publicações, no Marketing,
+mostra antes de agendar quantos ficariam fora; quem decide de verdade é este envio, na hora de sair.
 
 **O resumo ao representante** (desde 26/10/2026, #1142). Depois de cada lote, o **representante** (ou
 o corretor) recebe **uma** mensagem no WhatsApp: quantos clientes dele receberam, o que receberam, e
@@ -80,3 +86,5 @@ o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP 
 - **Não manda nada ao dono:** o resumo é só de representante e corretor.
 - **Não manda comunicação direta a quem nunca aceitou.**
 - **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão).
+- **Não tira ninguém do teto do mês:** o comprador no teto volta a receber no mês seguinte; não há
+  botão para mandar a terceira.
