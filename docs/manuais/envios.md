@@ -59,8 +59,13 @@ ao 40º…), e só com a nota verde.
 
 **O teto do comprador** (desde 27/10/2026, #1163): nenhum comprador recebe mais de **duas**
 mensagens nossas no mês. Quem já recebeu duas fica **"fora: teto do mês"** naquele envio — com o
-motivo escrito na linha — e o lote segue com os próximos da fila. A tela Publicações, no Marketing,
+motivo escrito na linha — e o lote segue com os próximos da fila. A aprovação da peça, no Marketing,
 mostra antes de agendar quantos ficariam fora; quem decide de verdade é este envio, na hora de sair.
+
+**A peça a mais** (desde 27/10/2026, #1175): quando o dono marca, ao aprovar a peça no Marketing,
+**"Peça a mais (passa do teto do mês)"**, o envio chega com essa marca e **o teto não segura
+ninguém nele** — o comprador que já recebeu duas no mês recebe esta também. Só o gesto do dono passa
+do teto; os outros envios do mês continuam segurando.
 
 **O resumo ao representante** (desde 26/10/2026, #1142). Depois de cada lote, o **representante** (ou
 o corretor) recebe **uma** mensagem no WhatsApp: quantos clientes dele receberam, o que receberam, e
@@ -86,5 +91,5 @@ o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP 
 - **Não manda nada ao dono:** o resumo é só de representante e corretor.
 - **Não manda comunicação direta a quem nunca aceitou.**
 - **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão).
-- **Não tira ninguém do teto do mês:** o comprador no teto volta a receber no mês seguinte; não há
-  botão para mandar a terceira.
+- **Não tira ninguém do teto do mês por aqui:** o comprador no teto volta a receber no mês seguinte.
+  A única passagem é a **peça a mais**, marcada pelo dono no Marketing, ao aprovar a peça.
