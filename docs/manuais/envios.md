@@ -15,6 +15,12 @@ Ver, cliente por cliente, o que aconteceu com um envio aprovado. Há dois tipos:
 - **Comunicação direta** — uma arte com o texto e o botão "Falar com meu atendimento": um toque e
   o cliente já está no WhatsApp do responsável dele, e o toque fica anotado. **Só vai a quem já
   aceitou.**
+- **A abertura do canal** (desde 28/10/2026, #1182) — a primeira mensagem ao comprador da carteira,
+  pelo modelo **abertura_do_canal**: o aviso de que a Renascer passou a falar com ele por aqui, com os
+  botões "Quero receber" / "Não quero receber", e o **pacote** (a leitura de safra e uma arte útil)
+  depois do toque. Aparece aqui como **material**, mas vai à **lista do comprador** da campanha (e
+  não às revendas com a versão da logo), **só a quem disse sim** ao marketing no cadastro do ERP ou
+  já tocou "Quero receber". Conta no teto do mês como **um** envio.
 
 ## 2. Quem usa e quando
 
