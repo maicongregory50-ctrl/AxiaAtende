@@ -7,7 +7,8 @@
 
 ## 1. Para que serve
 
-Ver, cliente por cliente, o que aconteceu com um envio aprovado. Há dois tipos:
+Ver, cliente por cliente, o que aconteceu com um envio aprovado. Há três tipos (o terceiro, a
+abertura do canal, usa o mesmo convite do material, mas vai a outra lista):
 
 - **Material para cliente** — a peça da esteira, com a versão de cada revenda. Vai um **convite** com
   a capa e os botões "Quero receber" / "Não quero receber"; quem toca "Quero receber" recebe as
