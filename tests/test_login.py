@@ -65,4 +65,4 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                                 "029_vaga_sem_autoavaliacao.sql", "030_hora_de_envio_das_fotos_antigas.sql",
                                 "032_clientes_do_dia.sql",
                               "033_fila_por_numero_e_resumo.sql", "034_teto_do_comprador.sql",
-                              "035_peca_a_mais.sql"]
+                              "035_peca_a_mais.sql", "036_modelo_abertura_do_canal.sql"]
