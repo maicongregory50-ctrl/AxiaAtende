@@ -14,6 +14,17 @@ const SITUACAO = {
 const TIPO = { material: 'Material para cliente', direta: 'Comunicação direta' }
 const ESTADO = { ativo: 'enviando', parado_nota: 'PARADO pela nota do número', concluido: 'concluído', suspenso: 'suspenso' }
 const NOTA = { GREEN: 'verde', YELLOW: 'amarela', RED: 'vermelha', UNKNOWN: 'sem leitura' }
+// #1188: os avisos a equipe. Dentro das 24 h da pessoa saem como texto (de graca); fora, esperam o
+// toque em Ver da reabertura; 7 dias sem o toque, "nao visto" -- e nao somem.
+const ESTADO_AVISO = {
+  texto: ['Enviado (texto)', 'v'], modelo: ['Enviado (modelo)', 'v'], guardado: ['Guardado', 'a'],
+  nao_visto: ['Não visto', 'r'], erro: ['Erro', 'r'], na_fila: ['na fila', ''],
+}
+const TIPO_AVISO = {
+  recusa: 'Cliente pediu para parar', sem_atendimento: 'Cliente sem atendimento', avaliacao_ruim: 'Avaliação ruim',
+  endereco_fora: 'Endereço fora do ar', endereco_voltou: 'Endereço voltou', plano_sem_registro: 'Plano sem registro',
+  lote_do_representante: 'Resumo do lote',
+}
 
 export default function Envios() {
   const [lista, setLista] = useState(null)
@@ -102,6 +113,26 @@ export default function Envios() {
                     {l.resposta === 'texto' && <><span className="selo v">escreveu · {hora(l.resposta_em)}</span> “{l.resposta_texto}”</>}
                     {!l.resposta && <span className="leve">—</span>}</td>
                   <td>{l.resposta === 'quero' ? l.imagens : <span className="leve">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {lista && lista.avisos && lista.avisos.length > 0 && (
+        <>
+          <h2>Avisos à equipe · últimos 30 dias</h2>
+          <table className="tabela">
+            <thead><tr><th>Para</th><th>Aviso</th><th>Situação</th><th>Quando</th><th>Criado</th></tr></thead>
+            <tbody>
+              {lista.avisos.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.para} <span className="leve">{a.numero}</span></td>
+                  <td>{TIPO_AVISO[a.tipo] || a.tipo}</td>
+                  <td><span className={'selo ' + ESTADO_AVISO[a.estado][1]}>{ESTADO_AVISO[a.estado][0]}</span>
+                    {a.estado === 'erro' && <span className="leve"> {a.erro}</span>}</td>
+                  <td>{a.em ? quando(a.em) : <span className="leve">—</span>}</td>
+                  <td>{quando(a.criado_em)}</td>
                 </tr>
               ))}
             </tbody>

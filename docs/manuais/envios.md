@@ -82,9 +82,51 @@ o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP 
 - **Nunca vai ao dono nem ao flutuante.** Até 23/10/2026 saía uma **cópia de cada convite** ao
   responsável, e no material às revendas o responsável é o dono — foi assim que as artes da Agro
   Real e da Agro Símil chegaram ao WhatsApp dele. A cópia acabou.
-- **Se o resumo não chegar:** o modelo `aviso_lote_do_representante` precisa estar aprovado na Meta,
-  na categoria **Utilidade**. Sem ele o aviso fica guardado com o erro escrito e **ninguém recebe** —
-  nada se perde, e sai quando o modelo entrar.
+- **Se o resumo não chegar:** quem **falou com o número da empresa no último dia** recebe o resumo
+  direto, como texto, e para isso não precisa de modelo nenhum. Quem não falou depende de dois
+  modelos aprovados na Meta: o `reabrir_avisos` (o "Você tem N aviso(s)… Ver", da seção abaixo) e,
+  com o porteiro desligado, o `aviso_lote_do_representante`, na categoria **Utilidade**. Sem o modelo,
+  o aviso aparece com **Erro** na tabela de avisos, com o motivo escrito, e **ninguém recebe**.
+
+## 4.1 Os avisos à equipe (desde 28/10/2026, #1188)
+
+Os avisos que o sistema manda **à equipe** pelo WhatsApp: o resumo do lote ao representante, o
+cliente que pediu para parar, o cliente que disse que não recebeu atendimento, a avaliação ruim, o
+endereço público fora do ar e o plano de marketing sem registro. Ficam numa tabela própria, **Avisos à
+equipe · últimos 30 dias**, no fim desta tela, com o nome de quem recebe, o número mascarado e o
+estado. **Cliente não entra aqui:** o convite dele já tem botão.
+
+**Para que serve.** A Meta só deixa mandar mensagem **de graça** a quem falou com o número da empresa
+nas últimas 24 horas; fora disso, cada mensagem é um modelo pago. Então o aviso:
+
+- **sai de graça, como texto**, quando a pessoa falou com o número da empresa no último dia (qualquer
+  mensagem: texto, foto ao canal de campo, um toque num botão). A frase é a mesma do modelo daquele
+  aviso;
+- **espera um toque**, quando ela não falou: chega **uma** mensagem só — *"Você tem 3 aviso(s) da
+  Sementes Renascer. Toque em Ver para receber."* —, e o toque em **Ver** traz os três na hora, na
+  ordem em que nasceram. Enquanto ela não toca, aviso novo **só se soma** aos guardados: não sai outra
+  mensagem dessas. Se ela escrever para o número da empresa em vez de tocar Ver, os guardados saem
+  igual, logo depois.
+
+**O que significa cada sinal:**
+
+| Sinal | Quer dizer |
+|---|---|
+| **Enviado (texto)** | saiu de graça: a pessoa tinha falado com o número da empresa no último dia |
+| **Enviado (modelo)** | saiu como modelo pago (o caminho de antes, com o porteiro desligado) |
+| **Guardado** | esperando o toque em **Ver** da mensagem "Você tem N aviso(s)" |
+| **Não visto** | **7 dias sem o toque.** O aviso não sai mais e **não some**: a pessoa não está lendo, e vale um telefonema |
+| **Erro** | a Meta recusou (o motivo está escrito ao lado). Em geral é modelo que ainda não foi aprovado |
+| **na fila** | ainda vai sair, na próxima volta (a cada minuto) |
+| **"—" em Quando** | ainda não aconteceu (não é zero) |
+
+**A chave.** Isso tudo depende de uma chave no serviço do recepcionista, `AXIAATENDE_PORTEIRO`, que
+**nasceu desligada** e só liga depois de o modelo `reabrir_avisos` estar aprovado na Meta. Desligada,
+todo aviso sai como antes, **um modelo pago por aviso**; o que estava guardado sai assim também, e o
+"não visto" continua parado.
+
+**O que NÃO faz:** não vale para cliente; não reenvia o que ficou **não visto**; não muda o texto de
+nenhum aviso; não deixa o toque em Ver de um número soltar o aviso de outro.
 
 ## 5. O que a tela NÃO faz
 

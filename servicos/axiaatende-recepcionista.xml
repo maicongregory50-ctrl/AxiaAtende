@@ -22,6 +22,10 @@
   <env name="AXIAATENDE_AMBIENTE" value="producao"/>
   <env name="AXIAATENDE_PROCESSO" value="recepcionista"/>
   <env name="AXIAATENDE_LOGS" value="C:\Logs\AxiaAtende\recepcionista"/>
+  <!-- #1188: o porteiro dos avisos internos (texto dentro das 24 h; fora, a reabertura com o Ver).
+       NASCE off. So vira on depois de o modelo reabrir_avisos estar APROVADO na Meta; ligado antes,
+       a reabertura falha e ninguem recebe o aviso. Para desligar: voltar a off e reiniciar. -->
+  <env name="AXIAATENDE_PORTEIRO" value="off"/>
   <logpath>C:\Logs\AxiaAtende\recepcionista</logpath>
   <log mode="roll-by-size">
     <sizeThreshold>10240</sizeThreshold>
