@@ -66,4 +66,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                                 "032_clientes_do_dia.sql",
                               "033_fila_por_numero_e_resumo.sql", "034_teto_do_comprador.sql",
                               "035_peca_a_mais.sql", "036_modelo_abertura_do_canal.sql",
-                              "037_texto_da_abertura_do_canal.sql"]
+                              "037_texto_da_abertura_do_canal.sql",
+                              "038_abertura_do_canal_volta_ao_texto_aprovado.sql"]

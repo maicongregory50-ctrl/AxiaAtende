@@ -23,6 +23,6 @@ def test_a_abertura_sai_como_convite_com_o_primeiro_nome_e_os_botoes(ligado, ima
     assert m["botoes"] and m["botoes"][0].endswith(":quero") and m["botoes"][1].endswith(":nao_quero")
     with conexao(ligado) as con:
         r = con.execute("SELECT texto, uso FROM atendimento.modelos WHERE nome = 'abertura_do_canal'").fetchone()
-    # o texto da 037 (dono, 28/10/2026): ola, o que vem por aqui e a pergunta do primeiro boletim
-    assert r["uso"] == "convite" and "agora também pelo WhatsApp" in r["texto"]
-    assert r["texto"].endswith("Quer receber?")
+    # o texto APROVADO na Meta (o da 036; a 037 o trocou e a 038 o devolveu, 28/10/2026)
+    assert r["uso"] == "convite" and "começou a falar com você por aqui" in r["texto"]
+    assert r["texto"].endswith("mandamos aqui na conversa.")
