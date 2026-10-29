@@ -412,8 +412,9 @@ class Envio:
 
     #: o canal de quem RECEBE o resumo do lote. O dono e o flutuante ficam de fora: a copia por
     #: cliente ia ao dono (o marketing o poe como responsavel de toda revenda) e foi assim que as
-    #: artes da Agro Real e da Agro Simil chegaram ao WhatsApp dele em 23/10.
-    CANAIS_DO_RESUMO = ("representante", "corretor")
+    #: artes da Agro Real e da Agro Simil chegaram ao WhatsApp dele em 23/10. E o CORRETOR tambem
+    #: (#1197, dono 29/10/2026): "corretor nao e representante; corretor nao recebe aviso nosso".
+    CANAIS_DO_RESUMO = ("representante",)
 
     def _resumo_ao_representante(self, con, e, fila):
         """#1142 (dono, 26/10/2026): UM RESUMO POR LOTE ao representante, no lugar de uma copia por

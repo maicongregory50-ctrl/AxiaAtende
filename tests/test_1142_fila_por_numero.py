@@ -118,6 +118,15 @@ def test_o_resumo_nunca_vai_ao_dono_nem_ao_flutuante(ligado, imagens):
     assert not [x for x in s.modelos if x["para"] == DONO[1]]
 
 
+def test_1197_o_resumo_nao_vai_ao_corretor(ligado, imagens):
+    """Dono, 29/10/2026: "corretor nao e representante; corretor nao recebe aviso nosso"."""
+    c = _com(cliente(50, 100, whatsapp="47999000050", resp=REPRESENTANTE),
+             papel="comprador", responsavel_canal="corretor")
+    s = _mandar_o_lote(ligado, [c], imagens)
+    assert [x for x in s.modelos if x["para"] == "5547999000050"]   # o cliente recebe
+    assert avisos(ligado) == []
+
+
 def test_um_cliente_so_fala_no_singular(ligado, imagens):
     c = _com(cliente(40, 100, whatsapp="47999000040", resp=REPRESENTANTE),
              papel="comprador", responsavel_canal="representante")

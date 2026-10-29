@@ -102,7 +102,9 @@ export default function Envios() {
                 <tr key={l.codigo}>
                   <td>{l.codigo} · {l.nome}</td><td>{l.cidade} {l.uf}</td>
                   <td>{l.responsavel || <span className="leve">— {l.sugestao && `sugestão: ${l.sugestao}`}</span>}</td>
-                  <td><span className={'selo ' + SITUACAO[l.situacao][1]}>{SITUACAO[l.situacao][0]}</span></td>
+                  {/* #1197: com o nome do responsavel preenchido, o que falta e o WhatsApp dele */}
+                  <td><span className={'selo ' + SITUACAO[l.situacao][1]}>{l.situacao === 'sem_responsavel' && l.responsavel
+                    ? 'responsável sem WhatsApp' : SITUACAO[l.situacao][0]}</span></td>
                   <td>{quando(l.convite_em)}</td>
                   <td className={l.entregue_em ? 'ok' : ''}>{hora(l.entregue_em)}</td>
                   <td className={l.lido_em ? 'ok' : ''}>{hora(l.lido_em)}</td>
