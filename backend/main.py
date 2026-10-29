@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agenda, clientes_erp, config, eventos_erp, migracoes, seguranca
+from . import agenda, clientes_erp, config, eventos_erp, migracoes, retomadas_erp, seguranca
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -53,7 +53,9 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
                 return
 
     def empurrar_os_eventos():
-        """#1090: o estado das mensagens enviadas a clientes vai ao Relacionamento do ERP, a cada 15 min."""
+        """#1090: o estado das mensagens enviadas a clientes vai ao Relacionamento do ERP, a cada 15 min.
+        #1193: na mesma volta, as retomadas do ERP viram aceite aqui -- em tentativa propria, um erro de
+        um lado nao leva o outro."""
         while True:
             try:
                 r = eventos_erp.empurrar(cfg)
@@ -61,6 +63,12 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
                     print("eventos ao ERP: %s" % r["erro"], flush=True)
             except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
                 print("eventos ao ERP: %s" % type(falha).__name__, flush=True)
+            try:
+                r = retomadas_erp.buscar(cfg)
+                if "erro" in r:
+                    print("retomadas do ERP: %s" % r["erro"], flush=True)
+            except Exception as falha:  # noqa: BLE001 -- idem
+                print("retomadas do ERP: %s" % type(falha).__name__, flush=True)
             if parar.wait(eventos_erp.INTERVALO_SEGUNDOS):
                 return
 

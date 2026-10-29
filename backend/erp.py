@@ -70,6 +70,27 @@ def empurrar_eventos(cfg, eventos: list[dict]) -> dict:
         raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
 
 
+def retomadas(cfg, depois: int) -> list[dict]:
+    """#1193: as retomadas que uma pessoa registrou no Relacionamento do ERP depois de falar com o
+    cliente, com id maior que `depois` (ate 200 por vez). O MESMO agente e o MESMO segredo dos eventos
+    (CRM.EVT.W). Fora do ar ou recusa: `ErpIndisponivel`."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        token = _pedir(base + "/auth/agente", {"agente": cfg.erp_agente, "segredo": cfg.erp_segredo,
+                                               "minutos": 5})["access_token"]
+        return _pedir(base + "/relacionamento/retomadas?depois=%d" % int(depois), token=token)["retomadas"]
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão CRM.EVT.W",
+                  404: "o ERP ainda não tem as retomadas (#1193)"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo que não são as retomadas") from None
+
+
 # ── #1090 etapa 3: "Meus clientes" (CRM.WPP, fase586 do ERP) ──────────────────────────────────────
 
 class ErpRecusou(ValueError):

@@ -68,7 +68,9 @@ Ao encerrar ou fazer pausa longa:
 3. **A IA não tem ferramenta.** Ela devolve só uma chave da lista de motivos; o link sai sempre da tela
    Destinos. Erro, demora ou resposta fora da lista vão para o menu, nunca para "tente de novo".
 4. **Consentimento não se apaga.** Aceite e recusa ficam gravados com data e id da Meta, inclusive num
-   rollback. Quem recusou não recebe mais convite.
+   rollback. Quem recusou não recebe mais convite, a não ser que uma pessoa registre no ERP a retomada
+   depois de falar com ele (#1193): ela entra como aceite novo (`origem = 'retomada'`, com quem e quando,
+   na hora em que foi registrada), e a recusa continua gravada. Um toque de recusa mais novo vence de novo.
 5. **Envio em degraus:** lotes de até 20 por dia, por faturamento; o próximo só sai com a nota do
    número em verde, e na amarela para sozinho.
 6. **Categoria declarada é a verdadeira.** Convite é Marketing. Aviso interno é Utilidade; se a Meta

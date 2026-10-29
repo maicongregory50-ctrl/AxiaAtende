@@ -30,6 +30,7 @@ envio que o AxiaMarketing pede. Ele não decide campanha, peça nem lista: isso 
 | A Cloud API do WhatsApp (`graph.facebook.com`) e a conta 1442233593867052 | Meta | nada entra e nada sai |
 | A API da Anthropic | Anthropic | quem escreve em vez de tocar recebe o menu; o resto continua |
 | O pedido de envio e a lista com o responsável de cada cliente | AxiaMarketing | não há envio à carteira; o recepcionista continua |
+| O Relacionamento do ERP pelo agente `ATENDIMENTO` (`CRM.EVT.W`): empurrar os estados das mensagens (#1090) e buscar as retomadas (#1193, `GET /relacionamento/retomadas`) | AxiaGestão | os estados não chegam ao ERP e quem foi retomado lá continua bloqueado aqui pela recusa; o envio e o recepcionista continuam |
 | Assinatura Claude Code no perfil | perfil do usuário | sem sessão de agente; os serviços continuam |
 
 ## Se eu cair
