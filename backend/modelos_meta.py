@@ -32,6 +32,8 @@ BOTAO_FALAR = "Falar com meu atendimento"
 #: terceiro e o link para conversar com o candidato, pelo NOSSO endereco (/falar/v<id>-<assinatura>).
 BOTOES_TRIAGEM = ("Triagem certa", "Triagem errada")
 BOTAO_CANDIDATO = "Conversar com o candidato"
+#: #1188: o botao da reabertura dos avisos internos; volta com a carga `reabrir:<numero>`.
+BOTAO_VER = "Ver"
 #: O endereco publico do recepcionista (Funnel 443). O botao da direta termina em {{1}} = o codigo.
 ENDERECO_FALAR = "https://serverrenascer.taild57672.ts.net/falar/"
 LIMITE_BOTAO = 25
@@ -40,6 +42,7 @@ LIMITE_BOTAO = 25
 EXEMPLOS = {
     "primeiro_nome": "João", "nome": "Agro Exemplo", "assunto": "soja", "peca": "a peça da semana",
     "n_imagens": "6", "responsavel": "o Maicon",
+    "n_avisos": "3",   # #1188, a reabertura dos avisos internos
     # #1098: o curriculo para a Fran (candidato ficticio, o mesmo da maquete)
     "vaga": "Vaga Comercial", "candidato": "João Exemplo (49 9 0000-0000)",
     "declarou": "atende a todos os requisitos",
@@ -106,6 +109,8 @@ def componentes(m: dict, cabecalho: str | None = None, documento: str | None = N
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t} for t in BOTOES_TRIAGEM] + [{
             "type": "URL", "text": BOTAO_CANDIDATO, "url": ENDERECO_FALAR + "{{1}}",
             "example": [ENDERECO_FALAR + "v1-0a1b2c3d4e5f6a7b"]}]})
+    elif m["botao"] == "ver":
+        saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": BOTAO_VER}]})
     for b in (c for c in saida if c["type"] == "BUTTONS"):
         for botao in b["buttons"]:
             assert len(botao["text"]) <= LIMITE_BOTAO, botao["text"]

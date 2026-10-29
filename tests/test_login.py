@@ -1,4 +1,4 @@
-﻿"""C2 do plano #950: o login das telas (copia do AxiaMarketing) entra, recusa e tranca."""
+"""C2 do plano #950: o login das telas (copia do AxiaMarketing) entra, recusa e tranca."""
 from fastapi.testclient import TestClient
 
 from backend import seguranca
@@ -68,4 +68,4 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                               "035_peca_a_mais.sql", "036_modelo_abertura_do_canal.sql",
                               "037_texto_da_abertura_do_canal.sql",
                               "038_abertura_do_canal_volta_ao_texto_aprovado.sql",
-                              "040_portao_do_cliente_da_carteira.sql"]
+                              "039_porteiro_dos_avisos.sql", "040_portao_do_cliente_da_carteira.sql"]

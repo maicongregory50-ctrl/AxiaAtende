@@ -182,15 +182,18 @@ def rotas(cfg) -> APIRouter:
 
     @r.get("/pedido/aviso/{aviso_id}")
     def situacao_do_aviso(aviso_id: int, x_axiaatende_chave: str | None = Header(default=None)):
-        """Na fila (sem enviado_em e sem erro), enviado (com a hora) ou com o erro. So os do plano."""
+        """Na fila (sem enviado_em e sem erro), enviado (com a hora) ou com o erro. So os do plano.
+        #1188: a `situacao` continua nesses tres valores (o CHECK do marketing so os aceita); o
+        guardado (esperando o toque em Ver) e o nao visto vem ao lado, e na fila continuam."""
         conferir(x_axiaatende_chave)
         with conexao(cfg) as con:
-            a = con.execute("""SELECT criado_em, enviado_em, erro FROM atendimento.avisos
+            a = con.execute("""SELECT criado_em, enviado_em, erro, guardado_em, nao_visto_em FROM atendimento.avisos
                                 WHERE id = %s AND tipo = 'plano_sem_registro'""", (aviso_id,)).fetchone()
         if not a:
             raise HTTPException(status_code=404, detail="aviso não encontrado")
         situacao = "erro" if a["erro"] else ("enviado" if a["enviado_em"] else "na_fila")
         return {"situacao": situacao, "criado_em": a["criado_em"], "enviado_em": a["enviado_em"],
-                "erro": a["erro"]}
+                "erro": a["erro"], "guardado": a["guardado_em"] is not None and not a["enviado_em"],
+                "nao_visto": a["nao_visto_em"] is not None}
 
     return r

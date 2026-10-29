@@ -17,6 +17,25 @@ PRECO_CONVITE = 0.07   # US$ por mensagem paga, por cima (A2 do plano)
 WHATS = re.compile(r"^55[1-9][0-9]9?[0-9]{8}$")
 
 
+def estado_do_aviso(a) -> dict:
+    """#1188: um aviso a equipe na tela Envios. O estado, e a hora em que ele aconteceu:
+    `texto` e `modelo` (saiu: de graca, ou pago), `guardado` (esperando o toque em Ver da reabertura),
+    `nao_visto` (7 dias sem o toque), `erro` (a Meta recusou) e `na_fila` (ainda nao saiu)."""
+    if a["erro"]:
+        estado, em = "erro", None
+    elif a["enviado_em"]:
+        estado, em = ("texto" if a["como"] == "texto" else "modelo"), a["enviado_em"]
+    elif a["nao_visto_em"]:
+        estado, em = "nao_visto", a["nao_visto_em"]
+    elif a["guardado_em"]:
+        estado, em = "guardado", a["guardado_em"]
+    else:
+        estado, em = "na_fila", None
+    return {"id": a["id"], "tipo": a["tipo"], "para": a["para_nome"], "numero": mascarar(a["para_whatsapp"]),
+            "estado": estado, "em": em.isoformat() if em else None, "criado_em": a["criado_em"].isoformat(),
+            "erro": a["erro"]}
+
+
 def mascarar(numero: str | None) -> str:
     """+55 46 9…·4421: o bastante para reconhecer, nunca o numero inteiro na tela."""
     d = re.sub(r"\D", "", numero or "")
@@ -153,8 +172,11 @@ def rotas(cfg, usuario) -> APIRouter:
                      FROM atendimento.envios e LEFT JOIN atendimento.envio_destinatarios d ON d.envio_id = e.id
                     GROUP BY e.id ORDER BY e.id DESC LIMIT 100""").fetchall()
             nota = con.execute("SELECT nota, lida_em FROM atendimento.nota_qualidade ORDER BY lida_em DESC LIMIT 1").fetchone()
+            avisos = con.execute("""SELECT * FROM atendimento.avisos WHERE criado_em > now() - interval '30 days'
+                                     ORDER BY id DESC LIMIT 200""").fetchall()
         return {"envios": [{**dict(e), "aprovado_em": e["aprovado_em"].isoformat()} for e in lista],
-                "nota": dict(nota, lida_em=nota["lida_em"].isoformat()) if nota else None}
+                "nota": dict(nota, lida_em=nota["lida_em"].isoformat()) if nota else None,
+                "avisos": [estado_do_aviso(a) for a in avisos]}
 
     @r.get("/envios/{envio_id}")
     def envio(envio_id: int, responsavel: str = "", resposta: str = ""):

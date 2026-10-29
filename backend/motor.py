@@ -22,6 +22,7 @@ O QUE VOLTA NO TOQUE (o `id` do botao ou da linha), e a unica coisa que o motor 
     pos:sim | pos:nao a resposta da pergunta das 4h30
     nota:<bom|normal|ruim>  a nota da pesquisa (1..5 = a lista antiga)
     envio:...         resposta a um convite da carteira (tratada pelo modulo de envio, Fase E)
+    reabrir:<numero>  o Ver da reabertura dos avisos internos (#1188, tratado pelo modulo de envio)
 """
 import unicodedata
 from dataclasses import dataclass
@@ -671,6 +672,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     if e.toque and e.toque.startswith("envio:"):
         if envio is not None:
             envio.tratar_toque(con, saida, e, agora)
+        return
+    # #1188: o Ver da reabertura solta os avisos guardados. Nao abre o menu nem a OlivIA.
+    if e.toque and e.toque.startswith("reabrir:"):
+        if envio is not None:
+            envio.tratar_reabrir(con, saida, e, agora)
         return
     # #1098: o retorno da Fran sobre a triagem vem ANTES do canal de campo -- ela e "da casa", e o
     # comentario dela depois de "Triagem errada" viraria a frase da proxima foto. A conversa de vaga

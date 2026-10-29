@@ -83,6 +83,11 @@ class Config:
     # responde SO a estes numeros (`ATENDE_SO_PARA=5549...,5549...`) e grava os outros em escuta.
     # Vazio = responde a todos (a troca de verdade).
     responde_so_para: tuple = ()
+    # #1188: O PORTEIRO DOS AVISOS INTERNOS (`AXIAATENDE_PORTEIRO=on` no XML do recepcionista). Ligado,
+    # o aviso sai como texto livre a quem falou com o numero nas ultimas 24 h, e os outros esperam o
+    # toque em Ver de UM modelo de reabertura. NASCE DESLIGADO, e so liga com o `reabrir_avisos`
+    # aprovado na Meta: sem ele, a reabertura falha e ninguem recebe.
+    porteiro: bool = False
     # A leitura do cadastro no ERP (#969): SO o processo das telas tem o segredo.
     erp_url: str = "http://127.0.0.1:8001"
     erp_agente: str = "ATENDIMENTO"
@@ -167,6 +172,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
         )
     if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
         base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele
-    base.update(ambiente=ambiente, banco_host="127.0.0.1", processo=processo)
+    base.update(ambiente=ambiente, banco_host="127.0.0.1", processo=processo,
+                porteiro=os.environ.get("AXIAATENDE_PORTEIRO", "off").strip().lower() == "on")
     base.update(trocas)
     return Config(**base)

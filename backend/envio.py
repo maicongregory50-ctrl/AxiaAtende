@@ -238,6 +238,56 @@ def _nao_e_whatsapp(con, numero):
                            WHERE whatsapp = %s AND situacao = 'nao_e_whatsapp'""", (numero,)).fetchone() is not None
 
 
+# ── o porteiro dos avisos internos (#1188) ──────────────────────────────────
+#
+# Dono, 28/10/2026: "sempre que passou de 24 horas do ultimo contato, a proxima mensagem precisa de um
+# botao, para receber mensagem do contato e abrir as 24 h de envio novamente". So os avisos INTERNOS
+# (`atendimento.avisos`: o representante, a equipe, o dono); o cliente e o #1189. Com a chave
+# `porteiro` ligada:
+#   - a pessoa escreveu ao numero da empresa nas ultimas 24 h: o aviso sai como TEXTO, de graca;
+#   - nao escreveu: o aviso fica GUARDADO, e sai UMA reabertura por numero (modelo de uso `reabertura`,
+#     "Voce tem N aviso(s)... Toque em Ver"). Aviso novo com reabertura pendente so se soma;
+#   - o toque em Ver (`reabrir:<numero>`) solta os guardados daquele numero, na ordem, como texto;
+#   - 7 dias sem o toque: os guardados da reabertura viram NAO VISTO. Nao saem mais e nao somem.
+
+NAO_VISTO = timedelta(days=7)
+
+
+def janela_aberta(con, numero: str, agora: datetime) -> bool:
+    """A pessoa mandou QUALQUER mensagem (texto, foto, toque, reacao) ao numero da empresa ha menos de
+    24 h. A fonte e `eventos_meta`, e nao `conversas`: o interno que so manda foto ao canal de campo
+    nao abre conversa nenhuma, e a janela dele esta aberta do mesmo jeito (o canal de campo mede
+    assim, `campo.ultima_mensagem_de`). A Meta manda o celular sem o 9; o cadastro o guarda com o 9:
+    procura-se pelas duas formas."""
+    from .saida import wa_id_do_whatsapp
+    formas = list({com_nove(numero), wa_id_do_whatsapp(com_nove(numero))})
+    r = con.execute("""SELECT max(recebido_em) AS em FROM atendimento.eventos_meta
+                        WHERE tipo = 'mensagem' AND corpo->'msg'->>'from' = ANY(%s)""", (formas,)).fetchone()
+    return r is not None and r["em"] is not None and agora - r["em"] < JANELA
+
+
+def texto_do_modelo(m, corpo: list[str]) -> str:
+    """O texto do modelo com as variaveis no lugar, em texto corrido."""
+    texto = m["texto"]
+    for i, valor in enumerate(corpo, start=1):
+        texto = texto.replace("{{%d}}" % i, valor)
+    return texto
+
+
+def _partes_do_aviso(m, a) -> list[str]:
+    partes = (a["sobre"].split("|") + ["", "", ""])[:3]
+    return parametros(m, {"aviso1": partes[0], "aviso2": partes[1], "aviso3": partes[2]})
+
+
+def texto_do_aviso(con, a) -> str:
+    """O aviso como TEXTO LIVRE: a frase do modelo do tipo, com os mesmos dados que o modelo levaria.
+    O representante le a mesma frase pelos dois caminhos."""
+    m = modelo_do_uso(con, "aviso_" + a["tipo"])
+    if not m:
+        raise RuntimeError("nenhum modelo cadastrado para aviso_%s" % a["tipo"])
+    return texto_do_modelo(m, _partes_do_aviso(m, a))
+
+
 # ── a rotina (lado do RECEPCIONISTA) ────────────────────────────────────────
 
 class Envio:
@@ -247,9 +297,11 @@ class Envio:
     def __init__(self, ler_nota=None):
         self._ler_nota = ler_nota
         self._segredo = ""
+        self._porteiro = False
 
     def rotina(self, cfg, saida: Saida, agora: datetime) -> None:
         self._segredo = cfg.meta_app_secret
+        self._porteiro = cfg.porteiro
         with conexao(cfg) as con:
             self.ler_nota_do_dia(con, agora)
             self.mandar_lotes(con, saida, agora)
@@ -485,18 +537,116 @@ class Envio:
             self._mandar_imagens(con, saida, d["id"], agora)
 
     def mandar_avisos(self, con, saida, agora):
+        if self._porteiro:
+            self._porteiro_dos_avisos(con, saida, agora)
+            return
+        # Chave desligada: um modelo por aviso, como sempre. O guardado de quando ela estava ligada sai
+        # aqui tambem (o ROLLBACK da spec); o nao visto, nao: "nao reenvia o que ficou nao visto".
         for a in con.execute("""SELECT * FROM atendimento.avisos WHERE enviado_em IS NULL AND erro = ''
+                                   AND nao_visto_em IS NULL
                                  ORDER BY id LIMIT 20""").fetchall():
             m = modelo_do_uso(con, "aviso_" + a["tipo"])
             try:
                 if not m:
                     raise RuntimeError("nenhum modelo cadastrado para aviso_%s" % a["tipo"])
-                partes = (a["sobre"].split("|") + ["", "", ""])[:3]
-                corpo = parametros(m, {"aviso1": partes[0], "aviso2": partes[1], "aviso3": partes[2]})
-                w = saida.modelo(a["para_whatsapp"], m["nome"], m["idioma"], corpo)
-                con.execute("UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s WHERE id = %s", (agora, w, a["id"]))
+                w = saida.modelo(a["para_whatsapp"], m["nome"], m["idioma"], _partes_do_aviso(m, a))
+                con.execute("UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'modelo' WHERE id = %s",
+                            (agora, w, a["id"]))
             except Exception as falha:  # noqa: BLE001
                 con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+
+    def _porteiro_dos_avisos(self, con, saida, agora):
+        # 1. os guardados: 7 dias sem toque viram nao visto; com a janela aberta (a pessoa escreveu,
+        #    mesmo sem tocar Ver), saem como texto. Uma linha por numero: os guardados nao entram no
+        #    lote de 20 de baixo, senao vinte guardados parariam a fila inteira.
+        # (a reabertura saiu no instante em que guardou o primeiro: `min(guardado_em)` e a hora dela)
+        for g in con.execute("""SELECT a.para_whatsapp, min(a.guardado_em) AS reaberto_em
+                                  FROM atendimento.avisos a
+                                 WHERE a.enviado_em IS NULL AND a.erro = '' AND a.guardado_em IS NOT NULL
+                                   AND a.nao_visto_em IS NULL
+                                 GROUP BY a.para_whatsapp""").fetchall():
+            numero = g["para_whatsapp"]
+            if janela_aberta(con, numero, agora):
+                self.soltar_guardados(con, saida, numero, agora)
+            elif agora - g["reaberto_em"] >= NAO_VISTO:
+                con.execute("""UPDATE atendimento.avisos SET nao_visto_em = %s
+                                WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
+                                  AND guardado_em IS NOT NULL AND nao_visto_em IS NULL""", (agora, numero))
+        # 2. os novos
+        for a in con.execute("""SELECT * FROM atendimento.avisos
+                                 WHERE enviado_em IS NULL AND erro = '' AND guardado_em IS NULL
+                                   AND nao_visto_em IS NULL
+                                 ORDER BY id LIMIT 20""").fetchall():
+            try:
+                # um ponto de retorno por aviso: o erro de banco de um nao derruba a volta dos outros
+                with con.transaction():
+                    self._porteiro_de_um(con, saida, a, agora)
+            except Exception as falha:  # noqa: BLE001 -- o proximo aviso segue; a linha diz o erro
+                con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+
+    def _porteiro_de_um(self, con, saida, a, agora):
+        numero = a["para_whatsapp"]
+        if janela_aberta(con, numero, agora):
+            self._aviso_como_texto(con, saida, a, agora)
+            return
+        pendente = con.execute("""SELECT reabertura_id FROM atendimento.avisos
+                                   WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
+                                     AND guardado_em IS NOT NULL AND nao_visto_em IS NULL
+                                   LIMIT 1""", (numero,)).fetchone()
+        if pendente:   # ja ha reabertura sem toque: so se soma ao guardado
+            con.execute("UPDATE atendimento.avisos SET guardado_em = %s, reabertura_id = %s WHERE id = %s",
+                        (agora, pendente["reabertura_id"], a["id"]))
+            return
+        self._reabrir(con, saida, a, agora)
+
+    def _aviso_como_texto(self, con, saida, a, agora):
+        w = saida.texto(a["para_whatsapp"], texto_do_aviso(con, a))
+        con.execute("""UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'texto' WHERE id = %s""",
+                    (agora, w, a["id"]))
+        con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', %s)",
+                    (w, a["para_whatsapp"], "aviso %s" % a["tipo"]))
+
+    def _reabrir(self, con, saida, a, agora):
+        """UMA reabertura ao numero, com o total que fica guardado (este aviso e os novos do mesmo numero
+        ainda na fila, que na mesma volta se somam a ela pelo `pendente`). Falhou na Meta: o aviso fica
+        com o erro, e nada se guarda."""
+        m = modelo_do_uso(con, "reabertura")
+        if not m:
+            raise RuntimeError("nenhum modelo cadastrado para reabertura")
+        numero = a["para_whatsapp"]
+        quantos = 1 + con.execute("""SELECT count(*) AS n FROM atendimento.avisos
+                                      WHERE para_whatsapp = %s AND id <> %s AND enviado_em IS NULL AND erro = ''
+                                        AND guardado_em IS NULL AND nao_visto_em IS NULL""",
+                                  (numero, a["id"])).fetchone()["n"]
+        w = saida.modelo(numero, m["nome"], m["idioma"], parametros(m, {"n_avisos": quantos}),
+                         botoes=["reabrir:%s" % numero])
+        r = con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
+                           VALUES (%s, %s, 'modelo', 'reabertura dos avisos') RETURNING id""", (w, numero)).fetchone()
+        con.execute("UPDATE atendimento.avisos SET guardado_em = %s, reabertura_id = %s WHERE id = %s",
+                    (agora, r["id"], a["id"]))
+
+    def soltar_guardados(self, con, saida, numero: str, agora: datetime) -> int:
+        """Os guardados do numero saem como texto, na ordem em que nasceram. O nao visto fica como esta."""
+        feitos = 0
+        for a in con.execute("""SELECT * FROM atendimento.avisos
+                                 WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
+                                   AND guardado_em IS NOT NULL AND nao_visto_em IS NULL
+                                 ORDER BY criado_em, id""", (numero,)).fetchall():
+            try:
+                with con.transaction():
+                    self._aviso_como_texto(con, saida, a, agora)
+                feitos += 1
+            except Exception as falha:  # noqa: BLE001
+                con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+        return feitos
+
+    def tratar_reabrir(self, con, saida, entrada, agora: datetime) -> None:
+        """O toque em Ver da reabertura (`reabrir:<numero>`). So vale do proprio numero da carga: um
+        toque de outro numero nao solta o aviso de ninguem. Segundo toque: nada a soltar."""
+        numero = (entrada.toque or "").partition(":")[2]
+        if not numero or com_nove(entrada.pessoa.wa_id) != com_nove(numero):
+            return
+        self.soltar_guardados(con, saida, numero, agora)
 
     # -- os status da Meta para o envio --
     def aplicar_status(self, con, st: dict, novo: str, erro: str, agora: datetime) -> None:
