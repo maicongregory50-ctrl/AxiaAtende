@@ -13,7 +13,7 @@ from backend import migracoes
 from backend.banco import conexao
 from backend.envio import Envio
 from tests.saida_falsa import SaidaFalsa
-from tests.test_envio import QUINTA_9H, cliente, destinatarios, imagens, ligado, pedido, pedir  # noqa: F401
+from tests.test_envio import QUINTA_10H, cliente, destinatarios, imagens, ligado, pedido, pedir  # noqa: F401
 
 REPRESENTANTE = ("Djeison de Oliveira", "5549999567572")
 DONO = ("Maicon Gregory", "5549991505565")
@@ -84,7 +84,7 @@ def test_o_pedido_sem_papel_nem_canal_continua_entrando(ligado, imagens):
 def _mandar_o_lote(cfg, clientes, imgs):
     assert pedir(cfg, pedido(imgs, clientes)).status_code == 200
     s = SaidaFalsa()
-    Envio(ler_nota=lambda: "GREEN").rotina(cfg, s, QUINTA_9H)
+    Envio(ler_nota=lambda: "GREEN").rotina(cfg, s, QUINTA_10H)
     return s
 
 
@@ -148,7 +148,7 @@ def test_o_evento_ao_erp_leva_o_papel(ligado, imagens):
              papel="tecnico", responsavel_canal="representante")
     _mandar_o_lote(ligado, [c], imagens)
     with conexao(ligado) as con:
-        eventos = eventos_erp.montar(con, QUINTA_9H + timedelta(minutes=1))
+        eventos = eventos_erp.montar(con, QUINTA_10H + timedelta(minutes=1))
     assert [e["papel"] for e in eventos] == ["tecnico"]
 
 

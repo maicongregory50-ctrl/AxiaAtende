@@ -13,9 +13,10 @@ from backend.banco import conexao
 from backend.envio import Envio
 from backend.main import criar_app
 from tests.saida_falsa import SaidaFalsa
+from tests.test_1192_janela import dia_util_10h
 from tests.test_envio import CHAVE, cliente, ligado, imagens, pedido, pedir  # noqa: F401 (fixtures)
 
-DIA_5 = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)      # 09:00 em Sao Paulo
+DIA_5 = datetime(2026, 11, 5, 13, 0, tzinfo=timezone.utc)      # quinta, 10:00 em Sao Paulo (#1192: dentro da janela)
 
 
 def _situacao(cfg, ref, codigo):
@@ -35,27 +36,31 @@ def test_a_terceira_do_mes_fica_no_teto_e_o_mes_seguinte_recebe(ligado, imagens)
     env, s = Envio(ler_nota=lambda: "GREEN"), SaidaFalsa()
     gente = [_com_papel(1, "comprador", "47991110001"), _com_papel(2, "tecnico", "47991110002"),
              _com_papel(3, None, "47991110003")]
-    for n, dia in ((1, DIA_5), (2, DIA_5 + timedelta(days=1)), (3, DIA_5 + timedelta(days=2))):
+    # #1192: so dia util -- quinta, sexta e a segunda seguinte
+    for n, dia in ((1, DIA_5), (2, DIA_5 + timedelta(days=1)), (3, DIA_5 + timedelta(days=4))):
         assert pedir(ligado, pedido(imagens, gente, ref="pub-%d" % n, peca="Peca %d" % n)).status_code == 200
         env.rotina(ligado, s, dia)
     assert [_situacao(ligado, "pub-%d" % n, 1) for n in (1, 2, 3)] == ["convidado", "convidado", "teto_do_mes"]
     assert _situacao(ligado, "pub-3", 2) == "convidado"           # o tecnico nao e segurado
     assert _situacao(ligado, "pub-3", 3) == "convidado"           # nem o contato sem papel
-    # 1o de dezembro, 00:30 em Sao Paulo (03:30 UTC): mes novo, o comprador recebe de novo
+    # 1o de dezembro (terca), 10:00 em Sao Paulo: mes novo, o comprador recebe de novo
     assert pedir(ligado, pedido(imagens, gente, ref="pub-4", peca="Peca 4")).status_code == 200
-    env.rotina(ligado, s, datetime(2026, 12, 1, 3, 30, tzinfo=timezone.utc))
+    env.rotina(ligado, s, datetime(2026, 12, 1, 13, 0, tzinfo=timezone.utc))
     assert _situacao(ligado, "pub-4", 1) == "convidado"
 
 
 def test_a_virada_do_mes_e_a_de_sao_paulo(ligado, imagens):
-    """30/11 23:30 em Sao Paulo ja e 01/12 em UTC: ainda e novembro, e conta no teto de novembro."""
+    """30/11 23:30 em Sao Paulo ja e 01/12 em UTC: ainda e novembro, e conta no teto de novembro. Desde
+    o #1192 nenhum lote sai as 23:30 (a janela fecha as 17h): a conta do mes se confere direto."""
     env, s = Envio(ler_nota=lambda: "GREEN"), SaidaFalsa()
     gente = [_com_papel(1, "comprador", "47991110001")]
-    for n, quando in ((1, DIA_5), (2, DIA_5 + timedelta(days=1)),
-                      (3, datetime(2026, 12, 1, 2, 30, tzinfo=timezone.utc))):   # 30/11 23:30 em SP
+    for n, quando in ((1, DIA_5), (2, DIA_5 + timedelta(days=1))):
         pedir(ligado, pedido(imagens, gente, ref="pub-%d" % n, peca="Peca %d" % n))
         env.rotina(ligado, s, quando)
-    assert _situacao(ligado, "pub-3", 1) == "teto_do_mes"
+    with conexao(ligado) as con:
+        numero = con.execute("SELECT whatsapp FROM atendimento.envio_destinatarios LIMIT 1").fetchone()["whatsapp"]
+        assert Envio.recebidas_no_mes(con, numero, datetime(2026, 12, 1, 2, 30, tzinfo=timezone.utc)) == 2
+        assert Envio.recebidas_no_mes(con, numero, datetime(2026, 12, 1, 13, 0, tzinfo=timezone.utc)) == 0
 
 
 def _volta():
@@ -86,7 +91,7 @@ def test_a_volta_recusa_com_o_numero_quando_ha_segurado(ligado, imagens):
 def test_a_rota_da_previa(ligado, imagens):
     env, s = Envio(ler_nota=lambda: "GREEN"), SaidaFalsa()
     pedir(ligado, pedido(imagens, [_com_papel(1, "comprador", "47991110001")], ref="pub-1"))
-    env.rotina(ligado, s, datetime.now(timezone.utc))
+    env.rotina(ligado, s, dia_util_10h())   # #1192: dentro da janela, no mes corrente
     with TestClient(criar_app(ligado)) as c:
         assert c.post("/pedido/teto", json={"numeros": ["5547991110001"]}).status_code == 403
         r = c.post("/pedido/teto", json={"numeros": ["5547991110001", "5547999999999"]}, headers=CHAVE)
@@ -105,7 +110,7 @@ def test_a_peca_a_mais_passa_do_teto_e_a_comum_continua_segurada(ligado, imagens
     a_mais = dict(pedido(imagens, gente, ref="pub-3", peca="Peca 3"), passa_do_teto=True)
     assert pedir(ligado, a_mais).status_code == 200
     pedir(ligado, pedido(imagens, gente, ref="pub-4", peca="Peca 4"))
-    env.rotina(ligado, s, DIA_5 + timedelta(days=2))
+    env.rotina(ligado, s, DIA_5 + timedelta(days=4))   # #1192: a segunda seguinte, dia util
     assert _situacao(ligado, "pub-3", 1) == "convidado"           # o dono mandou alem do teto
     assert _situacao(ligado, "pub-4", 1) == "teto_do_mes"         # a comum continua segurada
     with conexao(ligado) as con:

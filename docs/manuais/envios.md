@@ -64,6 +64,13 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 **Os lotes:** saem até 20 clientes por dia, na ordem do ranking de faturamento (Top 20, depois o 21º
 ao 40º…), e só com a nota verde.
 
+**A janela** (desde 29/10/2026, #1192): o envio ao cliente só sai **de segunda a sexta, das 9h30 às
+17h**, horário de Brasília. Envio aprovado fora da janela (à noite, no sábado) espera e começa no
+próximo dia útil, às 9h30; o lote do dia seguinte também começa às 9h30, nunca à meia-noite. Um envio
+"ativo" que não andou à noite ou no fim de semana **não está parado**: está esperando a janela. As
+imagens depois do "Quero receber" e as respostas do atendimento não esperam: saem na hora, porque são
+resposta a quem acabou de tocar.
+
 **O teto do comprador** (desde 27/10/2026, #1163): nenhum comprador recebe mais de **duas**
 mensagens nossas no mês. Quem já recebeu duas fica **"fora: teto do mês"** naquele envio — com o
 motivo escrito na linha — e o lote segue com os próximos da fila. A aprovação da peça, no Marketing,

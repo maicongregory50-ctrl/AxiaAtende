@@ -8,7 +8,7 @@ from backend.envio import Envio
 from tests.saida_falsa import SaidaFalsa
 from tests.test_envio import cliente, ligado, imagens, pedido, pedir  # noqa: F401 (fixtures)
 
-DIA_5 = datetime(2026, 11, 5, 12, 0, tzinfo=timezone.utc)
+DIA_5 = datetime(2026, 11, 5, 13, 0, tzinfo=timezone.utc)   # quinta, 10:00 em Sao Paulo (#1192)
 
 
 def test_a_abertura_sai_como_convite_com_o_primeiro_nome_e_os_botoes(ligado, imagens):

@@ -12,7 +12,7 @@ from backend.envio import Envio
 from backend.main import criar_app
 from tests.avisos_meta import aviso
 from tests.saida_falsa import SaidaFalsa
-from tests.test_envio import CHAVE, QUINTA_9H, cliente, destinatarios, pedido, pedir
+from tests.test_envio import CHAVE, QUINTA_10H, cliente, destinatarios, pedido, pedir
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def test_direta_vai_com_o_texto_e_o_botao_de_link_do_responsavel_e_sem_imagens_d
     pedir(ligado, direta(imagens, [dict(cliente(1, 30, nome="JOAO DA SILVA",
                                                 resp=("Djeison de Oliveira", "5549999567572")), aceite_cadastro=True)]))
     s = SaidaFalsa()
-    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_9H)
+    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_10H)
     m = next(x for x in s.modelos if x["para"] != "5549999567572")
     assert m["nome"] == "epoca_de_plantio"
     assert m["corpo"] == ["Joao", "plantio do Trigo Mourisco", "Djeison de Oliveira"]
@@ -70,7 +70,7 @@ def test_falar_com_meu_atendimento_anota_e_abre_o_whatsapp_do_responsavel(ligado
     pedir(ligado, direta(imagens, [dict(cliente(1, 30, resp=("Djeison de Oliveira", "5549999567572")),
                                         aceite_cadastro=True)]))
     s, env = SaidaFalsa(), Envio(ler_nota=lambda: "GREEN")
-    env.rotina(ligado, s, QUINTA_9H)
+    env.rotina(ligado, s, QUINTA_10H)
     m = next(x for x in s.modelos if x["para"] != "5549999567572")
     # #1142: a copia nao sai mais, mas o CODIGO dela continua valendo -- ha mensagens com esse botao
     # na rua, e o toque delas ainda chega. O codigo e forjado aqui como a copia o montava.
@@ -101,7 +101,7 @@ def test_cada_revenda_recebe_as_suas_imagens(ligado, imagens):
     pedir(ligado, pedido(imagens, [agro, outro]))
     s = SaidaFalsa()
     env = Envio(ler_nota=lambda: "GREEN")
-    env.rotina(ligado, s, QUINTA_9H)
+    env.rotina(ligado, s, QUINTA_10H)
     convite_agro = next(x for x in s.modelos if x["para"] == destinatarios(ligado)[5475]["whatsapp"])
     assert "agro_capa" not in convite_agro["imagem"] and convite_agro["imagem"].endswith("capa.jpg")
     assert str(ligado.envios_pasta) in convite_agro["imagem"] and "5475" in convite_agro["imagem"]
@@ -110,7 +110,7 @@ def test_cada_revenda_recebe_as_suas_imagens(ligado, imagens):
     msg = {"from": numero, "id": "wamid.t", "timestamp": "1", "type": "button",
            "context": {"from": "554936640121", "id": "x"}, "button": {"payload": "envio:1:quero", "text": "Quero"}}
     R.gravar(ligado, aviso([msg], numero=numero, bsuid="BR.agro"))
-    R.processar_pendentes(ligado, s, None, envio=env, agora=QUINTA_9H + timedelta(hours=1))
+    R.processar_pendentes(ligado, s, None, envio=env, agora=QUINTA_10H + timedelta(hours=1))
     imgs = [x for x in s.enviadas if x[0] == "imagem"]
     assert len(imgs) == 1 and "5475" in imgs[0][2]
 
@@ -120,7 +120,7 @@ def test_aviso_de_recusa_sai_pelo_modelo_do_cadastro(ligado, imagens):
         con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
                        VALUES ('recusa', 'Maicon', '5549991505565', 'Cliente X|10 · Rio do Sul|https://wa.me/554799')""")
     s = SaidaFalsa()
-    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_9H)
+    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_10H)
     assert s.modelos[-1]["nome"] == "aviso_recusa"
     assert s.modelos[-1]["corpo"] == ["Cliente X", "10 · Rio do Sul", "https://wa.me/554799"]
 

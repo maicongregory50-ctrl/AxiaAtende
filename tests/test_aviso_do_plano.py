@@ -12,7 +12,7 @@ from backend.envio import Envio
 from backend.main import criar_app
 from tests.saida_falsa import SaidaFalsa
 
-QUINTA_9H = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)
+QUINTA_10H = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)
 CHAVE = {"X-Axiaatende-Chave": "chave-do-marketing"}
 AVISO = {"tipo": "plano_sem_registro", "partes": ["7", "14/10/2026"]}
 
@@ -58,7 +58,7 @@ def test_o_aviso_vai_para_quem_recebe_o_nao_e_sai_com_o_modelo(ligado):
     assert situacao(ligado, aviso_id).json()["situacao"] == "na_fila"
 
     s = SaidaFalsa()
-    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_9H)
+    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_10H)
     m = [x for x in s.modelos if x["nome"] == "aviso_plano_sem_registro"]
     assert len(m) == 1 and m[0]["para"] == quem["whatsapp"]
     assert m[0]["corpo"][:2] == ["7", "14/10/2026"]

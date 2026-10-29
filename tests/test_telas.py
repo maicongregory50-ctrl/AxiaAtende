@@ -13,6 +13,7 @@ from backend.main import CABECALHO_DA_TELA, criar_app
 from backend.rotas_telas import link_conversa, mascarar
 from tests.avisos_meta import aviso, texto, toque
 from tests.saida_falsa import SaidaFalsa
+from tests.test_1192_janela import dia_util_10h
 from tests.test_envio import cliente, pedido, pedir
 
 AGORA = datetime.now(timezone.utc)
@@ -83,7 +84,7 @@ def test_envios_lista_detalhe_e_religar(ligado, tela, tmp_path):
         (pasta / n).write_bytes(b"\xff\xd8\xff")
         imgs.append(str(pasta / n))
     pedir(ligado, pedido(imgs, [cliente(1, 10), cliente(2, 5, resp=("", ""))]))
-    Envio(ler_nota=lambda: "YELLOW").rotina(ligado, SaidaFalsa(), AGORA)
+    Envio(ler_nota=lambda: "YELLOW").rotina(ligado, SaidaFalsa(), dia_util_10h())   # #1192: dentro da janela
     lista = tela.get("/api/envios").json()
     assert lista["envios"][0]["situacao"] == "parado_nota" and lista["nota"]["nota"] == "YELLOW"
     d = tela.get("/api/envios/1").json()
