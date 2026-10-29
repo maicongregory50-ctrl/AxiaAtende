@@ -303,3 +303,34 @@ def test_1189_o_portao_retroativo_acha_quem_escreveu_e_manda_uma_vez(ligado, ima
         assert [d["erp_codigo"] for _, _, d in lista] == [1]
         assert motor.portao_do_cliente(con, s, None, lista[0][1], agora, env)
         assert s.ultima[0] == "lista" and "https://wa.me/5549991505565" in s.ultima[2]
+
+
+def test_1197_quem_ganhou_responsavel_volta_a_fila_do_envio(ligado, imagens, tmp_path):
+    """Dono, 29/10/2026: a DISAM ficou "sem responsavel" no envio (a CERES sem WhatsApp); corrigido o
+    ERP, ela volta a fila do MESMO envio, na posicao dela -- e quem recusou antes continua fora."""
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location(
+        "religar", Path(__file__).resolve().parent.parent / "scripts" / "religar_sem_responsavel.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    pedir(ligado, pedido(imagens, [cliente(1, 900, resp=("", "")), cliente(2, 500, resp=("", "")), cliente(3, 100)]))
+    with conexao(ligado) as con:
+        con.execute("INSERT INTO atendimento.consentimentos (whatsapp, tipo, wamid) VALUES (%s, 'recusa', 'wamid.teste')",
+                    (destinatarios(ligado)[2]["whatsapp"],))
+    csv_ = tmp_path / "resp.csv"
+    csv_.write_text("erp_codigo,responsavel_nome,responsavel_whatsapp,responsavel_canal\n"
+                    "1,CERES REPRESENTACOES,5542999990000,representante\n"
+                    "2,CERES REPRESENTACOES,5542999990000,representante\n", encoding="utf-8")
+    novos = m.ler(str(csv_))
+    with conexao(ligado) as con:
+        assert all(not x[4].startswith("volta") or x[1] == 1 for x in m.religar(con, novos, gravar=False))
+    assert destinatarios(ligado)[1]["situacao"] == "sem_responsavel"     # o ensaio nao grava
+    with conexao(ligado) as con:
+        m.religar(con, novos, gravar=True)
+    d = destinatarios(ligado)
+    assert d[1]["situacao"] == "aguardando" and d[1]["responsavel_whatsapp"] == "5542999990000"
+    assert d[2]["situacao"] == "sem_responsavel"                         # recusou antes: fora
+    s = SaidaFalsa()
+    Envio(ler_nota=lambda: "GREEN").rotina(ligado, s, QUINTA_10H + timedelta(hours=1))
+    assert destinatarios(ligado)[1]["convite_em"] is not None            # sai no proximo lote
