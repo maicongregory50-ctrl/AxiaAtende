@@ -1,77 +1,78 @@
 /* As telas do AxiaAtende (#950), por cima do estilo da casa (estilo.css, copia do AxiaMarketing). */
 /* o estilo da casa ja da a margem do menu (.casa) e centra o main; aqui ele usa a largura toda */
 .casa main { max-width: none; padding: 22px 28px; }
-.atende h1 { font-size: 22px; color: var(--verde-escuro); margin: 0 0 4px; }
-.atende h2 { font-size: 16px; color: var(--verde-escuro); margin: 22px 0 8px; }
-.atende .sub { color: var(--texto-leve); font-size: 14px; margin: 0 0 14px; max-width: 980px; }
+.atende h1 { font-size: 22px; color: var(--at-titulo); margin: 0 0 4px; }
+.atende h2 { font-size: 16px; color: var(--at-titulo); margin: 22px 0 8px; }
+.atende .sub { color: var(--at-texto-brando); font-size: 14px; margin: 0 0 14px; max-width: 980px; }
 .atende .filtros { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-.atende .grupo { background: #e6f2d8; color: var(--verde-escuro); font-weight: 600; font-size: 13px; padding: 5px 10px;
+.atende .grupo { background: rgba(var(--at-primaria-rgb), .1); color: var(--at-titulo); font-weight: 600; font-size: 13px; padding: 5px 10px;
   border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 8px; }
 .atende .religar { margin-left: auto; }
 .atende .cartoes { display: flex; gap: 8px; margin-bottom: 18px; }
-.atende .cartao { flex: 1; min-width: 0; background: #fff; border: 1px solid var(--borda); border-radius: 8px;
+.atende .cartao { flex: 1; min-width: 0; background: var(--at-superficie); border: 1px solid var(--at-borda); border-radius: 8px;
   padding: 10px 12px; display: flex; flex-direction: column; }
-.atende .cartao span { font-size: 12.5px; color: var(--texto-leve); }
-.atende .cartao b { font-size: 24px; color: var(--verde-escuro); }
-.atende .cartao.alerta b { color: var(--aviso); }
-.atende .tabela { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--borda); font-size: 14px; }
+.atende .cartao span { font-size: 12.5px; color: var(--at-texto-brando); }
+.atende .cartao b { font-size: 24px; color: var(--at-titulo); }
+.atende .cartao.alerta b { color: var(--at-aviso); }
+.atende .tabela { width: 100%; border-collapse: collapse; background: var(--at-superficie); border: 1px solid var(--at-borda); font-size: 14px; }
 .atende .tabela.estreita { width: auto; min-width: 520px; }
-.atende .tabela th { text-align: left; font-size: 12.5px; color: var(--texto-leve); font-weight: 600; background: #fafbf9;
-  padding: 8px 10px; border-bottom: 1px solid var(--borda); }
+.atende .tabela th { text-align: left; font-size: 12.5px; color: var(--at-texto-brando); font-weight: 600; background: var(--at-fundo);
+  padding: 8px 10px; border-bottom: 1px solid var(--at-borda); }
 .atende .tabela th.ordenavel { cursor: pointer; user-select: none; white-space: nowrap; }
-.atende .tabela th.ordenavel:hover { color: var(--texto); }
-.atende .tabela td { padding: 7px 10px; border-bottom: 1px solid #eef1ec; vertical-align: top; }
-.atende .tabela td.ok { color: #2f7d1e; font-weight: 600; }
-.atende .leve { color: var(--texto-leve); font-size: 13px; }
-.atende .vazio { color: var(--texto-leve); }
-.atende .selo { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; background: #eef1ec; color: var(--texto-leve); }
-.atende .selo.v { background: #e3f2d3; color: #2f6a15; }
-.atende .selo.a { background: #fdf0d6; color: var(--aviso); }
-.atende .selo.r { background: #f8e0de; color: var(--perigo); }
-.atende .secundario { background: #fff; color: var(--verde-escuro); border: 1px solid var(--borda); border-radius: 6px; padding: 6px 12px; }
-.atende input[type=time] { border: 1px solid var(--borda); border-radius: 6px; padding: 5px; }
+.atende .tabela th.ordenavel:hover { color: var(--at-texto); }
+.atende .tabela td { padding: 7px 10px; border-bottom: 1px solid var(--at-borda-suave); vertical-align: top; }
+.atende .tabela td.ok { color: var(--at-ok); font-weight: 600; }
+.atende .leve { color: var(--at-texto-brando); font-size: 13px; }
+.atende .vazio { color: var(--at-texto-brando); }
+.atende .selo { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; background: var(--at-superficie-hover); color: var(--at-texto-brando); }
+.atende .selo.v { background: var(--at-ok-fundo); color: var(--at-ok); }
+.atende .selo.a { background: var(--at-aviso-fundo); color: var(--at-aviso); }
+.atende .selo.r { background: var(--at-erro-fundo); color: var(--at-erro); }
+.atende .secundario { background: var(--at-superficie); color: var(--at-violeta); border: 1px solid var(--at-borda); border-radius: 6px; padding: 6px 12px; }
+.atende input[type=time] { border: 1px solid var(--at-borda); border-radius: 6px; padding: 5px; }
 .atende .num { white-space: nowrap; }
 .atende .filtros label.caixa { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; width: auto; flex: none; }
 
 /* #969: quem e, pelo cadastro do ERP (maquete aprovada) */
 .chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin: 3px 6px 0 0;
-        background: #e8f2ea; color: #23633a; border: 1px solid #b9d8c2; }
-.chip.int { background: #e9eef8; color: #2b4a85; border-color: #bccbe6; }
-.chip.fora { background: #f3f3f3; color: #666; border-color: #ddd; }
-.chip.duvida { background: #fdf3e2; color: #8a5a00; border-color: #efd6a6; }
-.cod { color: #777; font-size: 12px; }
-.erro-leve { color: #a33; }
+        background: var(--at-superficie-hover); color: var(--at-ok); border: 1px solid var(--at-ok-fundo); }
+.chip.int { background: var(--at-info-fundo); color: var(--at-info); border-color: var(--at-info-fundo); }
+.chip.fora { background: var(--at-fundo); color: var(--at-texto-brando); border-color: var(--at-borda); }
+.chip.duvida { background: var(--at-urgente-fundo); color: var(--at-aviso); border-color: var(--at-aviso-fundo); }
+.cod { color: var(--at-texto-brando); font-size: 12px; }
+.erro-leve { color: var(--at-erro); }
 
 /* #1025: conversar no WhatsApp pela coluna QUEM. A pilula e acao, e por isso fica na linha do nome,
    e nao na fileira das etiquetas de papel, que sao descricao. O numero mascarado vira link discreto:
-   nada de azul de navegador no meio de uma tabela verde. */
+   nada de azul de navegador no meio da tabela. #1200: o verde do WhatsApp saiu (a marca e da Meta, nao
+   da casa); a pilula e acao, e por isso tem o contorno da cor do programa. */
 .zap { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; white-space: nowrap;
-       background: #25d366; color: #0b3d20; border: 1px solid #1faa51; text-decoration: none; font-weight: 600; }
-.zap:hover { background: #1faa51; color: #fff; }
-.zap-num { color: var(--texto); text-decoration: underline; text-decoration-color: #1faa51;
+       background: rgba(var(--at-primaria-rgb), .1); color: var(--at-violeta); border: 1px solid var(--at-violeta); text-decoration: none; font-weight: 600; }
+.zap:hover { background: var(--at-violeta); color: var(--at-sobre-cor); }
+.zap-num { color: var(--at-texto); text-decoration: underline; text-decoration-color: var(--at-violeta);
            text-underline-offset: 2px; white-space: nowrap; }
-.zap-num:hover { color: #1faa51; }
+.zap-num:hover { color: var(--at-violeta); }
 
 /* Destinos, passada de design de 11/10/2026 (#970): cartoes de ajuste como no ERP (h2, ajuda em
    cinza, cartao branco com borda e sombra leve), botoes com o estado escrito, dias em botoes. */
 .atende.destinos { max-width: 1100px; }
-.atende .ajuda { color: var(--texto-leve); font-size: 13px; margin: 0 0 10px; }
-.atende .cartao-ajuste { background: #fff; border: 1px solid var(--borda); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 14px 16px; margin-bottom: 6px; }
+.atende .ajuda { color: var(--at-texto-brando); font-size: 13px; margin: 0 0 10px; }
+.atende .cartao-ajuste { background: var(--at-superficie); border: 1px solid var(--at-borda); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 14px 16px; margin-bottom: 6px; }
 .atende .cartao-ajuste .tabela { border: 0; }
 .atende .linha-ajuste { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .atende .dias { display: flex; gap: 6px; flex-wrap: wrap; }
-.atende .dia { background: #fff; color: var(--texto-leve); border: 1px solid var(--borda); border-radius: 6px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
-.atende .dia.ligado { background: var(--verde-escuro); color: #fff; border-color: var(--verde-escuro); font-weight: 600; }
+.atende .dia { background: var(--at-superficie); color: var(--at-texto-brando); border: 1px solid var(--at-borda); border-radius: 6px; padding: 5px 10px; font-size: 13px; cursor: pointer; }
+.atende .dia.ligado { background: var(--at-violeta); color: var(--at-sobre-cor); border-color: var(--at-violeta); font-weight: 600; }
 .atende .faixas { display: flex; gap: 12px; flex-wrap: wrap; }
 .atende .faixa { display: inline-flex; gap: 6px; align-items: center; }
 .atende .estado { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; padding: 3px 10px; border-radius: 12px; border: 1px solid transparent; }
-.atende .estado.ok { background: #EAF5EE; color: #1F7A48; border-color: #A3CAB4; }
-.atende .estado.off { background: #eef1ec; color: var(--texto-leve); border-color: var(--borda); }
-.atende .fantasma { background: transparent; color: var(--texto); border: 1px solid var(--borda); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-.atende .fantasma:hover { background: var(--neutro); }
+.atende .estado.ok { background: var(--at-superficie-hover); color: var(--at-ok); border-color: var(--at-ok); }
+.atende .estado.off { background: var(--at-superficie-hover); color: var(--at-texto-brando); border-color: var(--at-borda); }
+.atende .fantasma { background: transparent; color: var(--at-texto); border: 1px solid var(--at-borda); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.atende .fantasma:hover { background: var(--at-fundo); }
 .atende .pequeno { padding: 4px 10px; font-size: 12px; }
-.atende button.perigo { background: var(--perigo); color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+.atende button.perigo { background: var(--at-erro); color: var(--at-sobre-cor); border: 0; border-radius: 6px; cursor: pointer; }
 .atende .primario:disabled { opacity: .5; cursor: not-allowed; }
 .atende td.acoes { white-space: nowrap; display: flex; gap: 4px; }
-.atende tr.editando td { background: #fafbf9; }
-.atende .aviso.ok { background: #EAF5EE; color: #1F7A48; border: 1px solid #A3CAB4; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+.atende tr.editando td { background: var(--at-fundo); }
+.atende .aviso.ok { background: var(--at-superficie-hover); color: var(--at-ok); border: 1px solid var(--at-ok); border-radius: 6px; padding: 8px 12px; font-size: 13px; }

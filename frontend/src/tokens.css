@@ -1,0 +1,66 @@
+/* AxiaAtende — tokens de identidade (#1200). Fonte da verdade: design-atende/01-identidade-visual.md
+   Os valores de marca, superficie, texto e estado sao copia de design-atende/tokens.css.
+   O bloco "papeis" no fim e desta tela: da nome ao que o CSS usa (primaria, hover, o texto
+   sobre fundo escuro), sempre derivado dos tokens acima. */
+:root {
+  /* Marca */
+  --at-violeta: #5B3FB5;
+  --at-violeta-profunda: #1E1440;
+  --at-lilas: #A792F2;
+  /* Superficies (tema claro) — as da casa */
+  --at-fundo: #F5F7F5;
+  --at-superficie: #FFFFFF;
+  --at-superficie-hover: #EFF4EF;
+  --at-borda: #DCE3DD;
+  --at-borda-suave: #E9EEE9;
+  /* Texto */
+  --at-texto-forte: #1A2420;
+  --at-texto: #3D4A44;
+  --at-texto-brando: #6B7A72;
+  --at-rotulo: #52705F;
+  /* Status (significado fixo — NAO trocar) */
+  --at-erro: #B3271D;         --at-erro-fundo: #FBEDEB;
+  --at-urgente: #A04E00;      --at-urgente-fundo: #FBF1E4;
+  --at-aviso: #8A6D03;        --at-aviso-fundo: #FAF5E1;
+  --at-ok: #1F7A48;           --at-ok-fundo: #EAF5EE;
+  --at-info: #2D6CA8;         --at-info-fundo: #EBF2F9;
+  /* Tipografia */
+  --at-fonte-ui: 'Archivo', system-ui, sans-serif;
+  --at-fonte-dados: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Papeis desta tela */
+  --at-primaria-rgb: 91, 63, 181;
+  --at-primaria-escura: #46309A;            /* hover do botao principal */
+  --at-profunda: var(--at-violeta-profunda);
+  --at-acento: var(--at-lilas);
+  --at-titulo: var(--at-violeta-profunda);  /* titulo e destaque de texto; o violeta fica para link e botao */
+  --at-sobre-escuro-texto: #ECE7FB;         /* texto sobre o menu lateral */
+  --at-sobre-escuro-brando: #B5A8E3;
+  --at-sobre-escuro-superficie: #33276A;    /* botao e divisoria dentro do fundo escuro */
+  --at-sobre-cor: #FFFFFF;                  /* texto sobre botao ou selo colorido */
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  /* escuro neutro puxado para o violeta, como o ameixa do Marketing (dono, 29/10/2026, opcao B) */
+  --at-fundo: #121019;
+  --at-superficie: #1A1724;
+  --at-superficie-hover: #231F31;
+  --at-borda: #352F49;
+  --at-borda-suave: #2A253A;
+  --at-texto-forte: #EEEBF7;
+  --at-texto: #C7C1D9;
+  --at-texto-brando: #948CAB;
+  --at-rotulo: #A99BD6;
+  --at-violeta: #9784E6;
+  --at-erro: #E5766C;         --at-erro-fundo: #2A1512;
+  --at-urgente: #DE9A4E;      --at-urgente-fundo: #271A0C;
+  --at-aviso: #CDB25A;        --at-aviso-fundo: #241F0D;
+  --at-ok: #55B784;           --at-ok-fundo: #10281C;
+  --at-info: #6FA8DC;         --at-info-fundo: #12233A;
+  --at-primaria-rgb: 151, 132, 230;
+  --at-primaria-escura: #B0A1EE;
+  --at-profunda: #150E2E;
+  --at-titulo: var(--at-texto-forte);
+  --at-sobre-cor: #120B26;                  /* a primaria e os estados clareiam no escuro: o texto sobre eles escurece */
+  color-scheme: dark;
+}

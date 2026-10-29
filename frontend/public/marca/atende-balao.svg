@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+<radialGradient id="atCcore" cx="0.5" cy="0.45" r="0.55"><stop offset="0" stop-color="#EDE8FF"></stop><stop offset="0.4" stop-color="#A792F2"></stop><stop offset="1" stop-color="#5B3FB5"></stop></radialGradient>
+<filter id="atCglow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.2" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+</defs>
+<path d="M26 22 H56 L64 8 L68 22 H74 Q86 22 86 34 V74 Q86 86 74 86 H26 Q14 86 14 74 V34 Q14 22 26 22 Z" fill="none" stroke="#5B3FB5" stroke-width="5" stroke-linejoin="round"></path>
+<g transform="translate(28.5,32.5) scale(0.43)">
+<g stroke="#6E55C2" stroke-width="6.5" fill="none" stroke-linecap="round">
+<path d="M50 50 H20 V24"></path>
+<path d="M50 50 H80 V76"></path>
+<path d="M50 50 V92"></path>
+<path d="M50 50 L24 76"></path>
+<path d="M50 50 L78 24"></path>
+</g>
+<path d="M50 50 V14" stroke="#6E55C2" stroke-width="6.5" fill="none" stroke-linecap="round"></path>
+<g fill="#A792F2">
+<circle cx="20" cy="24" r="7"></circle>
+<circle cx="80" cy="76" r="7"></circle>
+<circle cx="50" cy="92" r="7"></circle>
+<circle cx="24" cy="76" r="7"></circle>
+<circle cx="78" cy="24" r="7"></circle>
+</g>
+<circle cx="50" cy="50" r="16" fill="url(#atCcore)" filter="url(#atCglow)"></circle>
+<rect x="42.3" y="42.3" width="15.4" height="15.4" rx="2.4" transform="rotate(45 50 50)" fill="none" stroke="#1E1440" stroke-width="5"></rect>
+</g>
+</svg>

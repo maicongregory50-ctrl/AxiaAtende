@@ -24,7 +24,10 @@ export default function Entrar({ aoEntrar }) {
   return (
     <div className="entrar">
       <form onSubmit={enviar}>
-        <div className="marca grande">Atendimento <span>Renascer</span></div>
+        <div className="marca grande">
+          <img src="/marca/atende-balao.svg" alt="" width="44" height="44" />
+          <span>AxiaAtende</span>
+        </div>
         <label>
           Usuário
           <input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoFocus required />

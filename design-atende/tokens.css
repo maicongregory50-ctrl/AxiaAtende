@@ -1,0 +1,47 @@
+/* AxiaAtende — tokens de identidade. Fonte da verdade: design-atende/01-identidade-visual.md
+   Prefixo próprio --at-*: as telas do produto nunca leem variáveis de outro sistema. */
+:root {
+  /* Marca */
+  --at-violeta: #5B3FB5;          /* Cor primária: botões de ação, links, foco, seleção, contorno do balão */
+  --at-violeta-profunda: #1E1440; /* Wordmark, fundo escuro, app icon, losango do núcleo */
+  --at-lilas: #A792F2;            /* Acento: brilho do núcleo, terminais */
+  --at-traco: #6E55C2;            /* Só os traços do eixo na versão `primary` */
+  --at-tinta: #EDE8FF;            /* Centro do gradiente do núcleo */
+  /* Superfícies (tema claro) — as da casa */
+  --at-fundo: #F5F7F5;
+  --at-superficie: #FFFFFF;
+  --at-superficie-hover: #EFF4EF;
+  --at-borda: #DCE3DD;
+  --at-borda-suave: #E9EEE9;
+  /* Texto */
+  --at-texto-forte: #1A2420;
+  --at-texto: #3D4A44;
+  --at-texto-brando: #6B7A72;
+  --at-rotulo: #52705F;
+  /* Status (significado fixo — NÃO trocar) */
+  --at-erro: #B3271D;         --at-erro-fundo: #FBEDEB;       /* Erro fatal, cancelado */
+  --at-urgente: #A04E00;      --at-urgente-fundo: #FBF1E4;    /* Vencido, ação imediata */
+  --at-aviso: #8A6D03;        --at-aviso-fundo: #FAF5E1;      /* Prazo próximo, atenção não bloqueante */
+  --at-ok: #1F7A48;           --at-ok-fundo: #EAF5EE;         /* Publicado, entregue, resolvido */
+  --at-info: #2D6CA8;         --at-info-fundo: #EBF2F9;       /* Neutro / informativo */
+  /* Tipografia */
+  --at-fonte-ui: 'Archivo', sans-serif;
+  --at-fonte-dados: 'IBM Plex Mono', monospace;
+}
+[data-theme="dark"] {
+  --at-fundo: #0E1A14;
+  --at-superficie: #142720;
+  --at-superficie-hover: #1A3129;
+  --at-borda: #24443A;
+  --at-borda-suave: #1C382F;
+  --at-texto-forte: #EAF3ED;
+  --at-texto: #B9CCC1;
+  --at-texto-brando: #7E958A;
+  --at-rotulo: #8FB8A2;
+  --at-violeta: #9784E6;          /* primária erguida para 4.5:1 sobre as superfícies escuras */
+  --at-erro: #E5766C;         --at-erro-fundo: #2A1512;
+  --at-urgente: #DE9A4E;      --at-urgente-fundo: #271A0C;
+  --at-aviso: #CDB25A;        --at-aviso-fundo: #241F0D;
+  --at-ok: #55B784;           --at-ok-fundo: #10281C;
+  --at-info: #6FA8DC;         --at-info-fundo: #12233A;
+}

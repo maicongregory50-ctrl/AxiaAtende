@@ -54,9 +54,9 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 | **IA acertou / errou** | quem escreveu em vez de tocar recebeu a proposta da IA ("Entendi que você quer… É isso?"): **Sim** é acerto, **Ver todas as opções** é erro |
 | **Do nosso cadastro** | quantos dos que chegaram no período estão no cadastro do ERP |
 | **Quem: "Agro Real Insumos · 5475"** e as etiquetas | o número está no cadastro: o nome e o código dele. As etiquetas verdes (Cliente, Fornecedor, Produtor) e azuis (Equipe, Representante) dizem o papel; "contato comercial: João" diz de qual contato do cadastro o número veio |
-| O botão verde **Conversar no WhatsApp**, ao lado do nome | abre a conversa com essa pessoa no seu WhatsApp Web, pelo número por onde ela chamou. É um atalho: nada é mandado, e nada é registrado |
+| O botão **Conversar no WhatsApp** (contorno violeta), ao lado do nome | abre a conversa com essa pessoa no seu WhatsApp Web, pelo número por onde ela chamou. É um atalho: nada é mandado, e nada é registrado |
 | **"fora do cadastro"** | o número não está em nenhum cadastro. Pode ser um contato novo, ou alguém da casa cujo celular não foi cadastrado; aparece o número com o meio escondido e o nome do perfil do WhatsApp |
-| O **número sublinhado** de verde (`+55 46 9…·4421`) | o número é o link: clique e a conversa abre no seu WhatsApp Web. O meio continua escondido de propósito — você **clica**, não lê o número inteiro |
+| O **número sublinhado** (`+55 46 9…·4421`) | o número é o link: clique e a conversa abre no seu WhatsApp Web. O meio continua escondido de propósito — você **clica**, não lê o número inteiro |
 | O nome **sem** o botão, ou o número **sem** sublinhado | não temos telefone dessa conversa (ela chegou só pelo identificador do WhatsApp). Não é erro, e por aqui não há como chamar essa pessoa |
 | **"sem número"** no lugar do número | o mesmo caso acima, dito por extenso |
 | O clique abre o WhatsApp pedindo o código QR | o seu WhatsApp Web não está conectado neste navegador. Conecte e clique de novo |

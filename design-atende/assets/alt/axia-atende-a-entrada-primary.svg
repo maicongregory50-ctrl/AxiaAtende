@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+<radialGradient id="atAcore" cx="0.5" cy="0.45" r="0.55"><stop offset="0" stop-color="#EDE8FF"></stop><stop offset="0.4" stop-color="#A792F2"></stop><stop offset="1" stop-color="#5B3FB5"></stop></radialGradient>
+<filter id="atAglow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.9" result="b"></feGaussianBlur><feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge></filter>
+</defs>
+<g stroke="#6E55C2" stroke-width="3.4" fill="none" stroke-linecap="round">
+<path d="M50 50 H20 V24"></path>
+<path d="M50 50 H80 V76"></path>
+<path d="M50 50 V92"></path>
+<path d="M50 50 L24 76"></path>
+<path d="M50 50 L78 24"></path>
+</g>
+<path d="M50 50 V18" stroke="#1E1440" stroke-width="4.4" fill="none" stroke-linecap="round"></path>
+<g fill="#A792F2">
+<circle cx="20" cy="24" r="4"></circle>
+<circle cx="80" cy="76" r="4"></circle>
+<circle cx="50" cy="92" r="4"></circle>
+<circle cx="24" cy="76" r="4"></circle>
+<circle cx="78" cy="24" r="4"></circle>
+</g>
+<circle cx="50" cy="14" r="4.2" fill="none" stroke="#5B3FB5" stroke-width="2.6"></circle>
+<circle cx="50" cy="50" r="15.5" fill="url(#atAcore)" filter="url(#atAglow)"></circle>
+<rect x="42.3" y="42.3" width="15.4" height="15.4" rx="2.4" transform="rotate(45 50 50)" fill="none" stroke="#1E1440" stroke-width="2.6"></rect>
+</svg>
