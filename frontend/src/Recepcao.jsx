@@ -57,6 +57,7 @@ const ESTADO = {
   sem_pergunta: ['não perguntado (mais de 24h sem mensagem)', ''],
   curriculo: ['currículo recebido', 'v'], sem_curriculo: ['sem currículo', ''],   // #1098, o Trabalhe conosco
   imagem: ['imagem recebida', 'v'], logo: ['logo recebida', 'v'],                  // #1097, a equipe pelo Foto do campo
+  sem_resposta: ['não respondeu', ''],                                              // #1204, a que nós abrimos
 }
 
 // a nota da pesquisa, em tres botoes (#969, 11/10/2026): o Ruim tambem avisa o gestor
@@ -91,6 +92,7 @@ export default function Recepcao() {
         </select>
         <select value={situacao} onChange={(e) => setSituacao(e.target.value)}>
           <option value="">Toda situação</option><option value="parou">Parou no meio</option>
+          <option value="sem_resposta">Nós escrevemos, não respondeu</option>
           <option value="curriculo">Currículo recebido</option><option value="sem_curriculo">Sem currículo</option>
           <option value="imagem">Imagem recebida</option><option value="logo">Logo recebida</option>
           <option value="nao">Disse que não foi atendido</option><option value="sim">Disse que foi atendido</option>
@@ -123,7 +125,9 @@ export default function Recepcao() {
                 <tr key={i}>
                   <td>{quando(l.quando)}</td>
                   <td><Quem l={l} /></td>
-                  <td>{l.caminho.join(' › ') || <span className="leve">— só chegou</span>}{l.ia === true && <span className="leve"> · IA acertou</span>}</td>
+                  <td>{l.origem === 'portao_retroativo' && <span className="leve">nós escrevemos (portão retroativo){l.caminho.length ? ' · ' : ''}</span>}
+                    {l.caminho.join(' › ') || (l.origem === 'portao_retroativo' ? null : <span className="leve">— só chegou</span>)}
+                    {l.ia === true && <span className="leve"> · IA acertou</span>}</td>
                   <td>{l.destino || <span className="leve">—</span>}</td>
                   <td><span className={'selo ' + ESTADO[l.estado][1]}>
                     {ESTADO[l.estado][0]}{l.estado === 'pergunta_marcada' ? ' ' + hora(l.pergunta_em) : ''}

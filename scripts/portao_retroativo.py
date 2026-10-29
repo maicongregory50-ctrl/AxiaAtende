@@ -70,7 +70,8 @@ def main() -> int:
         with conexao(cfg) as con:
             antes = con.execute("SELECT count(*) AS n FROM atendimento.enviadas WHERE para = %s",
                                 (e.pessoa.para,)).fetchone()["n"]
-            tratou = motor.portao_do_cliente(con, saida, ia, e, agora, envio)
+            # #1204: a conversa nasce dizendo que fomos nos que escrevemos (a Recepcao nao a conta como chegada)
+            tratou = motor.portao_do_cliente(con, saida, ia, e, agora, envio, origem="portao_retroativo")
             depois = con.execute("SELECT count(*) AS n FROM atendimento.enviadas WHERE para = %s",
                                  (e.pessoa.para,)).fetchone()["n"]
         if not tratou:

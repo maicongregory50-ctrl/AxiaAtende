@@ -301,8 +301,21 @@ def test_1189_o_portao_retroativo_acha_quem_escreveu_e_manda_uma_vez(ligado, ima
         con.execute("UPDATE atendimento.eventos_meta SET processado_em = now(), recebido_em = now() - interval '2 hours'")
         lista = m.quem_escreveu(con, env, agora)
         assert [d["erp_codigo"] for _, _, d in lista] == [1]
-        assert motor.portao_do_cliente(con, s, None, lista[0][1], agora, env)
+        assert motor.portao_do_cliente(con, s, None, lista[0][1], agora, env, origem="portao_retroativo")
         assert s.ultima[0] == "lista" and "https://wa.me/5549991505565" in s.ultima[2]
+        # #1204: a conversa diz que fomos nos que abrimos
+        assert con.execute("SELECT origem FROM atendimento.conversas").fetchone()["origem"] == "portao_retroativo"
+
+
+def test_1204_a_saudacao_do_cliente_convidado_nao_abre_o_portao(ligado, imagens):
+    """A COPERMAP, 28/10: o convite saiu, e a saudacao do WhatsApp Business deles respondeu."""
+    s, env = _convidar(ligado, imagens, [cliente(1, 10)])
+    numero = destinatarios(ligado)[1]["whatsapp"]
+    n = len(s.enviadas)
+    _escreve(ligado, s, env, numero, "Copermap Compras Como posso lhe ajudar?", QUINTA_10H + timedelta(hours=1), "wamid.a")
+    assert len(s.enviadas) == n, s.enviadas[n:]
+    with conexao(ligado) as con:
+        assert con.execute("SELECT count(*) AS n FROM atendimento.conversas").fetchone()["n"] == 0
 
 
 def test_1197_quem_ganhou_responsavel_volta_a_fila_do_envio(ligado, imagens, tmp_path):

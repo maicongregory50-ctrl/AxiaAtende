@@ -315,14 +315,14 @@ def _empurrar_a_pergunta(con, pessoa: Pessoa, agora: datetime) -> None:
                 (hora_da_pergunta(con, agora), pessoa.bsuid))
 
 
-def _nova_conversa(con, pessoa: Pessoa, agora: datetime):
+def _nova_conversa(con, pessoa: Pessoa, agora: datetime, origem: str = "mensagem"):
     # Uma conversa que ficou em curso sem link e a pessoa voltou: a antiga parou no meio (a de vaga,
     # #1098, termina com ou sem curriculo).
     con.execute("UPDATE atendimento.conversas SET situacao = " + _SITUACAO_DA_PARADA +
                 " WHERE bsuid = %s AND situacao = 'em_curso'", (pessoa.bsuid,))
-    c = con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, nome_perfil, iniciada_em, ultimo_toque_em)
-                          VALUES (%s, %s, %s, %s, %s) RETURNING *""",
-                    (pessoa.bsuid, pessoa.wa_id, pessoa.nome, agora, agora)).fetchone()
+    c = con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, nome_perfil, iniciada_em, ultimo_toque_em, origem)
+                          VALUES (%s, %s, %s, %s, %s, %s) RETURNING *""",
+                    (pessoa.bsuid, pessoa.wa_id, pessoa.nome, agora, agora, origem)).fetchone()
     # #969: quem e, pelo cadastro do ERP. So o retrato na conversa: o caminho nao muda por isso.
     quem = agenda.reconhecer(con, pessoa.wa_id)
     if quem:
@@ -608,11 +608,14 @@ def assunto_da_carteira(con, ia, raiz, texto: str):
     return None, next((f for f in filhos if chave and f["chave"] == chave), None)
 
 
-def portao_do_cliente(con, saida: Saida, ia, e: Entrada, agora: datetime, envio) -> bool:
+def portao_do_cliente(con, saida: Saida, ia, e: Entrada, agora: datetime, envio, origem: str = "mensagem") -> bool:
     """True = a mensagem foi tratada aqui e NAO segue para o menu geral nem para a OlivIA geral.
 
     So a mensagem que ABRIRIA conversa: toque (o do proprio portao inclusive) e quem ja esta numa
-    conversa seguem o caminho de sempre, que conhece a `raiz_carteira` como no atual."""
+    conversa seguem o caminho de sempre, que conhece a `raiz_carteira` como no atual.
+
+    `origem` (#1204): 'portao_retroativo' quando quem chama e o script, e nao a mensagem chegando --
+    a conversa nasce dizendo que fomos nos que escrevemos, e a Recepcao nao a conta como chegada."""
     p = e.pessoa
     if envio is None or e.toque or e.tipo == "reaction":
         return False
@@ -636,7 +639,7 @@ def portao_do_cliente(con, saida: Saida, ia, e: Entrada, agora: datetime, envio)
     if ja and not (certo or parecido):
         print("portao: %s escreveu de novo sem assunto (%s): anotado, sem resposta" % (p.para, e.wamid), flush=True)
         return True
-    conversa = _nova_conversa(con, p, agora)
+    conversa = _nova_conversa(con, p, agora, origem)
     _chegou(con, p, conversa, agora)
     con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], conversa["id"]))
     conversa = _conversa_aberta(con, p)
@@ -863,7 +866,12 @@ POR_NADA = "Por nada! Se precisar de mais alguma coisa, é só escrever."
 AUTOMATICA = ("mensagem automatica", "resposta automatica", "nao estou disponivel", "nao estamos disponiveis",
               "agradeco sua mensagem", "agradecemos sua mensagem", "agradecemos o contato", "agradecemos seu contato",
               "obrigado por entrar em contato", "obrigada por entrar em contato", "obrigado pelo contato",
-              "obrigada pelo contato")
+              "obrigada pelo contato",
+              # #1204: a SAUDACAO do WhatsApp Business ("Copermap Compras Como posso lhe ajudar?", 28/10),
+              # que responde ao nosso envio -- e quem pede algo a nos nao pergunta como pode nos ajudar
+              "como posso ajudar", "como posso lhe ajudar", "como posso te ajudar", "como posso ajuda-lo",
+              "em que posso ajudar", "em que posso lhe ajudar", "em que posso te ajudar",
+              "como podemos ajudar", "como podemos lhe ajudar", "em que podemos ajudar", "em que podemos lhe ajudar")
 AGRADECE = {"obrigado", "obrigada", "obrigadao", "obg", "obgd", "brigado", "brigada", "valeu", "vlw", "ok", "okay",
             "blz", "beleza", "show", "top", "certo", "perfeito", "otimo", "grato", "grata", "agradeco", "joia", "tmj"}
 ACOMPANHA = {"muito", "mt", "mto", "muitissimo", "de", "nada", "boa", "bom", "tarde", "noite", "dia", "entao", "ta",
@@ -1066,6 +1074,7 @@ def retomar_paradas(con, saida: Saida, ia, agora: datetime) -> int:
     mandadas = 0
     paradas = con.execute("""SELECT * FROM atendimento.conversas
                               WHERE situacao = 'parou_no_meio' AND retomada_em IS NULL AND iniciada_em > %s
+                                AND origem = 'mensagem'   -- #1204: a que nos abrimos nao tem o que reler
                               ORDER BY id LIMIT 20""", (agora - timedelta(days=2),)).fetchall()
     if ia is None:
         return 0   # a IA fora nao gasta a tentativa: a conversa espera o minuto em que ela voltar

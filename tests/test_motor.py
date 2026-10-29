@@ -507,6 +507,17 @@ def test_resposta_automatica_a_pergunta_das_4h30_nao_e_respondida(ligado):
     assert len(s.enviadas) == n and _quantas(ligado) == 1
 
 
+@pytest.mark.parametrize("corpo", ["Copermap Compras Como posso lhe ajudar?", "Olá! Em que podemos ajudar?",
+                                   "Bem-vindo à Agro X. Como posso te ajudar?"])
+def test_1204_a_saudacao_do_whatsapp_business_depois_do_nosso_envio_nao_e_respondida(ligado, corpo):
+    """A COPERMAP, 28/10: a saudacao automatica deles respondeu ao nosso envio e levou o menu."""
+    s = SaidaFalsa()
+    _com_link(ligado, s)
+    n = len(s.enviadas)
+    passo(ligado, s, texto("wamid.3", corpo), agora=QUINTA_14H + timedelta(minutes=2))
+    assert len(s.enviadas) == n and _quantas(ligado) == 1
+
+
 def test_resposta_automatica_sem_nada_nosso_nas_24h_segue_o_caminho_de_sempre(ligado):
     s = SaidaFalsa()
     tipo, *_ = passo(ligado, s, texto("wamid.1", "Mensagem automática: obrigado pelo contato"))

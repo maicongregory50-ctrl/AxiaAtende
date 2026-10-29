@@ -119,6 +119,18 @@ def test_destinos_trocar_numero_ligar_opcao_e_horario(ligado, tela):
     assert tela.get("/api/destinos").json()["campo_ligado"] is True
 
 
+def test_1204_a_conversa_do_portao_retroativo_nao_e_chegada(ligado, tela):
+    """29/10 09:28: o script abriu a da COPERMAP, e a Recepcao a mostrava como "so chegou / parou no meio"."""
+    with conexao(ligado) as con:
+        con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, situacao, origem, iniciada_em)
+                       VALUES ('BR.1', '554988116066', 'parou_no_meio', 'portao_retroativo', now() - interval '1 hour'),
+                              ('BR.2', '5549988887777', 'parou_no_meio', 'mensagem', now() - interval '2 hours')""")
+    d = tela.get("/api/recepcao", params={"dias": 7}).json()
+    assert d["cartoes"]["chegaram"] == 1 and d["cartoes"]["pararam_no_meio"] == 1
+    assert [(l["origem"], l["estado"]) for l in d["linhas"]] == [("portao_retroativo", "sem_resposta"), ("mensagem", "parou")]
+    assert [l["origem"] for l in tela.get("/api/recepcao", params={"situacao": "parou"}).json()["linhas"]] == ["mensagem"]
+
+
 def test_recepcao_conversa_de_vaga_nao_e_parou_no_meio(ligado, tela):
     """#1098: quem chegou pelo anuncio e nao mandou o PDF termina "sem curriculo", fora das paradas."""
     s = SaidaFalsa()
