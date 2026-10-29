@@ -131,6 +131,20 @@ def primeiro_nome(nome: str) -> str:
     return (nome or "").split(" ")[0].title() or "tudo bem"
 
 
+#: #1189: o responsavel pode ser uma EMPRESA (a DJ AGRO COMPANY LTDA, representante de cooperativa) --
+#: e "Quem cuida de voce e Dj" nao serve. Empresa vai pelo nome, sem o tipo societario.
+_SOCIETARIO = {"LTDA", "LTDA.", "ME", "EPP", "EIRELI", "S/A", "SA", "S.A.", "COMPANY", "CIA", "-ME"}
+
+
+def nome_de_quem_atende(nome: str) -> str:
+    palavras = (nome or "").replace("-ME", " ME").split()
+    if not any(w.upper() in _SOCIETARIO for w in palavras):
+        return primeiro_nome(nome)
+    fica = [w for w in palavras if w.upper() not in _SOCIETARIO - {"COMPANY"}]
+    return " ".join(w.upper() if len(w) <= 2 and w.isalpha() and w.upper() not in ("DE", "DA", "DO", "E") else w.title()
+                    if w.upper() not in ("DE", "DA", "DO", "E") else w.lower() for w in fica) or primeiro_nome(nome)
+
+
 def modelo(con, nome: str):
     return con.execute("SELECT * FROM atendimento.modelos WHERE nome = %s AND ativo", (nome,)).fetchone()
 
@@ -429,8 +443,10 @@ class Envio:
         rep = so_digitos(d["responsavel_whatsapp"] or "")
         if not rep:
             return ""
+        if not (d["responsavel_nome"] or "").strip():
+            return "Quem cuida de você na Sementes Renascer fala direto por aqui: https://wa.me/%s" % rep
         return ("Quem cuida de você na Sementes Renascer é %s. Fale direto por aqui: https://wa.me/%s"
-                % (primeiro_nome(d["responsavel_nome"] or ""), rep))
+                % (nome_de_quem_atende(d["responsavel_nome"]), rep))
 
     def tratar_texto_de_convidado(self, con, entrada, agora) -> bool:
         """Quem recebeu um envio e ESCREVEU: o texto fica na linha dele na tela Envios."""

@@ -5,7 +5,7 @@ agora o que o portao manda a quem escreve: o representante e o menu dele -- pelo
 `motor.portao_do_cliente`, com as mesmas travas (a resposta automatica fica em silencio; quem ja esta
 numa conversa aberta nao recebe; uma vez por dia).
 
-Sem `--mandar`, SO MOSTRA a lista. Em producao, janela elevada:
+Sem `--mandar`, SO MOSTRA a lista. `--so 4829,7613` escolhe pelo codigo do ERP: so esses entram. Em producao, janela elevada:
 
     $env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
     C:\\AxiaAtende\\.venv\\Scripts\\python.exe C:\\AxiaAtende\\scripts\\portao_retroativo.py
@@ -52,8 +52,12 @@ def main() -> int:
             from backend.ia import IA
             ia = IA(cfg)
     envio = Envio(ler_nota=None)
+    so = next((sys.argv[i + 1] for i, x in enumerate(sys.argv[:-1]) if x == "--so"), "")
+    so = {c.strip() for c in so.split(",") if c.strip()}
     with conexao(cfg) as con:
         lista = quem_escreveu(con, envio, agora)
+    if so:   # --so 4829,7613: so esses codigos do ERP
+        lista = [x for x in lista if str(x[2]["erp_codigo"]) in so]
     print("Clientes da carteira que escreveram nas ultimas 23 h: %d" % len(lista))
     for ev, e, d in lista:
         print("  %s  %s (ERP %s)  escreveu as %s  representante: %s"
