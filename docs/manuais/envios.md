@@ -84,8 +84,8 @@ mostra antes de agendar quantos ficariam fora; quem decide de verdade é este en
 ninguém nele** — o comprador que já recebeu duas no mês recebe esta também. Só o gesto do dono passa
 do teto; os outros envios do mês continuam segurando.
 
-**O resumo ao representante** (desde 26/10/2026, #1142). Depois de cada lote, o **representante** (ou
-o corretor) recebe **uma** mensagem no WhatsApp: quantos clientes dele receberam, o que receberam, e
+**O resumo ao representante** (desde 26/10/2026, #1142). Depois de cada lote, o **representante**
+recebe **uma** mensagem no WhatsApp: quantos clientes dele receberam, o que receberam, e
 o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP — que é a tela dele.
 
 - **Uma por lote, não uma por cliente.** Cinco clientes num lote são uma mensagem, não cinco.
@@ -172,7 +172,7 @@ representante, e reclamação).
   diz quantos receberam, sem dizer quem respondeu o quê. *(Até 26/10/2026 o código mandava uma cópia
   de cada convite ao responsável, contra o que esta linha já dizia; o #1142 fez o código cumprir o
   manual.)*
-- **Não manda nada ao dono nem ao corretor:** o resumo é só do representante (o corretor deixou de receber em 29/10/2026, #1197).
+- **Não manda nada ao dono nem ao corretor:** o resumo é só do representante (o corretor deixou de receber em 29/10/2026, #1197). O **cliente de corretor** tem o dono como responsável desde 29/10/2026: o "fale direto" e o portão levam a ele, não ao corretor (vale para os envios criados daí em diante).
 - **Não manda comunicação direta a quem nunca aceitou.**
 - **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão).
 - **Não tira ninguém do teto do mês por aqui:** o comprador no teto volta a receber no mês seguinte.
