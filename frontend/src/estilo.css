@@ -42,7 +42,7 @@ button.perigo:not(.link) { background: var(--at-erro); color: var(--at-sobre-cor
   position: fixed; top: 0; left: 0; bottom: 0; width: var(--lateral-w); background: var(--at-profunda);
   color: var(--at-sobre-escuro-texto); display: flex; flex-direction: column; z-index: 5;
 }
-.lateral .marca { padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.1); font-size: 15px; }
+.lateral .marca { padding: 20px 20px 16px; background: #fff; color: var(--at-violeta-profunda); font-size: 15px; }
 .lateral nav { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
 .lateral nav button {
   display: flex; align-items: center; gap: 11px; padding: 9px 12px; font-size: 14.5px; text-align: left;

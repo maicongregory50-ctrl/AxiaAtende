@@ -37,7 +37,7 @@ export default function App() {
     <div className="casa">
       <aside className="lateral">
         <div className="marca">
-          <img src="/marca/atende-balao-reverse.svg" alt="" width="30" height="30" />
+          <img src="/marca/atende-balao.svg" alt="" width="30" height="30" />
           <span>AxiaAtende</span>
         </div>
         <nav>
