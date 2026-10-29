@@ -83,6 +83,8 @@ def test_a_024_vai_volta_e_vai(ligado):
                        VALUES ('plano_sem_registro', 'X', '5549991505565', '7|14/10')""")
         # a ordem das voltas e a inversa da das idas: a 039 (#1188), a 033 (#1142), a 032 (#1090) e a
         # 025 (#1098) mexem nos mesmos CHECKs
+        con.execute((pasta / "043_informativo_ao_comprador_VOLTA.sql").read_text(encoding="utf-8")
+                    .replace("BEGIN;", "").replace("COMMIT;", ""))   # a 043, a mais nova, primeiro
         volta_039 = (pasta / "039_porteiro_dos_avisos_VOLTA.sql").read_text(encoding="utf-8")
         con.execute(volta_039.replace("BEGIN;", "").replace("COMMIT;", ""))
         volta_033 = (pasta / "033_fila_por_numero_e_resumo_VOLTA.sql").read_text(encoding="utf-8")

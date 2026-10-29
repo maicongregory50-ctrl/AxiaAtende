@@ -69,4 +69,5 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                               "037_texto_da_abertura_do_canal.sql",
                               "038_abertura_do_canal_volta_ao_texto_aprovado.sql",
                               "039_porteiro_dos_avisos.sql", "040_portao_do_cliente_da_carteira.sql",
-                              "041_consentimento_retomada.sql"]
+                              "041_consentimento_retomada.sql", "042_pedido_de_cte.sql",
+                              "043_informativo_ao_comprador.sql"]

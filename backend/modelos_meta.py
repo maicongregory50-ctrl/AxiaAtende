@@ -3,6 +3,7 @@
     python -m backend.modelos_meta --ver                      so leitura: os nossos modelos na Meta e a situacao
     python -m backend.modelos_meta --propor --imagem capa.jpg manda para aprovacao os do cadastro que a Meta ainda nao tem
     python -m backend.modelos_meta --propor --documento exemplo.pdf   o mesmo, para o modelo com PDF no cabecalho (#1098)
+    python -m backend.modelos_meta --propor --so informativo_ao_comprador --imagem capa.png   so este (043)
 
 Roda em janela elevada, com AXIAATENDE_AMBIENTE=producao e AXIAATENDE_PROCESSO=recepcionista (le o
 token do .env.recepcionista; o token nunca e impresso). `--imagem` e o exemplo de cabecalho que a
@@ -28,6 +29,8 @@ from .banco import conexao
 #: `payload` do envio, nunca pelo texto, entao mudar o texto aqui nao muda o que o toque faz.
 BOTOES_CONVITE = ("Quero receber", "Não quero receber")
 BOTAO_FALAR = "Falar com meu atendimento"
+#: O informativo ao comprador (043): a saida do cliente, ao lado do link de falar.
+BOTAO_PARAR = "Não quero mais receber"
 #: #1098: o modelo da Fran. As duas respostas voltam com a carga do envio (vaga:certa:<id>); o
 #: terceiro e o link para conversar com o candidato, pelo NOSSO endereco (/falar/v<id>-<assinatura>).
 BOTOES_TRIAGEM = ("Triagem certa", "Triagem errada")
@@ -105,6 +108,11 @@ def componentes(m: dict, cabecalho: str | None = None, documento: str | None = N
         saida.append({"type": "BUTTONS", "buttons": [{
             "type": "URL", "text": BOTAO_FALAR, "url": ENDERECO_FALAR + "{{1}}",
             "example": [ENDERECO_FALAR + "1-0a1b2c3d4e5f6a7b"]}]})
+    elif m["botao"] == "parar_e_falar":
+        # a resposta rapida antes do link: a ordem e a do envio (as cargas primeiro, o link no fim)
+        saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": BOTAO_PARAR}, {
+            "type": "URL", "text": BOTAO_FALAR, "url": ENDERECO_FALAR + "{{1}}",
+            "example": [ENDERECO_FALAR + "1-0a1b2c3d4e5f6a7b"]}]})
     elif m["botao"] == "triagem":
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t} for t in BOTOES_TRIAGEM] + [{
             "type": "URL", "text": BOTAO_CANDIDATO, "url": ENDERECO_FALAR + "{{1}}",
@@ -142,12 +150,14 @@ def _subir_exemplo(c: httpx.Client, cfg, imagem: Path) -> str:
     return r["h"]
 
 
-def propor(cfg, imagem: Path | None = None, http=None, documento: Path | None = None) -> list[dict]:
-    """Manda para aprovacao os modelos do cadastro que a Meta ainda nao tem. Devolve o que fez."""
+def propor(cfg, imagem: Path | None = None, http=None, documento: Path | None = None,
+           so: list[str] | None = None) -> list[dict]:
+    """Manda para aprovacao os modelos do cadastro que a Meta ainda nao tem. Devolve o que fez.
+    `so`: so estes nomes (043) -- os outros que faltam ficam como estao."""
     feitos = []
     with (http or _cliente(cfg)) as c:
         ja = {(t["name"], t["language"]) for t in _listar(c, cfg)}
-        faltam = [m for m in cadastro(cfg) if (m["nome"], m["idioma"]) not in ja]
+        faltam = [m for m in cadastro(cfg) if (m["nome"], m["idioma"]) not in ja and (not so or m["nome"] in so)]
         cabecalho = None
         if any(m["cabecalho_imagem"] for m in faltam):
             if not imagem:
@@ -173,6 +183,7 @@ def main(argv=None) -> int:
     g.add_argument("--propor", action="store_true")
     ap.add_argument("--imagem", type=Path)
     ap.add_argument("--documento", type=Path)
+    ap.add_argument("--so", action="append", help="propor so este modelo (repetivel)")
     a = ap.parse_args(argv)
     cfg = config.carregar()
     migracoes.aplicar(cfg)   # o texto do cadastro pode ter sido acertado por mudanca nova
@@ -180,7 +191,7 @@ def main(argv=None) -> int:
         nossos = {m["nome"] for m in cadastro(cfg)}
         r = [t for t in ver(cfg) if t["name"] in nossos]
     else:
-        r = propor(cfg, a.imagem, documento=a.documento)
+        r = propor(cfg, a.imagem, documento=a.documento, so=a.so)
     print(json.dumps(r, ensure_ascii=False, indent=2))
     return 0
 

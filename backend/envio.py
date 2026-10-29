@@ -390,9 +390,12 @@ class Envio:
         imagens = d["imagens"] if d["imagens"] is not None else e["imagens"]
         fontes = {"primeiro_nome": primeiro_nome(para_nome), "nome": para_nome, "assunto": e["assunto"],
                   "peca": e["peca"], "n_imagens": len(imagens), "responsavel": d["responsavel_nome"]}
-        botoes = ["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "quero_nao_quero" else None
+        # o informativo ao comprador (043): "Nao quero mais receber" leva a mesma carga do "Nao quero" do
+        # convite (a recusa), e o link e o da direta
+        botoes = (["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "quero_nao_quero"
+                  else ["envio:%d:nao_quero" % e["id"]] if m["botao"] == "parar_e_falar" else None)
         url = (codigo_falar(self._segredo, d["id"], copia=para_nome == d["responsavel_nome"])
-               if m["botao"] == "falar_responsavel" else None)
+               if m["botao"] in ("falar_responsavel", "parar_e_falar") else None)
         capa = (d["capa"] or e["capa"]) if m["cabecalho_imagem"] else None
         return parametros(m, fontes), capa, botoes, url, len(imagens)
 

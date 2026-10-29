@@ -416,7 +416,8 @@ def test_a_volta_da_025_devolve_o_no_a_fran_e_guarda_os_curriculos(ligado):
     with conexao(ligado) as con:
         # a 032 (#1090) mexe no mesmo CHECK de acao do menu, e a 033 (#1142) e a 039 (#1188) no de uso
         # do modelo: as voltas vao na ordem inversa das idas
-        for anterior in ("039_porteiro_dos_avisos_VOLTA.sql", "033_fila_por_numero_e_resumo_VOLTA.sql",
+        for anterior in ("043_informativo_ao_comprador_VOLTA.sql",
+                         "039_porteiro_dos_avisos_VOLTA.sql", "033_fila_por_numero_e_resumo_VOLTA.sql",
                          "032_clientes_do_dia_VOLTA.sql"):
             con.execute((volta.parent / anterior).read_text(encoding="utf-8")
                         .replace("BEGIN;", "").replace("COMMIT;", ""))

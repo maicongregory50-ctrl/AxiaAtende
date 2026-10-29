@@ -171,6 +171,7 @@ def test_a_volta_desfaz_e_a_ida_volta_a_aplicar(cfg):
     # a 039 (#1188) reescreve o mesmo CHECK de uso do modelo: a volta dela vem antes (ordem inversa das idas)
     volta_039 = (migracoes.PASTA / "039_porteiro_dos_avisos_VOLTA.sql").read_text(encoding="utf-8")
     with conexao(cfg) as con:
+        con.execute((migracoes.PASTA / "043_informativo_ao_comprador_VOLTA.sql").read_text(encoding="utf-8").split("BEGIN;", 1)[1].rsplit("COMMIT;", 1)[0])   # a 043 mexe nos mesmos CHECKs: a volta dela vem primeiro
         con.execute(volta_039.split("BEGIN;", 1)[1].rsplit("COMMIT;", 1)[0])
         con.execute(corpo)
         assert not con.execute(
@@ -180,7 +181,8 @@ def test_a_volta_desfaz_e_a_ida_volta_a_aplicar(cfg):
         assert not con.execute("SELECT 1 FROM atendimento.modelos"
                                " WHERE uso = 'aviso_lote_do_representante'").fetchone()
     # e a ida aplica de novo, do zero
-    assert migracoes.aplicar(cfg) == ["033_fila_por_numero_e_resumo.sql", "039_porteiro_dos_avisos.sql"]
+    assert migracoes.aplicar(cfg) == ["033_fila_por_numero_e_resumo.sql", "039_porteiro_dos_avisos.sql",
+                                      "043_informativo_ao_comprador.sql"]
     with conexao(cfg) as con:
         assert con.execute("SELECT 1 FROM pg_indexes WHERE schemaname = 'atendimento'"
                            " AND indexname = 'envio_dest_um_por_numero'").fetchone()
