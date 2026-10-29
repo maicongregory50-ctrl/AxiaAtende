@@ -113,3 +113,14 @@ def test_falar_sem_numero_do_representante_responde_sem_link(ligado, imagens):
         con.execute("UPDATE atendimento.envio_destinatarios SET responsavel_whatsapp = ''")
     _tocar(ligado, s, env, numero, "falar", QUINTA_10H + timedelta(hours=1))
     assert s.ultima[2] == Envio.SEM_REPRESENTANTE
+
+
+# ── 045: a linha curta ───────────────────────────────────────────────────────
+
+def test_o_informativo_curto_tem_uma_linha_e_os_botoes_da_044(cfg):
+    m = {x["nome"]: x for x in modelos_meta.cadastro(cfg)}["informativo_curto"]
+    texto = "Olá, {{1}}! Informativo da Sementes Renascer."
+    assert (m["uso"], m["botao"], m["texto"]) == ("direta", "parar_e_chamar", texto)
+    c = modelos_meta.componentes(m, "4::h")
+    assert c[1]["text"] == texto and c[1]["example"]["body_text"] == [["João"]]
+    assert [b["type"] for b in c[2]["buttons"]] == ["QUICK_REPLY", "QUICK_REPLY"]
