@@ -391,9 +391,12 @@ class Envio:
         fontes = {"primeiro_nome": primeiro_nome(para_nome), "nome": para_nome, "assunto": e["assunto"],
                   "peca": e["peca"], "n_imagens": len(imagens), "responsavel": d["responsavel_nome"]}
         # o informativo ao comprador (043): "Nao quero mais receber" leva a mesma carga do "Nao quero" do
-        # convite (a recusa), e o link e o da direta
+        # convite (a recusa), e o link e o da direta. O informativo (044): as duas sao resposta rapida,
+        # e o "falar" volta a `tratar_toque` (sem link, a foto abre)
         botoes = (["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "quero_nao_quero"
-                  else ["envio:%d:nao_quero" % e["id"]] if m["botao"] == "parar_e_falar" else None)
+                  else ["envio:%d:nao_quero" % e["id"]] if m["botao"] == "parar_e_falar"
+                  else ["envio:%d:nao_quero" % e["id"], "envio:%d:falar" % e["id"]] if m["botao"] == "parar_e_chamar"
+                  else None)
         url = (codigo_falar(self._segredo, d["id"], copia=para_nome == d["responsavel_nome"])
                if m["botao"] in ("falar_responsavel", "parar_e_falar") else None)
         capa = (d["capa"] or e["capa"]) if m["cabecalho_imagem"] else None
@@ -458,6 +461,9 @@ class Envio:
         # toque cair nos ramos de baixo.
         if acao == "copia" or not d or d["resposta"] in ("quero", "nao_quero"):
             return   # o toque do responsavel na copia, de quem nao estava na lista, ou o segundo toque
+        if acao == "falar":
+            self._falar_pelo_toque(con, saida, d, numero, agora)
+            return
         tipo = "aceite" if acao == "quero" else "recusa" if acao == "nao_quero" else None
         if not tipo:
             return
@@ -480,6 +486,20 @@ class Envio:
                        VALUES ('recusa', %s, %s, %s)""",
                     (d["responsavel_nome"], d["responsavel_whatsapp"],
                      "|".join([d["nome"], local, "https://wa.me/%s" % numero])))
+
+    #: #1203 (dono, 29/10/2026): o "Falar com meu atendimento" do informativo e RESPOSTA RAPIDA, nao
+    #: link -- com botao de link no modelo, o WhatsApp leva o toque na FOTO para o link, e a foto nao
+    #: abre. O toque chega aqui, fica anotado como `falar` (o primeiro) e a resposta e a linha do
+    #: representante, a mesma que o portao da carteira manda a quem escreve.
+    SEM_REPRESENTANTE = "Obrigado! Pode escrever aqui o que você precisa."
+
+    def _falar_pelo_toque(self, con, saida, d, numero, agora):
+        if d["resposta"] in (None, "texto"):
+            con.execute("""UPDATE atendimento.envio_destinatarios SET resposta = 'falar', resposta_em = %s
+                            WHERE id = %s""", (agora, d["id"]))
+        w = saida.texto(numero, self.linha_do_representante(d) or self.SEM_REPRESENTANTE)
+        con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', 'falar pelo toque')",
+                    (w, numero))
 
     #: #1189 (dono, 28/10/2026): o cliente que recebeu um envio da carteira nos ultimos 30 dias e
     #: escreve ao numero da empresa nao cai no fluxo geral ("nao podemos ligar no fluxo geral"). O

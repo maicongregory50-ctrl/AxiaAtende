@@ -113,6 +113,10 @@ def componentes(m: dict, cabecalho: str | None = None, documento: str | None = N
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": BOTAO_PARAR}, {
             "type": "URL", "text": BOTAO_FALAR, "url": ENDERECO_FALAR + "{{1}}",
             "example": [ENDERECO_FALAR + "1-0a1b2c3d4e5f6a7b"]}]})
+    elif m["botao"] == "parar_e_chamar":
+        # 044: os dois sao resposta rapida -- botao de link faz o toque na foto abrir o link
+        saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t}
+                                                     for t in (BOTAO_PARAR, BOTAO_FALAR)]})
     elif m["botao"] == "triagem":
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t} for t in BOTOES_TRIAGEM] + [{
             "type": "URL", "text": BOTAO_CANDIDATO, "url": ENDERECO_FALAR + "{{1}}",

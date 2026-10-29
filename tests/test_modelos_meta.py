@@ -56,10 +56,10 @@ def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
                                                  "aviso_endereco_voltou", "aviso_lote_do_representante",
                                                  "aviso_plano_sem_registro",
                                                  "aviso_sem_atendimento", "curriculo_para_fran",
-                                                 "epoca_de_plantio", "informativo_ao_comprador",
+                                                 "epoca_de_plantio", "informativo_ao_comprador", "informativo_renascer",
                                                  "pecas_da_revenda", "reabrir_avisos"]
     criados = [p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]
-    assert len(criados) == 12   # #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043: + informativo
+    assert len(criados) == 13   # #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 e 044: + informativos
     import json
     reabrir = next(json.loads(p.content) for p in criados if json.loads(p.content)["name"] == "reabrir_avisos")
     assert reabrir["category"] == "UTILITY"

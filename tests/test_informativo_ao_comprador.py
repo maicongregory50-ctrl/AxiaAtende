@@ -66,3 +66,50 @@ def test_propor_so_o_informativo_deixa_os_outros_que_faltam(cfg, tmp_path):
                                  so=["informativo_ao_comprador"])
     assert [f["nome"] for f in feitos] == ["informativo_ao_comprador"]
     assert len([p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]) == 1
+
+
+# ── 044: o informativo sem botao de link ─────────────────────────────────────
+
+def renascer(imagens, clientes):
+    return {**informativo(imagens, clientes), "modelo": "informativo_renascer"}
+
+
+def test_o_informativo_renascer_tem_as_duas_respostas_rapidas_e_nenhum_link(cfg):
+    m = {x["nome"]: x for x in modelos_meta.cadastro(cfg)}["informativo_renascer"]
+    assert (m["uso"], m["botao"], m["texto"]) == ("direta", "parar_e_chamar", TEXTO)
+    botoes = modelos_meta.componentes(m, "4::h")[2]["buttons"]
+    assert [(b["type"], b["text"]) for b in botoes] == [("QUICK_REPLY", "Não quero mais receber"),
+                                                       ("QUICK_REPLY", "Falar com meu atendimento")]
+
+
+def _manda(ligado, imagens, resp=("Djeison de Oliveira", "5549999567572")):
+    pedir(ligado, renascer(imagens, [dict(cliente(1, 30, resp=resp), aceite_cadastro=True)]))
+    s, env = SaidaFalsa(), Envio(ler_nota=lambda: "GREEN")
+    env.rotina(ligado, s, QUINTA_10H)
+    return s, env, destinatarios(ligado)[1]["whatsapp"]
+
+
+def test_o_informativo_renascer_sai_sem_link(ligado, imagens):
+    s, _, numero = _manda(ligado, imagens)
+    m = next(x for x in s.modelos if x["para"] == numero)
+    assert m["botoes"] == ["envio:1:nao_quero", "envio:1:falar"] and m["url"] is None and m["imagem"]
+
+
+def test_falar_com_meu_atendimento_anota_e_responde_com_o_representante(ligado, imagens):
+    s, env, numero = _manda(ligado, imagens)
+    _tocar(ligado, s, env, numero, "falar", QUINTA_10H + timedelta(hours=1))
+    assert s.ultima[0] == "texto" and s.ultima[1] == numero
+    assert "Djeison" in s.ultima[2] and "https://wa.me/5549999567572" in s.ultima[2]
+    d = destinatarios(ligado)[1]
+    assert d["resposta"] == "falar" and d["resposta_em"] is not None
+    # e ainda pode sair depois: o "falar" nao fecha a recusa
+    _tocar(ligado, s, env, numero, "nao_quero", QUINTA_10H + timedelta(hours=2), wamid="w2")
+    assert destinatarios(ligado)[1]["resposta"] == "nao_quero" and "não vai mais receber" in s.ultima[2]
+
+
+def test_falar_sem_numero_do_representante_responde_sem_link(ligado, imagens):
+    s, env, numero = _manda(ligado, imagens, resp=("Djeison de Oliveira", "5549999567572"))
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.envio_destinatarios SET responsavel_whatsapp = ''")
+    _tocar(ligado, s, env, numero, "falar", QUINTA_10H + timedelta(hours=1))
+    assert s.ultima[2] == Envio.SEM_REPRESENTANTE
