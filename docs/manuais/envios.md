@@ -32,7 +32,9 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 1. Escolha o envio (tipo · campanha · data).
 2. Leia a barra verde (o que é, quem aprovou e se está **enviando**, **concluído** ou **PARADO**) e os
    cartões.
-3. Filtre por responsável ou por resposta.
+3. Filtre por responsável, por **situação** (na fila, enviado, sem responsável, responsável sem WhatsApp, recusou
+   antes… — cada uma com quantos são) ou por resposta. Clique no título de uma coluna para ordenar por ela;
+   um segundo clique inverte, e o terceiro volta à ordem do ranking (#1199).
 4. Na lista, veja quem escreveu alguma coisa: o texto aparece ao lado.
 5. Se a barra disser **PARADO pela nota do número**, leia o porquê abaixo antes de clicar **Religar o
    envio**.

@@ -26,12 +26,35 @@ const TIPO_AVISO = {
   lote_do_representante: 'Resumo do lote',
 }
 
+// #1199 (dono, 29/10/2026): "precisamos melhorar os filtros e ordenar as colunas; nao existe filtro por
+// situacao". A situacao que a linha MOSTRA (com o "responsavel sem WhatsApp" do #1197), e a ordem por
+// coluna, tudo na tela: a lista do envio ja vem inteira.
+function situacaoDe(l) {
+  if (l.situacao === 'sem_responsavel' && l.responsavel) return ['resp_sem_whatsapp', 'responsável sem WhatsApp', 'a']
+  const [rot, cls] = SITUACAO[l.situacao] || [l.situacao, '']
+  return [l.situacao, rot, cls]
+}
+const RESPOSTA = { quero: 'Quero receber', nao_quero: 'Não quero', falar: 'tocou em falar', texto: 'escreveu' }
+const COLUNAS = [
+  ['cliente', 'Cliente', (l) => (l.nome || '').toLowerCase()],
+  ['cidade', 'Cidade', (l) => `${l.uf || ''} ${(l.cidade || '').toLowerCase()}`],
+  ['responsavel', 'Responsável', (l) => (l.responsavel || '').toLowerCase()],
+  ['situacao', 'Situação', (l) => situacaoDe(l)[1]],
+  ['enviado', 'Enviado', (l) => l.convite_em || ''],
+  ['entregue', 'Entregue', (l) => l.entregue_em || ''],
+  ['lido', 'Lido', (l) => l.lido_em || ''],
+  ['resposta', 'Resposta', (l) => (l.resposta ? RESPOSTA[l.resposta] || l.resposta : '')],
+  ['imagens', 'Imagens', (l) => (l.resposta === 'quero' ? Number(l.imagens) || 0 : -1)],
+]
+
 export default function Envios() {
   const [lista, setLista] = useState(null)
   const [escolhido, setEscolhido] = useState(null)
   const [d, setD] = useState(null)
   const [responsavel, setResponsavel] = useState('')
   const [resposta, setResposta] = useState('')
+  const [situacao, setSituacao] = useState('')
+  const [ordem, setOrdem] = useState({ col: '', desc: false })   // sem coluna: a ordem do ranking
   const [erro, setErro] = useState('')
 
   function carregar() {
@@ -53,6 +76,15 @@ export default function Envios() {
   }
 
   const c = d && d.cartoes
+  const linhasVisiveis = !d ? [] : (() => {
+    let ls = situacao ? d.linhas.filter((l) => situacaoDe(l)[0] === situacao) : d.linhas.slice()
+    const col = COLUNAS.find(([k]) => k === ordem.col)
+    if (col) {
+      const chave = col[2]
+      ls = ls.sort((a, b) => { const x = chave(a), y = chave(b); return (x < y ? -1 : x > y ? 1 : 0) * (ordem.desc ? -1 : 1) })
+    }
+    return ls
+  })()
   return (
     <section className="atende">
       <h1>Envios</h1>
@@ -62,7 +94,7 @@ export default function Envios() {
       {lista && lista.envios.length === 0 && <p className="vazio">Nenhum envio ainda. Ele nasce em Publicações, no AxiaMarketing.</p>}
       {lista && lista.envios.length > 0 && (
         <div className="filtros">
-          <select value={escolhido || ''} onChange={(e) => { setEscolhido(Number(e.target.value)); setD(null) }}>
+          <select value={escolhido || ''} onChange={(e) => { setEscolhido(Number(e.target.value)); setD(null); setSituacao("") }}>
             {lista.envios.map((e) => (
               <option key={e.id} value={e.id}>{TIPO[e.tipo]} · {e.campanha || e.peca} · {quando(e.aprovado_em)}</option>))}
           </select>
@@ -70,10 +102,15 @@ export default function Envios() {
             <option value="">Todos os responsáveis</option>
             {d && d.responsaveis.map((r) => <option key={r}>{r}</option>)}
           </select>
+          <select value={situacao} onChange={(e) => setSituacao(e.target.value)}>
+            <option value="">Toda situação</option>
+            {d && Object.entries(d.linhas.reduce((n, l) => { const [k, rot] = situacaoDe(l); n[k] = n[k] || [rot, 0]; n[k][1] += 1; return n }, {}))
+              .sort((a, b) => a[1][0].localeCompare(b[1][0]))
+              .map(([k, [rot, n]]) => <option key={k} value={k}>{rot} ({n})</option>)}
+          </select>
           <select value={resposta} onChange={(e) => setResposta(e.target.value)}>
             <option value="">Toda resposta</option><option value="quero">Quero receber</option>
             <option value="nao_quero">Não quero</option><option value="texto">Escreveu</option><option value="falar">Tocou em falar</option>
-            <option value="sem_responsavel">Sem responsável</option><option value="sem_aceite">Sem aceite</option>
           </select>
           {lista.nota && <span className="leve">Nota do número: <b>{NOTA[lista.nota.nota]}</b></span>}
         </div>
@@ -95,16 +132,17 @@ export default function Envios() {
             <div className="cartao"><span>Custo US$</span><b>{String(c.custo_usd).replace('.', ',')}</b></div>
           </div>
           <table className="tabela">
-            <thead><tr><th>Cliente</th><th>Cidade</th><th>Responsável</th><th>Situação</th><th>Enviado</th>
-              <th>Entregue</th><th>Lido</th><th>Resposta</th><th>Imagens</th></tr></thead>
+            <thead><tr>{COLUNAS.map(([k, rot]) => (
+              <th key={k} className="ordenavel" title="Clique para ordenar"
+                onClick={() => setOrdem((o) => (o.col === k ? (o.desc ? { col: '', desc: false } : { col: k, desc: true }) : { col: k, desc: false }))}>
+                {rot}{ordem.col === k ? (ordem.desc ? ' ▼' : ' ▲') : ''}</th>))}</tr></thead>
             <tbody>
-              {d.linhas.map((l) => (
+              {linhasVisiveis.map((l) => (
                 <tr key={l.codigo}>
                   <td>{l.codigo} · {l.nome}</td><td>{l.cidade} {l.uf}</td>
                   <td>{l.responsavel || <span className="leve">— {l.sugestao && `sugestão: ${l.sugestao}`}</span>}</td>
                   {/* #1197: com o nome do responsavel preenchido, o que falta e o WhatsApp dele */}
-                  <td><span className={'selo ' + SITUACAO[l.situacao][1]}>{l.situacao === 'sem_responsavel' && l.responsavel
-                    ? 'responsável sem WhatsApp' : SITUACAO[l.situacao][0]}</span></td>
+                  <td><span className={'selo ' + situacaoDe(l)[2]}>{situacaoDe(l)[1]}</span></td>
                   <td>{quando(l.convite_em)}</td>
                   <td className={l.entregue_em ? 'ok' : ''}>{hora(l.entregue_em)}</td>
                   <td className={l.lido_em ? 'ok' : ''}>{hora(l.lido_em)}</td>
