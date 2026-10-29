@@ -37,14 +37,22 @@ def _sem_acento(s: str) -> str:
 
 
 def destino(con) -> dict | None:
-    """O destino ativo cujo nome e o do ajuste `logistica.destino` (ausente = "Logística"), sem olhar
-    acento nem caixa: quem cadastrou pode ter escrito "Logistica"."""
+    """Para quem vai a ficha, nesta ordem, sem olhar acento nem caixa:
+    1. o destino ativo com o nome do ajuste `logistica.destino` (ausente = "Logística");
+    2. o destino ativo com "logistica" no nome ("Benedito - Logística");
+    3. o destino do item "Fretes" do menu (chave `fretes`), que e quem cuida de frete para o cliente.
+    O nome escolhido vai ao ERP junto com a janela, e a tela Fretes o mostra."""
     r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = 'logistica.destino'").fetchone()
-    nome = r["valor"] if r and isinstance(r["valor"], str) else DESTINO_PADRAO
-    for d in con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE ativo ORDER BY id").fetchall():
-        if _sem_acento(d["nome"]) == _sem_acento(nome):
-            return dict(d)
-    return None
+    nome = _sem_acento(r["valor"] if r and isinstance(r["valor"], str) else DESTINO_PADRAO)
+    ativos = [dict(d) for d in con.execute("SELECT id, nome, whatsapp FROM atendimento.destinos WHERE ativo ORDER BY id").fetchall()]
+    for teste in (lambda n: n == nome, lambda n: "logistica" in n):
+        for d in ativos:
+            if teste(_sem_acento(d["nome"])):
+                return d
+    m = con.execute("""SELECT d.id, d.nome, d.whatsapp FROM atendimento.menu m
+                         JOIN atendimento.destinos d ON d.id = m.destino_id AND d.ativo
+                        WHERE m.chave = 'fretes'""").fetchone()
+    return dict(m) if m else None
 
 
 def aberta_ate(con, numero: str):

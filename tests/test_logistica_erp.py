@@ -101,8 +101,29 @@ def test_janela_fechada_nao_sai_e_volta_falhou_com_a_frase(ligado):
     assert e.estados == [(7, "FALHOU", "Você precisa abrir a janela no WhatsApp.", "")]
 
 
+def test_sem_logistica_vai_ao_destino_do_item_fretes_do_menu(cfg, tmp_path):
+    c = replace(cfg, erp_segredo="s", envios_pasta=tmp_path / "envios")
+    with conexao(c) as con:
+        esperado = con.execute("""SELECT d.nome FROM atendimento.menu m JOIN atendimento.destinos d ON d.id = m.destino_id
+                                   WHERE m.chave = 'fretes'""").fetchone()["nome"]
+    e = ErpFalso()
+    _volta(c, e)
+    assert e.janelas[0]["destino"] == esperado
+
+
+def test_logistica_no_meio_do_nome_tambem_serve(cfg, tmp_path):
+    c = replace(cfg, erp_segredo="s", envios_pasta=tmp_path / "envios")
+    with conexao(c) as con:
+        con.execute("INSERT INTO atendimento.destinos (nome, whatsapp, ativo) VALUES ('Benedito - Logística', %s, true)", (BENEDITO,))
+    e = ErpFalso()
+    _volta(c, e)
+    assert e.janelas[0]["destino"] == "Benedito - Logística"
+
+
 def test_sem_destino_volta_falhou_dizendo_o_que_falta(cfg, tmp_path):
     c = replace(cfg, erp_segredo="s", envios_pasta=tmp_path / "envios")
+    with conexao(c) as con:
+        con.execute("UPDATE atendimento.destinos SET ativo = false")
     e = ErpFalso([PENDENTE])
     _volta(c, e)
     _volta(c, e)
