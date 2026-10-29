@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agenda, clientes_erp, config, eventos_erp, migracoes, retomadas_erp, seguranca
+from . import agenda, clientes_erp, config, eventos_erp, logistica_erp, migracoes, retomadas_erp, seguranca
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -90,6 +90,18 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             if parar.wait(clientes_erp.INTERVALO_ENVIO):
                 return
 
+    def pedidos_de_cte():
+        """#1128: a janela da Logistica ao ERP, os pedidos de CT-e de la para ca, e o estado de volta (1 min)."""
+        while True:
+            try:
+                r = logistica_erp.volta(cfg)
+                if "erro" in r:
+                    print("logistica: %s" % r["erro"], flush=True)
+            except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
+                print("logistica: %s" % type(falha).__name__, flush=True)
+            if parar.wait(logistica_erp.INTERVALO_SEGUNDOS):
+                return
+
     @asynccontextmanager
     async def vida(app: FastAPI):
         migracoes.aplicar(cfg)
@@ -97,6 +109,7 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             threading.Thread(target=ler_o_cadastro, name="agenda", daemon=True).start()
             threading.Thread(target=empurrar_os_eventos, name="eventos-erp", daemon=True).start()
             threading.Thread(target=meus_clientes, name="meus-clientes", daemon=True).start()
+            threading.Thread(target=pedidos_de_cte, name="logistica", daemon=True).start()
         yield
         parar.set()
 

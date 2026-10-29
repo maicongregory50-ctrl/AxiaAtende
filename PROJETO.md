@@ -31,6 +31,7 @@ envio que o AxiaMarketing pede. Ele não decide campanha, peça nem lista: isso 
 | A API da Anthropic | Anthropic | quem escreve em vez de tocar recebe o menu; o resto continua |
 | O pedido de envio e a lista com o responsável de cada cliente | AxiaMarketing | não há envio à carteira; o recepcionista continua |
 | O Relacionamento do ERP pelo agente `ATENDIMENTO` (`CRM.EVT.W`): empurrar os estados das mensagens (#1090) e buscar as retomadas (#1193, `GET /relacionamento/retomadas`) | AxiaGestão | os estados não chegam ao ERP e quem foi retomado lá continua bloqueado aqui pela recusa; o envio e o recepcionista continuam |
+| Os pedidos de CT-e da Logística do ERP pelo agente `ATENDIMENTO` (`LOG.CTE`, #1128): informar a janela de 24 h do destino "Logística", buscar os pedidos e a ficha do frete, devolver o estado | AxiaGestão | o botão CT-e da tela Fretes fica em "Enviando…" e a Logística manda a ficha à mão pelo botão Ficha; o resto continua |
 | Assinatura Claude Code no perfil | perfil do usuário | sem sessão de agente; os serviços continuam |
 
 ## Se eu cair
@@ -44,6 +45,10 @@ que fica contratado e parado por um mês depois da troca. O envio à carteira pa
 fora do que foi aprovado: o convite que não saiu não sai depois sozinho.
 
 Antes da troca, cair não afeta ninguém: o recepcionista está em escuta e o Opa atende.
+
+**A ficha do frete (#1128) também para:** o pedido de CT-e fica "Enviando…" na tela Fretes do ERP e não
+sai depois sozinho se a janela de 24 h tiver fechado (volta "Falhou"); a Logística baixa a ficha pelo botão
+**Ficha** e manda à mão.
 
 ## Se o endereço público cair
 

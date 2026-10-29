@@ -180,6 +180,12 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
             logos.mandar_avisos(con, saida, momento)
     except Exception as falha:  # noqa: BLE001
         print("logos: %s" % type(falha).__name__, flush=True)
+    try:   # #1128: a ficha do frete ao WhatsApp da Logistica do ERP (so dentro das 24 h, sem modelo)
+        from . import logistica_erp
+        with conexao(cfg) as con:
+            logistica_erp.mandar(con, saida, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("logistica: %s: %s" % (type(falha).__name__, falha), flush=True)
 
 
 def rotina_dos_clientes(cfg: config.Config, saida, ia=None, agora: datetime | None = None) -> int:

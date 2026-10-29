@@ -154,3 +154,56 @@ def registrar_contato(cfg, corpo: dict) -> dict:
         raise ErpIndisponivel("o ERP não respondeu") from None
     except (KeyError, ValueError, TypeError):
         raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+# ── #1128: o pedido de CT-e da Logistica (LOG.CTE, fase609 do ERP) ────────────────────────────────
+
+def _baixar(url: str, token: str) -> bytes:
+    pedido = urllib.request.Request(url, method="GET")
+    pedido.add_header("Authorization", "Bearer " + token)
+    with urllib.request.urlopen(pedido, timeout=60) as r:   # noqa: S310 -- URL da config
+        return r.read()
+
+
+def logistica(cfg, janela: dict) -> dict:
+    """Uma ida ao ERP com um token so: informa a janela de 24 h do destino da Logistica e traz os pedidos
+    de CT-e pendentes. Devolve {"pendentes": [...], "token": ...} (o token serve as fichas e aos estados
+    desta mesma volta, e nunca sai daqui). Fora do ar ou recusa: `ErpIndisponivel`."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        token = _token(cfg)
+        _pedir(base + "/logistica/agente/janela", janela, token=token)
+        return {"pendentes": _pedir(base + "/logistica/agente/pendentes", token=token), "token": token}
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão LOG.CTE",
+                  404: "o ERP ainda não tem a Logística (#1128)"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+def ficha_do_frete(cfg, token: str, frete_id: int) -> bytes:
+    """O PDF da ficha do frete. Erro: `ErpIndisponivel`."""
+    try:
+        return _baixar(cfg.erp_url.rstrip("/") + "/logistica/agente/fretes/%d/ficha.pdf" % int(frete_id), token)
+    except urllib.error.HTTPError as e:
+        raise ErpIndisponivel("a ficha não veio (%d)" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+
+
+def estado_do_pedido(cfg, token: str, pedido_id: int, estado: str, motivo: str = "", wamid: str = "") -> None:
+    """Devolve ao ERP ENVIADO (com o wamid) ou FALHOU (com o motivo, em portugues). 404 = ja respondido."""
+    corpo = {"estado": estado, "motivo": motivo[:500] or None, "ref_externa": wamid[:120] or None}
+    try:
+        _pedir(cfg.erp_url.rstrip("/") + "/logistica/agente/pedidos/%d/estado" % int(pedido_id), corpo, token=token)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return
+        raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
