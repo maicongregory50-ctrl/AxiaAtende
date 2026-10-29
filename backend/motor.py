@@ -146,7 +146,8 @@ def _filhos(con, no_id: int):
 
 RAIZ = "raiz"                  # a arvore do cliente
 RAIZ_INTERNA = "raiz_interna"  # a arvore de quem e da casa (#1031)
-RAIZES = (RAIZ, RAIZ_INTERNA)
+RAIZ_CARTEIRA = "raiz_carteira"  # o "outro assunto" do cliente da carteira (#1189)
+RAIZES = (RAIZ, RAIZ_INTERNA, RAIZ_CARTEIRA)
 
 
 def folhas_e_menus(con) -> list[dict]:
@@ -522,9 +523,11 @@ def reperguntar(con, saida: Saida, pessoa: Pessoa, conversa, aviso: str) -> None
     mostrar_menu(con, saida, pessoa, conversa, False)
 
 
-def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas_vindas: bool, no=None) -> None:
+def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas_vindas: bool, no=None,
+           antes: str = "") -> None:
     """Quem escreveu: a IA propoe; sem proposta (ou sem IA), o menu. `no` ja proposto (pelas opcoes
-    do no atual, #988) pula a IA sobre a arvore inteira."""
+    do no atual, #988) pula a IA sobre a arvore inteira. `antes`: a linha que vai antes da proposta
+    quando nao ha boas-vindas (o representante, no portao do #1189)."""
     chave = None
     if no is None and ia is not None and texto.strip():
         try:
@@ -536,7 +539,7 @@ def propor(con, saida: Saida, ia, pessoa: Pessoa, conversa, texto: str, com_boas
         mostrar_menu(con, saida, pessoa, conversa, com_boas_vindas)
         return
     explica = no["descricao"] or no["rotulo"]
-    antes = _ajuste(con, "boas_vindas", "") + "\n\n" if com_boas_vindas else ""
+    antes = _ajuste(con, "boas_vindas", "") + "\n\n" if com_boas_vindas else (antes + "\n\n" if antes else "")
     w = saida.botoes(pessoa.para, "%sEntendi que você quer: %s. É isso?" % (antes, explica),
                      [Opcao("ia:sim:%s" % no["chave"], "Sim"), Opcao("ia:menu", "Ver todas as opções")])
     con.execute("UPDATE atendimento.conversas SET ia_proposta_id = %s WHERE id = %s", (no["id"], conversa["id"]))
@@ -555,6 +558,109 @@ def fechar_do_menu_interno(con, pessoa: Pessoa, agora: datetime, situacao: str) 
                                      AND c2.iniciada_em > %s
                                    ORDER BY c2.id DESC LIMIT 1)""",
                 (situacao, pessoa.bsuid, agora - timedelta(hours=24)))
+
+
+# ── o portao do cliente da carteira (#1189, dono 28/10/2026) ─────────────────
+# "Se clientes comecarem a voltar, precisamos ajustar o atendimento personalizado, nao podemos ligar
+# no fluxo geral." O cliente que recebeu um envio da carteira nos ultimos 30 dias e escreve recebe o
+# contato do REPRESENTANTE dele e, para outro assunto, o menu `raiz_carteira`: boleto e nota, carga,
+# qualidade (os destinos de sempre) e "Falar com a empresa" (o dono: o comercial de quem nao quer o
+# representante, e a reclamacao -- "cliente quer reclamar, estiver zangado, ai fala comigo").
+# A linha do representante sai UMA vez por dia. O texto que nao diz assunto, depois dela no mesmo dia,
+# fica anotado e nao recebe nada: do outro lado pode estar a resposta automatica do WhatsApp Business
+# do cliente, e duas maquinas nao ficam se respondendo.
+
+PORTAO_RESUMO = "portao do cliente"
+OBRIGADO = "Obrigado pela mensagem!"
+SEM_REPRESENTANTE = "Sobre o que você quer falar? Escolha abaixo."
+
+
+def _portao_hoje(con, para: str, agora: datetime) -> bool:
+    return con.execute("""SELECT 1 FROM atendimento.enviadas
+                           WHERE para = %s AND resumo LIKE %s
+                             AND (enviada_em AT TIME ZONE 'America/Sao_Paulo')::date = %s LIMIT 1""",
+                       (para, PORTAO_RESUMO + "%", agora.astimezone(FUSO).date())).fetchone() is not None
+
+
+def _registrar_portao(con, conversa_id, para, tipo, erp_codigo, wamid, agora: datetime) -> None:
+    """Como `_registrar`, com a hora de agora: e por ela que `_portao_hoje` conta o dia."""
+    if wamid:
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, conversa_id, para, tipo, resumo, enviada_em)
+                       VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (wamid, conversa_id, para, tipo, "%s: %s" % (PORTAO_RESUMO, erp_codigo or ""), agora))
+
+
+def assunto_da_carteira(con, ia, raiz, texto: str):
+    """(certo, parecido) entre as opcoes da `raiz_carteira`. O texto curto vai por `casar_opcao`
+    (o casamento exato, e a IA restrita); o longo -- a reclamacao costuma ser longa -- direto a IA,
+    que `casar_opcao` nao chama acima de 80 letras."""
+    if len(_sem_acento(texto)) <= 80:
+        return casar_opcao(con, ia, raiz, texto)
+    if ia is None:
+        return None, None
+    filhos = [f for f in _filhos(con, raiz["id"]) if f["acao"] != "encerrar"]
+    try:
+        chave = ia.classificar(texto, [{"chave": f["chave"], "rotulo": f["rotulo"], "descricao": f["descricao"],
+                                        "acao": f["acao"], "caminho": []} for f in filhos])
+    except Exception:   # noqa: BLE001 -- a IA nunca derruba o atendimento
+        chave = None
+    return None, next((f for f in filhos if chave and f["chave"] == chave), None)
+
+
+def portao_do_cliente(con, saida: Saida, ia, e: Entrada, agora: datetime, envio) -> bool:
+    """True = a mensagem foi tratada aqui e NAO segue para o menu geral nem para a OlivIA geral.
+
+    So a mensagem que ABRIRIA conversa: toque (o do proprio portao inclusive) e quem ja esta numa
+    conversa seguem o caminho de sempre, que conhece a `raiz_carteira` como no atual."""
+    p = e.pessoa
+    if envio is None or e.toque or e.tipo == "reaction":
+        return False
+    if _ajuste(con, "portao.ligado", True) is False:
+        return False
+    raiz = _no(con, RAIZ_CARTEIRA)
+    if not raiz or internos.e_interno(con, p.wa_id) or _conversa_aberta(con, p) is not None:
+        return False
+    d = envio.convidado_recente(con, p.wa_id, agora)
+    if not d:
+        return False
+    if e.texto:
+        envio.tratar_texto_de_convidado(con, e, agora)
+        # a resposta automatica e o "obrigado" depois do link: as regras de sempre (silencio, "por nada")
+        if depois_do_atendimento(con, saida, p, e.texto, agora):
+            return True
+    ja = _portao_hoje(con, p.para, agora)
+    if ja and not e.texto:
+        return False   # a foto ou o audio depois da linha de hoje: a linha curta de sempre
+    certo, parecido = assunto_da_carteira(con, ia, raiz, e.texto) if e.texto else (None, None)
+    if ja and not (certo or parecido):
+        print("portao: %s escreveu de novo sem assunto (%s): anotado, sem resposta" % (p.para, e.wamid), flush=True)
+        return True
+    conversa = _nova_conversa(con, p, agora)
+    _chegou(con, p, conversa, agora)
+    con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], conversa["id"]))
+    conversa = _conversa_aberta(con, p)
+    representante = envio.linha_do_representante(d)
+    linha = "" if ja else "\n\n".join(x for x in (OBRIGADO, representante) if x)
+    if certo:
+        if linha:
+            _registrar_portao(con, conversa["id"], p.para, "texto", d["erp_codigo"], saida.texto(p.para, linha), agora)
+        escolher(con, saida, p, conversa, certo, agora)
+    elif parecido:
+        propor(con, saida, ia, p, conversa, e.texto, False, no=parecido, antes=linha)
+        if linha:
+            # a proposta levou a linha do representante: e ela que conta o dia
+            con.execute("""UPDATE atendimento.enviadas SET resumo = %s, enviada_em = %s
+                            WHERE id = (SELECT max(id) FROM atendimento.enviadas WHERE conversa_id = %s)""",
+                        ("%s: %s" % (PORTAO_RESUMO, d["erp_codigo"] or ""), agora, conversa["id"]))
+    else:
+        pergunta = dict(raiz)
+        if not representante:
+            pergunta["pergunta"] = SEM_REPRESENTANTE
+        w = perguntar(con, saida, p, pergunta, linha)
+        if w is None and linha:
+            w = saida.texto(p.para, linha)   # #1028: a lista calada para este numero; o representante sai
+        _registrar_portao(con, conversa["id"], p.para, "lista", d["erp_codigo"], w, agora)
+    return True
 
 
 def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo=None) -> None:
@@ -597,6 +703,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
             return
         if campo.texto_de_interno(con, saida, e, agora):
             return
+    # #1189: o CLIENTE da carteira que escreve vai ao representante e ao menu dele, nunca ao fluxo
+    # geral. Depois do canal de campo e dos clientes do dia (que sao da equipe) e antes de tudo o que
+    # abre conversa.
+    if portao_do_cliente(con, saida, ia, e, agora, envio):
+        return
     # O que nao e texto nem botao (dono, 12/10/2026, depois de um menu as 00:15): a REACAO (o joinha
     # numa mensagem nossa) nao e pedido de nada e nao se responde; figurinha, audio, foto de quem
     # nao e da equipe, localizacao, contato e documento recebem uma linha curta, nunca as
@@ -658,7 +769,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
             mostrar_menu(con, saida, p, conversa, False)
     elif e.toque == "ia:menu":
         con.execute("UPDATE atendimento.conversas SET ia_confirmou = false WHERE id = %s", (conversa["id"],))
-        mostrar_menu(con, saida, p, conversa, False)
+        no_atual = _no_atual(con, conversa)
+        if no_atual is not None and no_atual["chave"] == RAIZ_CARTEIRA:
+            reperguntar(con, saida, p, conversa, "")   # #1189: o cliente da carteira volta ao menu dele
+        else:
+            mostrar_menu(con, saida, p, conversa, False)
     elif e.toque == "ia:volta":
         # "Ver opcoes" da RETOMADA (#989, dono 13/10/2026): a pergunta do ponto onde a opcao proposta
         # mora (o pai dela: "Em qual estado voce atua?" para SC), com as opcoes daquele ponto -- nao o
@@ -705,6 +820,16 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         if nova and e.texto and vaga.volta(con, saida, ia, p, conversa, e.texto, agora):
             return
         no_atual = _no_atual(con, conversa)
+        if no_atual is not None and no_atual["chave"] == RAIZ_CARTEIRA:
+            # #1189: na conversa do cliente da carteira, so as opcoes dele -- nunca a arvore geral
+            certo, parecido = assunto_da_carteira(con, ia, no_atual, e.texto or "")
+            if certo:
+                escolher(con, saida, p, conversa, certo, agora)
+            elif parecido:
+                propor(con, saida, ia, p, conversa, e.texto or "", False, no=parecido)
+            else:
+                reperguntar(con, saida, p, conversa, "")
+            return
         certo, parecido = casar_opcao(con, ia, no_atual, e.texto or "")
         if certo:
             escolher(con, saida, p, conversa, certo, agora)
@@ -953,10 +1078,17 @@ def retomar_paradas(con, saida: Saida, ia, agora: datetime) -> int:
         texto = "" if motivo else _o_que_a_pessoa_disse(con, c)
         if not motivo and not texto:
             motivo = "sem texto"
+        no_parado = no
         no = None
         if not motivo:
+            # #1189: a conversa do cliente da carteira se retoma so com as opcoes dele
+            if no_parado is not None and no_parado["chave"] == RAIZ_CARTEIRA:
+                opcoes = [{"chave": f["chave"], "rotulo": f["rotulo"], "descricao": f["descricao"],
+                           "acao": f["acao"], "caminho": []} for f in _filhos(con, no_parado["id"])]
+            else:
+                opcoes = folhas_e_menus(con)
             try:
-                chave = ia.classificar(texto, folhas_e_menus(con))
+                chave = ia.classificar(texto, opcoes)
             except Exception:   # noqa: BLE001 -- a IA nunca derruba o laco
                 chave = None
             no = _no(con, chave) if chave else None

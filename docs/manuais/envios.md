@@ -86,6 +86,31 @@ o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP 
   na categoria **Utilidade**. Sem ele o aviso fica guardado com o erro escrito e **ninguém recebe** —
   nada se perde, e sai quando o modelo entrar.
 
+## 4b. Quando o cliente que recebeu um envio escreve (#1189)
+
+O cliente que recebeu um envio da carteira nos últimos 30 dias e escreve ao número da empresa **não
+cai no menu geral**. Ele recebe:
+
+> Obrigado pela mensagem!
+>
+> Quem cuida de você na Sementes Renascer é **Maicon**. Fale direto por aqui: https://wa.me/55…
+>
+> Se for outro assunto, escolha abaixo. **[Ver opções]**
+
+As opções levam aos contatos de sempre: **Boleto e nota** (financeiro), **Carga e entrega**
+(fretes), **Qualidade** e **Falar c/ a empresa** (o dono: assunto comercial de quem não quer o
+representante, e reclamação).
+
+- **Se ele escreve o assunto em vez de tocar**, a OlivIA lê o texto e propõe uma dessas quatro
+  ("Entendi que você quer: … É isso?"). Reclamação ou cliente irritado vai a **Falar c/ a empresa**,
+  qualquer que seja o assunto. Se a OlivIA não tiver certeza, ele vê as quatro opções.
+- **A linha do representante sai uma vez por dia.** O texto sem assunto que chega depois dela, no
+  mesmo dia, fica anotado na linha dele aqui na tela e não recebe resposta: do outro lado pode
+  estar a resposta automática do WhatsApp Business do cliente.
+- **O texto que ele escreveu aparece ao lado do nome**, como antes.
+- **Para desligar** (voltar ao menu geral para todos): ajuste `portao.ligado` = `false`, sem
+  reiniciar.
+
 ## 5. O que a tela NÃO faz
 
 - **Não cria nem aprova envio:** o envio nasce e é aprovado em Publicações, no AxiaMarketing.

@@ -10,8 +10,8 @@ from backend import recepcionista as R
 from backend.banco import conexao
 from backend.envio import Envio
 from backend.main import criar_app
-from tests.avisos_meta import aviso, status, texto
-from tests.saida_falsa import SaidaFalsa
+from tests.avisos_meta import aviso, status, texto, toque
+from tests.saida_falsa import IAFalsa, SaidaFalsa
 
 QUINTA_9H = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)   # 09:00 em Sao Paulo
 CHAVE = {"X-Axiaatende-Chave": "chave-do-marketing"}
@@ -188,7 +188,90 @@ def test_entregue_e_lido_e_o_texto_de_quem_escreveu(ligado, imagens):
     d = destinatarios(ligado)[1]
     assert d["entregue_em"] and d["lido_em"]
     assert d["resposta"] == "texto" and d["resposta_texto"] == "tem aveia branca?"
-    assert s.ultima[0] == "lista"                       # e a OlivIA atende quem escreveu
+    # #1189: o cliente convidado vai ao representante dele, nao a OlivIA (antes: a lista do menu)
+    assert s.ultima[0] == "lista" and "https://wa.me/5549991505565" in s.ultima[2]
+
+
+def _escreve(ligado, s, env, numero, frase, agora, wamid, ia=None):
+    R.gravar(ligado, aviso([texto(wamid, frase, numero=numero)], numero=numero, bsuid="BR." + numero))
+    R.processar_pendentes(ligado, s, ia, envio=env, agora=agora)
+
+
+def _toca(ligado, s, env, numero, opcao, agora, wamid, lista=True):
+    R.gravar(ligado, aviso([toque(wamid, opcao, numero=numero, lista=lista)], numero=numero, bsuid="BR." + numero))
+    R.processar_pendentes(ligado, s, None, envio=env, agora=agora)
+
+
+def test_1189_o_portao_manda_ao_representante_e_ao_menu_da_carteira_uma_vez_por_dia(ligado, imagens):
+    """Dono, 28/10/2026: "nao podemos ligar no fluxo geral". O cliente da carteira recebe o contato do
+    representante e, para outro assunto, o menu dele -- uma vez por dia: do outro lado pode estar a
+    resposta automatica do WhatsApp Business do cliente."""
+    s, env = _convidar(ligado, imagens, [cliente(1, 10)])
+    numero = destinatarios(ligado)[1]["whatsapp"]
+
+    def portoes():
+        return [x for x in s.enviadas if x[1] == numero and "Obrigado pela mensagem" in x[2]]
+
+    _escreve(ligado, s, env, numero, "bom dia, tudo bem?", QUINTA_9H + timedelta(hours=1), "wamid.a")
+    assert len(portoes()) == 1
+    tipo, _, msg, opcoes = portoes()[0]
+    assert tipo == "lista" and "Maicon" in msg and "https://wa.me/5549991505565" in msg
+    assert [o for o, _ in opcoes] == ["menu:carteira.financeiro", "menu:carteira.carga",
+                                      "menu:carteira.qualidade", "menu:carteira.empresa"]
+    assert destinatarios(ligado)[1]["resposta_texto"] == "bom dia, tudo bem?"   # anotado na tela Envios
+    # sem tocar, a segunda mensagem do mesmo dia sem assunto (a resposta automatica) nao recebe nada
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.conversas SET situacao = 'parou_no_meio'")
+    n = len(s.enviadas)
+    _escreve(ligado, s, env, numero, "Em breve retornaremos", QUINTA_9H + timedelta(hours=2), "wamid.b")
+    assert len(s.enviadas) == n, s.enviadas[n:]
+    # no dia seguinte, de novo uma
+    _escreve(ligado, s, env, numero, "bom dia", QUINTA_9H + timedelta(days=1), "wamid.c")
+    assert len(portoes()) == 2
+
+
+def test_1189_o_toque_no_boleto_leva_a_fran_e_o_da_empresa_ao_dono(ligado, imagens):
+    s, env = _convidar(ligado, imagens, [cliente(1, 10)])
+    numero = destinatarios(ligado)[1]["whatsapp"]
+    _escreve(ligado, s, env, numero, "oi", QUINTA_9H + timedelta(hours=1), "wamid.a")
+    _toca(ligado, s, env, numero, "menu:carteira.financeiro", QUINTA_9H + timedelta(hours=1, minutes=1), "wamid.t1")
+    assert s.ultima[0] == "contato" and s.ultima[2] == "Fran"
+    _escreve(ligado, s, env, numero, "empresa", QUINTA_9H + timedelta(days=1), "wamid.b")
+    assert s.ultima[0] == "contato" and s.ultima[2] == "Maicon Gregory"   # a palavra da opcao: direto
+    assert "Obrigado pela mensagem" in s.enviadas[-3][2]                  # a linha do dia antes do contato
+
+
+def test_1189_o_texto_com_assunto_a_olivia_propoe_so_as_opcoes_da_carteira(ligado, imagens):
+    """"OlivIA precisa entender o tipo de atendimento": o texto vai a IA SO com as quatro opcoes, e
+    a reclamacao longa tambem (casar_opcao nao chama a IA acima de 80 letras)."""
+    s, env = _convidar(ligado, imagens, [cliente(1, 10)])
+    numero = destinatarios(ligado)[1]["whatsapp"]
+    ia = IAFalsa(resposta="carteira.empresa")
+    frase = ("a semente que chegou semana passada veio com muita impureza, estou muito chateado com "
+             "isso e quero uma solucao")
+    _escreve(ligado, s, env, numero, frase, QUINTA_9H + timedelta(hours=1), "wamid.a", ia=ia)
+    assert ia.opcoes == [["carteira.financeiro", "carteira.carga", "carteira.qualidade", "carteira.empresa"]]
+    tipo, _, msg, opcoes = s.ultima
+    assert tipo == "botoes" and "https://wa.me/5549991505565" in msg and "Falar com a empresa" not in msg
+    assert opcoes[0][0] == "ia:sim:carteira.empresa"
+    # "Ver todas as opcoes" volta ao menu da carteira, nao ao menu geral
+    _toca(ligado, s, env, numero, "ia:menu", QUINTA_9H + timedelta(hours=1, minutes=1), "wamid.t", lista=False)
+    assert s.ultima[0] == "lista" and s.ultima[3][0][0] == "menu:carteira.financeiro"
+
+
+def test_1189_quem_nao_esta_em_envio_segue_o_fluxo_geral(ligado, imagens):
+    s, env = _convidar(ligado, imagens, [cliente(1, 10)])
+    _escreve(ligado, s, env, "5547988887777", "quero comprar semente", QUINTA_9H + timedelta(hours=1), "wamid.z")
+    assert s.ultima[0] == "lista" and "menu:carteira.financeiro" not in [o for o, _ in s.ultima[3]]
+
+
+def test_1189_o_portao_desligado_e_o_comportamento_de_antes(ligado, imagens):
+    s, env = _convidar(ligado, imagens, [cliente(1, 10)])
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.ajustes SET valor = 'false'::jsonb WHERE chave = 'portao.ligado'")
+    numero = destinatarios(ligado)[1]["whatsapp"]
+    _escreve(ligado, s, env, numero, "tem aveia branca?", QUINTA_9H + timedelta(hours=1), "wamid.d")
+    assert s.ultima[0] == "lista" and "Obrigado pela mensagem" not in s.ultima[2]
 
 
 def test_resumo_do_kr2(ligado, imagens):

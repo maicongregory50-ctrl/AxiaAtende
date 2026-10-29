@@ -42,7 +42,7 @@ import hashlib
 import hmac
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .banco import conexao
@@ -52,6 +52,12 @@ FUSO = ZoneInfo("America/Sao_Paulo")
 #: #1163 (o #1103, spec de 26/10, linha 27): "Teto de duas mensagens por mes por comprador". Conta o
 #: convite e a peca. So o comprador: o tecnico tem a regua dele, e o contato sem papel fica como esta.
 TETO_DO_COMPRADOR = 2
+#: #1192 (dono, 29/10/2026): a janela do envio ao cliente -- de segunda a sexta, das 9h30 as 17h, no
+#: relogio de Sao Paulo. O lote do dia virava a 00h01 (o cliente recebeu de madrugada); fora da janela
+#: nada sai, e o que ficou segue no proximo dia util, as 9h30.
+JANELA_INICIO = time(9, 30)
+JANELA_FIM = time(17, 0)
+DIAS_DA_JANELA = (0, 1, 2, 3, 4)   # weekday(): segunda a sexta
 JANELA = timedelta(hours=24)
 NAO_E_WHATSAPP = {"131026"}   # codigo da Meta: mensagem nao entregavel (numero sem WhatsApp)
 CELULAR = re.compile(r"^55[1-9][0-9]9[0-9]{8}$")
@@ -253,8 +259,11 @@ class Envio:
         return nota
 
     def mandar_lotes(self, con, saida: Saida, agora: datetime) -> int:
+        local = agora.astimezone(FUSO)
+        if local.weekday() not in DIAS_DA_JANELA or not JANELA_INICIO <= local.time() < JANELA_FIM:
+            return 0   # #1192: fora da janela nada sai; o lote espera o proximo dia util, 9h30
         nota = self.ler_nota_do_dia(con, agora)
-        hoje = agora.astimezone(FUSO).date()
+        hoje = local.date()
         mandados = 0
         for e in con.execute("SELECT * FROM atendimento.envios WHERE situacao IN ('ativo', 'parado_nota') ORDER BY id").fetchall():
             if nota != "GREEN":
@@ -401,6 +410,27 @@ class Envio:
                        VALUES ('recusa', %s, %s, %s)""",
                     (d["responsavel_nome"], d["responsavel_whatsapp"],
                      "|".join([d["nome"], local, "https://wa.me/%s" % numero])))
+
+    #: #1189 (dono, 28/10/2026): o cliente que recebeu um envio da carteira nos ultimos 30 dias e
+    #: escreve ao numero da empresa nao cai no fluxo geral ("nao podemos ligar no fluxo geral"). O
+    #: portao mora no motor (`motor.portao_do_cliente`); daqui saem quem e e a linha do representante.
+    PORTAO_DIAS = 30
+
+    def convidado_recente(self, con, wa_id: str, agora: datetime):
+        """O destinatario do envio mais recente a este numero nos ultimos 30 dias, ou None."""
+        return con.execute("""SELECT * FROM atendimento.envio_destinatarios
+                               WHERE whatsapp = %s AND convite_em > %s
+                               ORDER BY convite_em DESC LIMIT 1""",
+                           (com_nove(wa_id), agora - timedelta(days=self.PORTAO_DIAS))).fetchone()
+
+    @staticmethod
+    def linha_do_representante(d) -> str:
+        """"Quem cuida de voce ... e Fulano", com o endereco dele; vazio quando o envio nao tem o numero."""
+        rep = so_digitos(d["responsavel_whatsapp"] or "")
+        if not rep:
+            return ""
+        return ("Quem cuida de você na Sementes Renascer é %s. Fale direto por aqui: https://wa.me/%s"
+                % (primeiro_nome(d["responsavel_nome"] or ""), rep))
 
     def tratar_texto_de_convidado(self, con, entrada, agora) -> bool:
         """Quem recebeu um envio e ESCREVEU: o texto fica na linha dele na tela Envios."""
