@@ -138,6 +138,22 @@ todo aviso sai como antes, **um modelo pago por aviso**; o que estava guardado s
 **O que NÃO faz:** não vale para cliente; não reenvia o que ficou **não visto**; não muda o texto de
 nenhum aviso; não deixa o toque em Ver de um número soltar o aviso de outro.
 
+### Status do dia (desde 30/10/2026, #1207)
+
+As artes do Stories que o Marketing manda ao dono para ele postar no status do WhatsApp da empresa
+chegam por aqui, como um aviso **Status do dia**, na mesma tabela. Na hora marcada na tela
+Publicações do Marketing:
+
+- **dentro das 24 h** (o dono falou com o número da empresa no último dia): chegam **as artes, na
+  ordem, sem texto nenhum**, e só a última com a legenda, como ela é (com as quebras de linha). Legenda
+  maior que 1.024 caracteres (o limite da legenda de uma imagem) vem inteira numa mensagem logo depois
+  da última arte. Sai de graça: aparece **Enviado (texto)**;
+- **fora das 24 h**: o mesmo "Você tem N aviso(s)… Ver"; o toque em **Ver** traz as artes.
+
+Quem recebe é o destino do ajuste `status_do_dia_para`, que nasceu igual ao do aviso do plano (o dono).
+O Status do dia **não tem modelo**: com a chave do porteiro desligada, ele só sai dentro das 24 h, e
+fora delas fica com **Erro** ("janela de 24 h fechada e porteiro desligado").
+
 ## 4b. Quando o cliente que recebeu um envio escreve (#1189)
 
 O cliente que recebeu um envio da carteira nos últimos 30 dias e escreve ao número da empresa **não

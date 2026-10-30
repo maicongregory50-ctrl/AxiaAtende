@@ -251,6 +251,7 @@ def _nao_e_whatsapp(con, numero):
 #   - 7 dias sem o toque: os guardados da reabertura viram NAO VISTO. Nao saem mais e nao somem.
 
 NAO_VISTO = timedelta(days=7)
+LEGENDA_DA_IMAGEM = 1024   # o limite da Meta para a legenda de uma imagem (#1207)
 
 
 def janela_aberta(con, numero: str, agora: datetime) -> bool:
@@ -569,6 +570,18 @@ class Envio:
         for a in con.execute("""SELECT * FROM atendimento.avisos WHERE enviado_em IS NULL AND erro = ''
                                    AND nao_visto_em IS NULL
                                  ORDER BY id LIMIT 20""").fetchall():
+            if a["tipo"] == "status_do_dia":
+                # #1207: o status do dia nao tem modelo (a Meta poria texto fixo em cada imagem): sem o
+                # porteiro, so sai dentro da janela; fora dela, o erro diz por que
+                try:
+                    with con.transaction():
+                        if not janela_aberta(con, a["para_whatsapp"], agora):
+                            raise RuntimeError("janela de 24 h fechada e porteiro desligado: o status do dia "
+                                               "não tem modelo, só sai como imagem dentro da janela")
+                        self._status_como_imagens(con, saida, a, agora)
+                except Exception as falha:  # noqa: BLE001
+                    con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+                continue
             m = modelo_do_uso(con, "aviso_" + a["tipo"])
             try:
                 if not m:
@@ -624,11 +637,33 @@ class Envio:
         self._reabrir(con, saida, a, agora)
 
     def _aviso_como_texto(self, con, saida, a, agora):
+        if a["tipo"] == "status_do_dia":
+            self._status_como_imagens(con, saida, a, agora)
+            return
         w = saida.texto(a["para_whatsapp"], texto_do_aviso(con, a))
         con.execute("""UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'texto' WHERE id = %s""",
                     (agora, w, a["id"]))
         con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', %s)",
                     (w, a["para_whatsapp"], "aviso %s" % a["tipo"]))
+
+    def _status_como_imagens(self, con, saida, a, agora):
+        """#1207: o status do dia -- as imagens, na ordem, sem texto nenhum; a ultima com a legenda como
+        esta (com as quebras de linha). A legenda da imagem tem ate 1024 caracteres; a maior vai num
+        texto logo depois da ultima imagem, inteira. So dentro da janela (quem chama confere)."""
+        para, imagens, legenda = a["para_whatsapp"], list(a["imagens"]), (a["legenda"] or "").strip()
+        cabe = len(legenda) <= LEGENDA_DA_IMAGEM
+        w = None
+        for i, arquivo in enumerate(imagens, start=1):
+            ultima = i == len(imagens)
+            w = saida.imagem(para, arquivo, legenda if ultima and cabe else "")
+            con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'imagem', %s)",
+                        (w, para, "status do dia %d/%d" % (i, len(imagens))))
+        if legenda and not cabe:
+            w = saida.texto(para, legenda)
+            con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', %s)",
+                        (w, para, "status do dia, a legenda"))
+        con.execute("""UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'texto' WHERE id = %s""",
+                    (agora, w, a["id"]))
 
     def _reabrir(self, con, saida, a, agora):
         """UMA reabertura ao numero, com o total que fica guardado (este aviso e os novos do mesmo numero

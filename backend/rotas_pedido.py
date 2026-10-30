@@ -159,36 +159,58 @@ def rotas(cfg) -> APIRouter:
         return dict(r1)
 
     class Aviso(BaseModel):
-        tipo: Literal["plano_sem_registro"]
-        partes: list[str] = Field(min_length=1, max_length=3)
+        tipo: Literal["plano_sem_registro", "status_do_dia"]
+        partes: list[str] = Field(default_factory=list, max_length=3)
+        # #1207: o status do dia -- as artes do Stories, na ordem, e a legenda que vai na ultima
+        imagens: list[str] = Field(default_factory=list, max_length=10)
+        legenda: str = ""
+        ref: str = Field(default="", max_length=120)   # o codigo da publicacao no Marketing (PUB-0000)
+
+    # quem recebe cada aviso pedido pelo Marketing (o ajuste aponta para um destino)
+    PARA = {"plano_sem_registro": "avisado_no_nao", "status_do_dia": "status_do_dia_para"}
 
     @r.post("/pedido/aviso")
     def pedir_aviso(pedido: Aviso, x_axiaatende_chave: str | None = Header(default=None)):
-        """O aviso ao dono pedido pelo Marketing (#926, o Controle do plano): vai para a fila de
-        avisos, para quem o ajuste `avisado_no_nao` aponta, e sai na volta do envio. So o tipo do
-        plano: os outros avisos nascem aqui dentro."""
+        """O aviso ao dono pedido pelo Marketing: o do plano (#926, o Controle do plano) e o status do
+        dia (#1207, as artes do Stories para ele postar). Vai para a fila de avisos, para quem o ajuste
+        do tipo aponta, e sai na volta do envio. Os outros avisos nascem aqui dentro."""
         conferir(x_axiaatende_chave)
-        if any("|" in p for p in pedido.partes):
-            raise HTTPException(status_code=422, detail="parte do aviso com barra vertical")
+        if pedido.tipo == "plano_sem_registro":
+            if not pedido.partes:
+                raise HTTPException(status_code=422, detail="aviso do plano sem as partes")
+            if any("|" in p for p in pedido.partes):
+                raise HTTPException(status_code=422, detail="parte do aviso com barra vertical")
+            sobre = "|".join(pedido.partes)
+        else:
+            if not pedido.imagens:
+                raise HTTPException(status_code=422, detail="status do dia sem imagens")
+            sobre = "%s · %d imagem(ns)" % (pedido.ref or "status do dia", len(pedido.imagens))
+        imagens = []
+        if pedido.imagens:
+            pasta = cfg.envios_pasta / "avisos" / hashlib.sha256(
+                ("%s|%s" % (pedido.ref, datetime.now().isoformat())).encode()).hexdigest()[:16]
+            imagens = [copiar(img, pasta / ("%02d" % i)) for i, img in enumerate(pedido.imagens, start=1)]
         with conexao(cfg) as con:
             quem = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
-                               (_ajuste(con, "avisado_no_nao"),)).fetchone()
+                               (_ajuste(con, PARA[pedido.tipo]),)).fetchone()
             if not quem:
                 raise HTTPException(status_code=422, detail="ninguém configurado para receber o aviso")
-            a = con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
-                               VALUES (%s, %s, %s, %s) RETURNING id""",
-                            (pedido.tipo, quem["nome"], quem["whatsapp"], "|".join(pedido.partes))).fetchone()
+            a = con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre, imagens, legenda)
+                               VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
+                            (pedido.tipo, quem["nome"], quem["whatsapp"], sobre, imagens,
+                             pedido.legenda)).fetchone()
         return {"aviso_id": a["id"]}
 
     @r.get("/pedido/aviso/{aviso_id}")
     def situacao_do_aviso(aviso_id: int, x_axiaatende_chave: str | None = Header(default=None)):
-        """Na fila (sem enviado_em e sem erro), enviado (com a hora) ou com o erro. So os do plano.
-        #1188: a `situacao` continua nesses tres valores (o CHECK do marketing so os aceita); o
+        """Na fila (sem enviado_em e sem erro), enviado (com a hora) ou com o erro. So os que o
+        Marketing pede (o do plano e o status do dia, #1207). #1188: a `situacao` continua nesses tres valores (o CHECK do marketing so os aceita); o
         guardado (esperando o toque em Ver) e o nao visto vem ao lado, e na fila continuam."""
         conferir(x_axiaatende_chave)
         with conexao(cfg) as con:
             a = con.execute("""SELECT criado_em, enviado_em, erro, guardado_em, nao_visto_em FROM atendimento.avisos
-                                WHERE id = %s AND tipo = 'plano_sem_registro'""", (aviso_id,)).fetchone()
+                                WHERE id = %s AND tipo IN ('plano_sem_registro', 'status_do_dia')""",
+                            (aviso_id,)).fetchone()
         if not a:
             raise HTTPException(status_code=404, detail="aviso não encontrado")
         situacao = "erro" if a["erro"] else ("enviado" if a["enviado_em"] else "na_fila")

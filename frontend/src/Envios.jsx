@@ -23,7 +23,7 @@ const ESTADO_AVISO = {
 const TIPO_AVISO = {
   recusa: 'Cliente pediu para parar', sem_atendimento: 'Cliente sem atendimento', avaliacao_ruim: 'Avaliação ruim',
   endereco_fora: 'Endereço fora do ar', endereco_voltou: 'Endereço voltou', plano_sem_registro: 'Plano sem registro',
-  lote_do_representante: 'Resumo do lote',
+  lote_do_representante: 'Resumo do lote', status_do_dia: 'Status do dia',
 }
 
 // #1199 (dono, 29/10/2026): "precisamos melhorar os filtros e ordenar as colunas; nao existe filtro por
