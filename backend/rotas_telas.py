@@ -104,7 +104,9 @@ def rotas(cfg, usuario) -> APIRouter:
                               AND m.pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') LIMIT 1) AS motivo
                      FROM atendimento.conversas c
                      LEFT JOIN atendimento.destinos d ON d.id = c.destino_id
-                    WHERE c.iniciada_em >= %s ORDER BY c.iniciada_em DESC LIMIT 500""", (desde,)).fetchall()
+                    WHERE c.iniciada_em >= %s
+                      AND c.origem = 'mensagem'   -- #1204 (dono, 30/10): a que nos abrimos nao aparece aqui
+                    ORDER BY c.iniciada_em DESC LIMIT 500""", (desde,)).fetchall()
             motivos = [dict(m) for m in con.execute(
                 """SELECT chave, rotulo FROM atendimento.menu
                     WHERE pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') AND ativo
@@ -121,14 +123,12 @@ def rotas(cfg, usuario) -> APIRouter:
             linhas = [l for l in linhas if l["erp_cadastros"] == 1]
         elif quem == "fora":
             linhas = [l for l in linhas if l["erp_cadastros"] != 1]
-        # #1204: a conversa que o portao retroativo abriu nao e chegada -- fomos nos que escrevemos
-        chegadas = [l for l in linhas if l["origem"] == "mensagem"]
         cartoes = {
             "campo": campo["n"], "campo_catalogadas": campo["c"],
-            "chegaram": len(chegadas),
-            "do_cadastro": sum(1 for l in chegadas if l["erp_cadastros"] == 1),
+            "chegaram": len(linhas),
+            "do_cadastro": sum(1 for l in linhas if l["erp_cadastros"] == 1),
             "receberam_link": sum(1 for l in linhas if l["link_em"]),
-            "pararam_no_meio": sum(1 for l in chegadas if l["situacao"] == "parou_no_meio"),
+            "pararam_no_meio": sum(1 for l in linhas if l["situacao"] == "parou_no_meio"),
             "disseram_sim": sum(1 for l in linhas if l["recebeu"] is True),
             "disseram_nao": sum(1 for l in linhas if l["recebeu"] is False),
             "ia_acertou": sum(1 for l in linhas if l["ia_confirmou"] is True),
@@ -148,8 +148,6 @@ def rotas(cfg, usuario) -> APIRouter:
                           "sem_curriculo": "sem_curriculo",
                           # #1097: a equipe tocou "Foto do campo" e a foto (ou a logo) chegou
                           "imagem_recebida": "imagem", "logo_recebida": "logo"}.get(l["situacao"], "em_curso")
-                if estado == "parou" and l["origem"] != "mensagem":
-                    estado = "sem_resposta"   # #1204: nao parou no meio de nada; nao respondeu ao que mandamos
             if situacao and estado != situacao:
                 continue
             saida.append({"quando": l["iniciada_em"].isoformat(),
@@ -160,7 +158,6 @@ def rotas(cfg, usuario) -> APIRouter:
                           "numero": mascarar(l["wa_id"]), "conversar": link_conversa(l["wa_id"]),
                           "perfil": l["nome_perfil"],
                           "caminho": l["caminho"], "destino": l["destino_nome"], "estado": estado,
-                          "origem": l["origem"],
                           "pergunta_em": l["pergunta_em"].isoformat() if l["pergunta_em"] else None,
                           "aviso_nao_em": l["aviso_nao_em"].isoformat() if l["aviso_nao_em"] else None,
                           "satisfacao": l["satisfacao"], "ia": l["ia_confirmou"]})

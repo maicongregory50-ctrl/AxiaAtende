@@ -125,10 +125,10 @@ def test_1204_a_conversa_do_portao_retroativo_nao_e_chegada(ligado, tela):
         con.execute("""INSERT INTO atendimento.conversas (bsuid, wa_id, situacao, origem, iniciada_em)
                        VALUES ('BR.1', '554988116066', 'parou_no_meio', 'portao_retroativo', now() - interval '1 hour'),
                               ('BR.2', '5549988887777', 'parou_no_meio', 'mensagem', now() - interval '2 hours')""")
+    # dono, 30/10: a que nos abrimos nem aparece -- nem na lista, nem nos cartoes
     d = tela.get("/api/recepcao", params={"dias": 7}).json()
     assert d["cartoes"]["chegaram"] == 1 and d["cartoes"]["pararam_no_meio"] == 1
-    assert [(l["origem"], l["estado"]) for l in d["linhas"]] == [("portao_retroativo", "sem_resposta"), ("mensagem", "parou")]
-    assert [l["origem"] for l in tela.get("/api/recepcao", params={"situacao": "parou"}).json()["linhas"]] == ["mensagem"]
+    assert [(l["numero"][-4:], l["estado"]) for l in d["linhas"]] == [("7777", "parou")]
 
 
 def test_recepcao_conversa_de_vaga_nao_e_parou_no_meio(ligado, tela):
