@@ -76,3 +76,24 @@
 .atende td.acoes { white-space: nowrap; display: flex; gap: 4px; }
 .atende tr.editando td { background: var(--at-fundo); }
 .atende .aviso.ok { background: var(--at-superficie-hover); color: var(--at-ok); border: 1px solid var(--at-ok); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+
+/* #1205: a janela da conversa na Recepcao. So leitura; as cores sao os tokens da casa (claro e escuro). */
+.atende tr.abre { cursor: pointer; }
+.atende tr.abre:hover td { background: var(--at-superficie-hover); }
+.atende tr.abre td.sem-janela { cursor: auto; }
+.atende .janela-fundo { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; justify-content: center; align-items: center; z-index: 50; padding: 16px; }
+.atende .janela { background: var(--at-fundo); color: var(--at-texto); border: 1px solid var(--at-borda); border-radius: 10px; width: min(720px, 100%); max-height: 88vh; display: flex; flex-direction: column; }
+.atende .janela-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--at-borda); }
+.atende .janela-corpo { overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.atende .balao { max-width: 78%; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--at-borda-suave); background: var(--at-superficie); }
+.atende .balao.cliente { align-self: flex-start; }
+.atende .balao.nos { align-self: flex-end; background: var(--at-info-fundo); }
+.atende .balao.resumo .balao-texto { font-style: italic; color: var(--at-texto-brando); }
+.atende .balao-texto { white-space: pre-wrap; word-break: break-word; }
+.atende .balao-opcoes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.atende .balao-opcoes span { font-size: 12px; border: 1px solid var(--at-borda); border-radius: 10px; padding: 1px 8px; color: var(--at-acento); }
+.atende .balao-pe { font-size: 11px; color: var(--at-texto-brando); margin-top: 4px; text-align: right; }
+.atende .balao-pe .falhou { color: var(--at-erro); font-weight: 600; }
+.atende .marco { align-self: center; font-size: 12px; color: var(--at-texto-brando); border-top: 1px dashed var(--at-borda); padding-top: 6px; margin-top: 4px; width: 100%; text-align: center; }
+.atende .em-destaque { box-shadow: 0 0 0 2px var(--at-violeta); }
+.atende .marco.em-destaque { box-shadow: none; color: var(--at-violeta); font-weight: 600; border-top: 2px solid var(--at-violeta); }

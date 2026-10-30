@@ -47,7 +47,8 @@ def main() -> int:
     saida = ia = None
     if mandar:
         from backend.saida import SaidaMeta
-        saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token)
+        from backend.texto_enviado import guardar_no_banco   # #1205
+        saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg))
         if cfg.anthropic_chave:
             from backend.ia import IA
             ia = IA(cfg)

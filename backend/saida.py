@@ -101,38 +101,56 @@ class SaidaMeta(Saida):
     """A Meta de verdade, pelo PyWa 4.5.0. `sessao` e um httpx.Client: os testes passam um com
     transporte falso e nada sai da maquina."""
 
-    def __init__(self, phone_id: str, token: str, sessao=None, versao: str | None = None):
+    def __init__(self, phone_id: str, token: str, sessao=None, versao: str | None = None, guardar=None):
+        """`guardar` (#1205): a funcao que grava o texto exato de cada envio aceito, por wamid
+        (`texto_enviado.guardar_no_banco`). Sem ela, nada e guardado -- e nada muda no envio."""
         from pywa import WhatsApp   # so o recepcionista importa a Meta
         extra = {"api_version": versao} if versao else {}
         self._wa = WhatsApp(phone_id=phone_id, token=token, session=sessao, server=None,
                             verify_token=None, **extra)
+        self._guardar = guardar
 
     def __repr__(self):   # nunca o token
         return "SaidaMeta()"
 
+    def _guardado(self, wamid, tipo, **conteudo):
+        """#1205: o envio JA SAIU quando isto roda. Guardar o texto nunca derruba o envio nem muda o
+        wamid devolvido: qualquer erro aqui e uma linha no log, e o texto daquele envio se perde."""
+        if wamid and self._guardar is not None:
+            try:
+                self._guardar(wamid, tipo, conteudo)
+            except Exception as falha:   # noqa: BLE001
+                print("saida: texto do envio %s nao guardado: %s" % (wamid, type(falha).__name__), flush=True)
+        return wamid
+
     def texto(self, para, texto):
-        return self._wa.send_message(to=para, text=texto, preview_url=True).id
+        w = self._wa.send_message(to=para, text=texto, preview_url=True).id
+        return self._guardado(w, "texto", texto=texto)
 
     def botoes(self, para, texto, opcoes):
         from pywa.types import Button
         conferir_botoes(opcoes)
-        return self._wa.send_message(
+        w = self._wa.send_message(
             to=para, text=texto, buttons=[Button(title=o.titulo, callback_data=o.id) for o in opcoes]).id
+        return self._guardado(w, "botoes", texto=texto, opcoes=[{"titulo": o.titulo} for o in opcoes])
 
     def lista(self, para, texto, botao, opcoes):
         from pywa.types import Section, SectionList, SectionRow
         conferir_lista(opcoes)
         linhas = [SectionRow(title=o.titulo, callback_data=o.id, description=o.descricao or None)
                   for o in opcoes]
-        return self._wa.send_message(
+        w = self._wa.send_message(
             to=para, text=texto,
             buttons=SectionList(button_title=botao, sections=[Section(title="Opções", rows=linhas)])).id
+        return self._guardado(w, "lista", texto=texto, opcoes={
+            "botao": botao, "linhas": [{"titulo": o.titulo, "descricao": o.descricao} for o in opcoes]})
 
     def link(self, para, texto, rotulo, url):
         from pywa.types import URLButton
         if len(rotulo) > LIMITE_LINK:
             raise ValueError("rotulo do link com mais de %d caracteres: %r" % (LIMITE_LINK, rotulo))
-        return self._wa.send_message(to=para, text=texto, buttons=URLButton(title=rotulo, url=url)).id
+        w = self._wa.send_message(to=para, text=texto, buttons=URLButton(title=rotulo, url=url)).id
+        return self._guardado(w, "link", texto=texto, opcoes={"rotulo": rotulo, "url": url})
 
     def contato(self, para, nome, whatsapp, empresa=EMPRESA):
         from pywa.types import Contact
@@ -141,7 +159,8 @@ class SaidaMeta(Saida):
                                            last_name=" ".join(partes[1:]) or None),
                          phones=[Contact.Phone(phone="+" + whatsapp, wa_id=wa_id_do_whatsapp(whatsapp), type="WORK")],
                          org=Contact.Org(company=empresa))
-        return self._wa.send_contact(to=para, contact=cartao).id
+        w = self._wa.send_contact(to=para, contact=cartao).id
+        return self._guardado(w, "contato", texto="%s (%s)" % (nome, empresa))
 
     def nota(self) -> str:
         """A nota de qualidade do numero na Meta (GREEN/YELLOW/RED), so leitura."""
@@ -149,7 +168,9 @@ class SaidaMeta(Saida):
         return str(getattr(q, "value", q) or "UNKNOWN").upper()   # o PyWa pode devolver enum
 
     def imagem(self, para, arquivo, legenda=""):
-        return self._wa.send_image(to=para, image=arquivo, caption=legenda or None).id
+        w = self._wa.send_image(to=para, image=arquivo, caption=legenda or None).id
+        nome = arquivo.rsplit("\\", 1)[-1].rsplit("/", 1)[-1] if isinstance(arquivo, str) else ""
+        return self._guardado(w, "imagem", legenda=" — ".join(x for x in (legenda, nome) if x))
 
     def baixar(self, media_id, destino):
         from pathlib import Path
@@ -163,9 +184,11 @@ class SaidaMeta(Saida):
         from pywa.types import Button
         if opcoes:
             conferir_botoes(opcoes)
-        return self._wa.send_document(
+        w = self._wa.send_document(
             to=para, document=dados, filename=nome, caption=legenda or None, mime_type="application/pdf",
             buttons=[Button(title=o.titulo, callback_data=o.id) for o in opcoes] if opcoes else None).id
+        return self._guardado(w, "documento", legenda=" — ".join(x for x in (legenda, nome) if x),
+                              opcoes=[{"titulo": o.titulo} for o in opcoes] if opcoes else None)
 
     def modelo(self, para, nome, idioma, corpo, imagem=None, botoes=None, url=None, documento=None):
         # O modelo vai como JSON cru (a forma da Cloud API), sem depender da classe de modelo do
@@ -190,5 +213,9 @@ class SaidaMeta(Saida):
             componentes.append({"type": "button", "sub_type": "url", "index": str(len(botoes or [])),
                                 "parameters": [{"type": "text", "text": url}]})
         from pywa.types.templates import TemplateLanguage   # o PyWa pede o idioma no tipo dele
-        return self._wa.send_template(to=para, name=nome, language=TemplateLanguage(idioma),
-                                      params=componentes).id
+        w = self._wa.send_template(to=para, name=nome, language=TemplateLanguage(idioma),
+                                   params=componentes).id
+        # o corpo do modelo e o de `atendimento.modelos`: aqui so o que muda de envio para envio
+        return self._guardado(w, "modelo", modelo=nome, variaveis=list(corpo or []),
+                              legenda=documento[1] if documento else ("[imagem]" if imagem else ""),
+                              opcoes={"botoes": list(botoes or []), "url": url} if (botoes or url) else None)

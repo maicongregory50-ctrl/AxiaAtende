@@ -51,7 +51,8 @@ def main(argv=None, saida=None):
             if not cfg.meta_token:
                 sys.exit("sem o token da Meta: rode com AXIAATENDE_PROCESSO=recepcionista, em janela elevada")
             from backend.saida import SaidaMeta
-            saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token)
+            from backend.texto_enviado import guardar_no_banco   # #1205
+            saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg))
         env = Envio()
         env._segredo = cfg.meta_app_secret
         env._mandar_um(con, saida, e, m, d, 1, datetime.now(timezone.utc))

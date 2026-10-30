@@ -37,6 +37,7 @@ banco e o arquivo de senha da sessão, e prova que o banco recusa escrever.
 |---|---|
 | `→` | o que chegou da pessoa: texto, `[botão] Sim (id)`, `[lista] ...`, `[foto id=...]`, `[áudio id=...]`, `[reação 👍]` |
 | `← [tipo, status]` | o que a OlivIA mandou: `texto`, `botoes`, `lista`, `imagem`, `modelo`; o status é o último que a Meta contou (`aceita`, `enviada`, `entregue`, `lida`, `falhou`) |
+| `← [...] resumo \| 'texto' ['Opção', ...]` | desde 30/10/2026 (#1205): depois do resumo, o **texto exato** que saiu e os botões ou linhas que a pessoa viu. Sem o `\|`, o envio é de antes disso e só o resumo existe. Os envios ao número com o nono dígito (convite e material da carteira) aparecem junto da mesma pessoa |
 | `!!` no fim da linha | erro gravado naquele evento ou envio |
 | `[atendimento] abriu ...; caminho:` | a conversa de atendimento e os rótulos tocados no menu |
 | `← [botoes, ...] ia retomou <opção>` | a retomada pela OlivIA (#989): 30 min depois de a pessoa parar, a opção do menu que ela propôs com Sim / Ver opções |

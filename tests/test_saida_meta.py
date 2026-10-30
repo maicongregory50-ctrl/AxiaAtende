@@ -180,3 +180,66 @@ def test_link_vai_como_cta_url_e_recusa_rotulo_longo(meta):
     assert i["action"]["parameters"] == {"display_text": "Chamar Márcio", "url": "https://wa.me/5549988595737"}
     with pytest.raises(ValueError):
         s.link("5549999990000", "x", "Chamar Márcio no WhatsApp", "https://wa.me/1")
+
+
+# ── #1205: o texto exato de cada envio, por wamid ─────────────────────────────
+
+def _saida_que_guarda(cfg, guardar=None):
+    from backend.texto_enviado import guardar_no_banco
+
+    pedidos = []
+
+    def responder(req: httpx.Request):
+        pedidos.append(req)
+        if req.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "midia.1"})
+        return httpx.Response(200, json={"messaging_product": "whatsapp",
+                                         "contacts": [{"input": "5549999990000", "wa_id": "5549999990000"}],
+                                         "messages": [{"id": "wamid.g.%d" % len(pedidos)}]})
+    sessao = httpx.Client(transport=httpx.MockTransport(responder))
+    return SaidaMeta("725888737278277", "token-falso", sessao=sessao,
+                     guardar=guardar if guardar is not None else guardar_no_banco(cfg))
+
+
+def _guardados(cfg):
+    from backend.banco import conexao
+    with conexao(cfg) as con:
+        return {r["wamid"]: r for r in con.execute("SELECT * FROM atendimento.enviadas_texto").fetchall()}
+
+
+def test_1205_cada_forma_de_envio_guarda_o_texto_exato(cfg, tmp_path):
+    s = _saida_que_guarda(cfg)
+    capa = tmp_path / "capa.jpg"
+    capa.write_bytes(b"JPEG")
+    w1 = s.texto("5549999990000", "Obrigado pela mensagem!")
+    w2 = s.botoes("5549999990000", "Você já é nosso fornecedor?", [Opcao("a", "Sim"), Opcao("b", "Não")])
+    w3 = s.lista("5549999990000", "Como podemos ajudar?", "Ver opções",
+                 [Opcao("menu:fretes", "Fretes", "transporte de carga")])
+    w4 = s.modelo("5549999990000", "convite_material", "pt_BR", ["Alex"], imagem=str(capa),
+                  botoes=["envio:quero", "envio:nao"])
+    w5 = s.contato("5549999990000", "Benedito Vaskevicz", "5549999998888")
+    g = _guardados(cfg)
+    assert g[w1]["tipo"] == "texto" and g[w1]["texto"] == "Obrigado pela mensagem!"
+    assert g[w2]["opcoes"] == [{"titulo": "Sim"}, {"titulo": "Não"}]
+    assert g[w3]["texto"] == "Como podemos ajudar?"
+    assert g[w3]["opcoes"] == {"botao": "Ver opções", "linhas": [{"titulo": "Fretes", "descricao": "transporte de carga"}]}
+    assert g[w4]["modelo"] == "convite_material" and g[w4]["variaveis"] == ["Alex"] and g[w4]["legenda"] == "[imagem]"
+    assert g[w5]["texto"] == "Benedito Vaskevicz (Sementes Renascer)"
+
+
+def test_1205_a_chave_desligada_nao_guarda(cfg):
+    from backend.banco import conexao
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.ajustes SET valor = 'false'::jsonb WHERE chave = 'enviadas.guardar_texto'")
+    s = _saida_que_guarda(cfg)
+    assert s.texto("5549999990000", "oi")
+    assert _guardados(cfg) == {}
+
+
+def test_1205_guardar_falhando_nao_derruba_o_envio(cfg, capsys):
+    def quebra(*_):
+        raise RuntimeError("banco fora")
+    s = _saida_que_guarda(cfg, guardar=quebra)
+    w = s.texto("5549999990000", "oi")
+    assert w == "wamid.g.1"   # o envio saiu e o wamid volta igual
+    assert "nao guardado" in capsys.readouterr().out

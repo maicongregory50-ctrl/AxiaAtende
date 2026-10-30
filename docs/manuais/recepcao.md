@@ -25,6 +25,9 @@ E quando você precisa falar com a pessoa, a coluna **Quem** é o caminho: um cl
 com ela no **seu** WhatsApp Web, já no lugar certo (#1025). Antes era preciso sair da tela e procurar
 o número em outro sistema.
 
+E para **ler** o que aconteceu, clique na linha: abre uma janela com tudo o que essa pessoa trocou com
+a OlivIA, na ordem — ver *Ler a conversa* no fim deste manual (#1205, 30/10/2026).
+
 ## 2. Quem usa e quando
 
 Você, no computador, quando quiser acompanhar o atendimento — por exemplo, uma vez por dia.
@@ -42,6 +45,8 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
    a pessoa está no nosso cadastro) ou no **próprio número** (quando não está). Abre uma aba nova com
    a conversa dela no seu WhatsApp Web — **a primeira mensagem é você que escreve**, o sistema não
    manda nada. Depois volte para a aba da Recepção, que continua como estava.
+7. Para **ler** a conversa de alguém, clique em qualquer lugar da linha **menos** a coluna **Quem**.
+   Abre a janela com a conversa; feche no **✕** ou com **Esc**.
 
 ## 4. O que significa cada sinal
 
@@ -88,12 +93,14 @@ Você, no computador, quando quiser acompanhar o atendimento — por exemplo, um
 ## 5. O que a tela NÃO faz
 
 - **Não mostra a conversa** da pessoa com o atendente: ela acontece no WhatsApp de quem recebeu o link.
-- **Não responde ninguém** pela tela.
+  A conversa dela com a **OlivIA** aparece na janela (*Ler a conversa*, abaixo).
+- **Não responde ninguém** pela tela — nem pela janela da conversa.
 - **Não manda mensagem no clique da coluna Quem:** ele só abre a conversa. Quem escreve é você.
 - **Não fala pelo número da empresa:** a conversa sai do **seu** WhatsApp, não do 49 3664 0121 — a
   pessoa vai ver que é você.
 - **Não mostra o número inteiro**, nem depois do clique: o que você lê continua mascarado.
-- **Não registra** que você clicou, nem avisa a pessoa.
+- **Não registra** que você clicou na coluna **Quem**, nem avisa a pessoa. (Abrir a **janela da
+  conversa** fica registrado — ver abaixo.)
 - **Não muda o menu nem para quem cada motivo vai:** isso é a tela **Destinos**.
 - **Não corrige o cadastro:** número faltando ou repetido se corrige no ERP.
 - **Não reconhece de novo conversas antigas:** cada conversa guarda quem era no momento em que chegou.
@@ -199,3 +206,35 @@ não se faz por WhatsApp.
 PDF** nem gera a versão em branco da logo (isso é do gerador do marketing); e **ainda não faz a logo
 aparecer na tela Parceiras** — puxá-la para lá é a etapa seguinte, em chamado próprio. Até ela
 existir, a logo fica guardada aqui, esperando.
+
+## Ler a conversa (#1205, 30/10/2026)
+
+**Para que serve.** Ler o atendimento de uma pessoa sem sair da Recepção e sem pedir à sessão: o que
+ela escreveu e tocou, e o que a OlivIA mandou, na ordem em que aconteceu.
+
+**Quem usa e quando.** Quem confere o atendimento, quando uma linha chama atenção: "parou no meio",
+"Não · você foi avisado", nota Ruim, ou um nome conhecido.
+
+**O caminho comum.**
+1. Na Recepção, clique na linha — em qualquer lugar **menos** a coluna **Quem**, que continua abrindo
+   o seu WhatsApp Web.
+2. Abre a janela com **tudo o que essa pessoa trocou com a Renascer**, do mais antigo ao mais novo, já
+   rolada até o atendimento que você clicou, que aparece em destaque (contorno violeta).
+3. Leia. Feche no **✕**, com **Esc** ou clicando fora da janela. Nada é mandado a ninguém.
+
+**O que significa cada sinal.**
+
+| O que você vê | O que quer dizer |
+|---|---|
+| **Balão à esquerda** | o que a pessoa mandou. Texto inteiro; toque em botão aparece com o nome do botão; foto, documento e áudio aparecem como **[foto]**, **[documento]**, **[áudio]** com a legenda, sem a imagem |
+| **Balão à direita** | o que nós mandamos, com o texto exato e os botões ou a lista que a pessoa viu (as etiquetas embaixo do texto) |
+| **Balão à direita em itálico, com "resumo"** | envio de **antes de 30/10/2026**, quando o texto não era guardado. Mostra só o que era ("menu principal", "material criacao-6"), não as palavras |
+| **entregue · lida · falhou** no pé do balão nosso | o último estado que o WhatsApp contou daquele envio. **falhou** em vermelho: não chegou |
+| **Linha "atendimento"** entre os balões | onde cada atendimento começou, com o caminho que a pessoa tocou nele. O que você clicou fica em violeta |
+| **"atendimento aberto por nós (portão retroativo)"** | esse atendimento foi aberto por nós, não por mensagem da pessoa (#1204); por isso ele não aparece na lista |
+| Convite ou material da carteira antes da primeira mensagem dela | o envio que provocou a resposta — muitas vezes a primeira "mensagem" dela é a resposta automática do WhatsApp Business dela a esse envio |
+
+**O que NÃO faz.** Não responde nem manda nada: para falar com a pessoa, use a coluna **Quem** (o seu
+WhatsApp Web). Não mostra a foto nem abre o PDF. Não recupera o texto dos envios antigos — ele não
+existe em lugar nenhum. E **toda abertura fica registrada**: quem abriu, quando e qual conversa, no
+servidor, como as leituras feitas pela sessão.

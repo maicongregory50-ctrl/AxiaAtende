@@ -42,7 +42,8 @@ def main(argv=None) -> int:
                 print("nenhuma conversa esperando a pergunta")
             return 0
         from .saida import SaidaMeta
-        saiu = motor.perguntar_agora(con, SaidaMeta(cfg.meta_phone_id, cfg.meta_token), a.conversa,
+        from .texto_enviado import guardar_no_banco   # #1205
+        saiu = motor.perguntar_agora(con, SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg)), a.conversa,
                                      datetime.now(timezone.utc))
     print("pergunta enviada" if saiu else
           "nada saiu: a conversa %s nao espera pergunta, ou passou das 24h" % a.conversa)

@@ -4,13 +4,14 @@ So no processo das telas (127.0.0.1:8009), com login. Nenhuma rota daqui fala co
 muda e o banco (o destino de uma opcao, o horario, religar um envio parado), e o recepcionista le
 na proxima mensagem.
 """
+import json
 import re
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from . import agenda
+from . import agenda, leitura
 from .banco import conexao
 
 PRECO_CONVITE = 0.07   # US$ por mensagem paga, por cima (A2 do plano)
@@ -61,6 +62,21 @@ def link_conversa(numero: str | None) -> str | None:
     if len(d) < 10:
         return None
     return "https://web.whatsapp.com/send?phone=%s" % d
+
+
+def _registrar_leitura(cfg, u: dict, conversa_id: int, itens: int) -> None:
+    """#1205: a linha do registro das leituras da TELA. Um escritor por arquivo (regra do #981): o
+    `leituras.jsonl` da raiz e so do script da sessao; este e so desta rota. Falhar ao registrar nao
+    tira a leitura de quem pediu -- vai ao log do servico, como o script faz no stderr."""
+    try:
+        arquivo = cfg.logs / "telas" / "leituras.jsonl"
+        arquivo.parent.mkdir(parents=True, exist_ok=True)
+        with open(arquivo, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"quando": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                                "quem": u.get("login"), "conversa": conversa_id, "itens": itens},
+                               ensure_ascii=False) + "\n")
+    except OSError as e:
+        print("telas: registro da leitura falhou: %s" % e, flush=True)
 
 
 class Destino(BaseModel):
@@ -150,7 +166,8 @@ def rotas(cfg, usuario) -> APIRouter:
                           "imagem_recebida": "imagem", "logo_recebida": "logo"}.get(l["situacao"], "em_curso")
             if situacao and estado != situacao:
                 continue
-            saida.append({"quando": l["iniciada_em"].isoformat(),
+            saida.append({"id": l["id"],   # #1205: a janela abre a conversa por ele
+                          "quando": l["iniciada_em"].isoformat(),
                           "cadastro": ({"codigo": l["erp_codigo"], "nome": l["erp_nome"], "papeis": l["erp_papeis"] or [],
                                         "contato_setor": l["erp_contato_setor"], "contato_nome": l["erp_contato_nome"]}
                                        if l["erp_cadastros"] == 1 else None),
@@ -162,6 +179,35 @@ def rotas(cfg, usuario) -> APIRouter:
                           "aviso_nao_em": l["aviso_nao_em"].isoformat() if l["aviso_nao_em"] else None,
                           "satisfacao": l["satisfacao"], "ia": l["ia_confirmou"]})
         return {"cartoes": cartoes, "motivos": motivos, "linhas": saida, "leitura": leitura}
+
+    @r.get("/recepcao/conversa/{conversa_id}")
+    def ler_conversa(conversa_id: int, u: dict = Depends(usuario)):
+        """#1205: a janela da Recepcao. A PESSOA inteira daquela conversa (dono, 30/10: "a pessoa
+        inteira"), em ordem, com o atendimento clicado em destaque. So le; cada abertura fica
+        registrada, como a leitura da sessao (#981) -- num arquivo proprio das telas, um escritor."""
+        with conexao(cfg) as con:
+            c = con.execute("SELECT id, wa_id, bsuid, nome_perfil, erp_nome, erp_codigo, erp_cadastros "
+                            "FROM atendimento.conversas WHERE id = %s", (conversa_id,)).fetchone()
+            if not c:
+                raise HTTPException(status_code=404, detail="conversa não encontrada")
+            _, _, lista = leitura.itens(con, c["wa_id"], c["bsuid"])
+        # o atendimento clicado: do marco dele ate o marco do proximo atendimento da pessoa
+        inicio = fim = None
+        for i in lista:
+            if i["tipo"] == "atendimento":
+                if inicio is not None and fim is None:
+                    fim = i["quando"]
+                if i["conversa_id"] == conversa_id:
+                    inicio = i["quando"]
+        itens = [{"quando": i["quando"].isoformat(), "lado": i["lado"], "tipo": i["tipo"], "texto": i["texto"],
+                  "opcoes": i["opcoes"], "estado": i["estado"], "erro": i["erro"], "resumo": i["resumo"],
+                  "destaque": inicio is not None and i["quando"] >= inicio and (fim is None or i["quando"] < fim)}
+                 for i in lista]
+        _registrar_leitura(cfg, u, conversa_id, len(itens))
+        return {"pessoa": {"nome": (c["erp_nome"] if c["erp_cadastros"] == 1 else None) or c["nome_perfil"] or "sem nome",
+                           "codigo": c["erp_codigo"] if c["erp_cadastros"] == 1 else None,
+                           "numero": mascarar(c["wa_id"])},
+                "itens": itens}
 
     # ── Envios ───────────────────────────────────────────────────────────────
 

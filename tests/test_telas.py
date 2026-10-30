@@ -131,6 +131,37 @@ def test_1204_a_conversa_do_portao_retroativo_nao_e_chegada(ligado, tela):
     assert [(l["numero"][-4:], l["estado"]) for l in d["linhas"]] == [("7777", "parou")]
 
 
+def test_1205_a_janela_le_a_pessoa_inteira_com_o_atendimento_em_destaque(ligado, tela):
+    import json
+    with conexao(ligado) as con:
+        ids = [r["id"] for r in con.execute(
+            """INSERT INTO atendimento.conversas (bsuid, wa_id, nome_perfil, iniciada_em, situacao) VALUES
+                 ('BR.c', '554988116066', 'Alex Sandro Compras Copermap', now() - interval '2 hours', 'parou_no_meio'),
+                 ('BR.c', '554988116066', 'Alex Sandro Compras Copermap', now() - interval '1 hour', 'em_curso')
+               RETURNING id""").fetchall()]
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo, status, enviada_em)
+                       VALUES ('wamid.m1', '554988116066', 'lista', 'menu principal', 'lida', now() - interval '90 minutes')""")
+    R.gravar(ligado, aviso([texto("wamid.e1", "Como posso lhe ajudar?", numero="554988116066")],
+                           numero="554988116066", bsuid="BR.c"))
+    with conexao(ligado) as con:   # a mensagem que ABRIU o 2o atendimento: chegou 1 s antes de ele nascer
+        assert con.execute("""UPDATE atendimento.eventos_meta e SET processado_em = c.iniciada_em,
+                                     recebido_em = c.iniciada_em - interval '1 second'
+                                FROM atendimento.conversas c WHERE c.id = %s AND e.chave_meta = 'wamid.e1'""",
+                           (ids[1],)).rowcount == 1
+    d = tela.get("/api/recepcao/conversa/%d" % ids[1]).json()
+    assert d["pessoa"]["nome"] == "Alex Sandro Compras Copermap" and "…" in d["pessoa"]["numero"]
+    assert [(i["lado"], i["texto"], i["resumo"], i["destaque"]) for i in d["itens"]] == [
+        ("marco", "atendimento", False, False),
+        ("nos", "menu principal", True, False),
+        ("marco", "atendimento", False, True),
+        ("cliente", "Como posso lhe ajudar?", False, True)]
+    assert tela.get("/api/recepcao/conversa/999999").status_code == 404
+    registro = [json.loads(l) for l in (ligado.logs / "telas" / "leituras.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert registro[-1]["quem"] == "dono" and registro[-1]["conversa"] == ids[1] and registro[-1]["itens"] == 4
+    with TestClient(criar_app(ligado)) as sem_login:
+        assert sem_login.get("/api/recepcao/conversa/%d" % ids[1]).status_code == 401
+
+
 def test_recepcao_conversa_de_vaga_nao_e_parou_no_meio(ligado, tela):
     """#1098: quem chegou pelo anuncio e nao mandou o PDF termina "sem curriculo", fora das paradas."""
     s = SaidaFalsa()

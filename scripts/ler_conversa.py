@@ -34,13 +34,12 @@ from psycopg.rows import dict_row
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 from backend import agenda  # noqa: E402 -- o reconhecimento do numero, o mesmo do atendimento
+# #1205: a montagem da conversa mora no backend, e a janela da Recepcao usa a mesma
+from backend.leitura import BASTIDORES, FASES, FUSO, bsuids_de, descrever_entrada, itens  # noqa: E402,F401
+from backend.leitura import hora as _hora  # noqa: E402
 PGPASS = RAIZ / ".pgpass_leitura"
 LOG = Path(r"C:\Logs\AxiaAtende\leituras.jsonl")
 DSN = "host=127.0.0.1 port=5436 dbname=axiaatende user=axiaatende_ro"
-FUSO = ZoneInfo("America/Sao_Paulo")
-BASTIDORES = {"campo-de-sementes": "Campo de sementes", "colheita": "Colheita", "beneficiamento": "Beneficiamento",
-              "controle-de-qualidade": "Controle de qualidade", "entrega": "Entrega / carregamento"}
-FASES = {"inicial": "inicial", "vegetativo": "vegetativo", "flor": "flor", "pre-colheita": "pré-colheita", "semente": "semente"}
 
 
 class SemAcesso(Exception):
@@ -64,114 +63,15 @@ def conectar(dsn: str | None = None, pgpass: Path | None = None):
     return con
 
 
-def _hora(t) -> str:
-    if t is None:
-        return "--:--"
-    if t.tzinfo is None:
-        t = t.replace(tzinfo=timezone.utc)
-    return t.astimezone(FUSO).strftime("%d/%m %H:%M")
-
-
-def descrever_entrada(corpo: dict) -> str:
-    """O que a pessoa mandou, em uma linha, pelo corpo da Meta (sem baixar nada)."""
-    msg = (corpo or {}).get("msg") or {}
-    tipo = msg.get("type") or "?"
-    if tipo == "text":
-        return (msg.get("text") or {}).get("body", "")
-    if tipo == "interactive":
-        i = msg.get("interactive") or {}
-        r = i.get("button_reply") or i.get("list_reply") or {}
-        return "[%s] %s (%s)" % ("botão" if "button_reply" in i else "lista", r.get("title", ""), r.get("id", ""))
-    if tipo in ("image", "video", "audio", "document", "sticker"):
-        m = msg.get(tipo) or {}
-        nome = {"image": "foto", "video": "vídeo", "audio": "áudio", "document": "documento", "sticker": "figurinha"}[tipo]
-        legenda = m.get("caption") or m.get("filename") or ""
-        return ("[%s id=%s] %s" % (nome, m.get("id", "?"), legenda)).rstrip()
-    if tipo == "reaction":
-        return "[reação %s]" % (msg.get("reaction") or {}).get("emoji", "")
-    if tipo == "location":
-        return "[localização]"
-    if tipo == "contacts":
-        return "[contato]"
-    return "[%s]" % tipo
-
-
-def _bsuids_de(con, wa_id: str) -> list[str]:
-    return [r["b"] for r in con.execute(
-        """SELECT DISTINCT bsuid AS b FROM atendimento.eventos_meta
-            WHERE tipo = 'mensagem' AND corpo->'msg'->>'from' = %s AND bsuid IS NOT NULL""", (wa_id,)).fetchall()]
-
-
 def conversa(con, wa_id: str | None = None, bsuid: str | None = None, desde: datetime | None = None) -> list[str]:
     """A conversa de um numero (ou bsuid), em ordem de tempo: o que chegou, o que saiu, o atendimento
-    e o canal de campo. Devolve as linhas prontas para imprimir."""
-    if not wa_id and not bsuid:
-        raise ValueError("numero ou bsuid")
-    desde = desde or datetime(2000, 1, 1, tzinfo=timezone.utc)
-    bsuids = ([bsuid] if bsuid else []) + (_bsuids_de(con, wa_id) if wa_id else [])
-    if bsuid and not wa_id:
-        w = con.execute("""SELECT corpo->'msg'->>'from' AS w FROM atendimento.eventos_meta
-                            WHERE bsuid = %s AND tipo = 'mensagem' ORDER BY id DESC LIMIT 1""", (bsuid,)).fetchone()
-        wa_id = w["w"] if w else None
-    paras = [p for p in [wa_id] + bsuids if p]
-    itens = []
-    for e in con.execute("""SELECT recebido_em, corpo, erro, processado_em FROM atendimento.eventos_meta
-                             WHERE tipo = 'mensagem' AND recebido_em >= %s
-                               AND (corpo->'msg'->>'from' = %s OR bsuid = ANY(%s)) ORDER BY id""",
-                         (desde, wa_id or "", bsuids)).fetchall():
-        texto = descrever_entrada(e["corpo"])
-        # #1099: o celular sem rede entrega com atraso (ate 33 h medidas) e fora de ordem; o canal de
-        # campo agrupa pela hora de ENVIO, entao a leitura a mostra quando difere da chegada
-        ts = str(((e["corpo"] or {}).get("msg") or {}).get("timestamp") or "")
-        if ts.isdigit():
-            mandada = datetime.fromtimestamp(int(ts), tz=timezone.utc)
-            if abs((e["recebido_em"] - mandada).total_seconds()) > 60:
-                texto += " (mandada %s)" % _hora(mandada)
-        erro = (" !! %s" % e["erro"]) if e["erro"] else ""
-        itens.append((e["recebido_em"], "→ %s%s" % (texto, erro)))
-    for s in con.execute("""SELECT enviada_em, tipo, resumo, status, erro FROM atendimento.enviadas
-                             WHERE para = ANY(%s) AND enviada_em >= %s ORDER BY id""", (paras, desde)).fetchall():
-        erro = (" !! %s" % s["erro"]) if s["erro"] else ""
-        itens.append((s["enviada_em"], "← [%s, %s] %s%s" % (s["tipo"], s["status"], s["resumo"], erro)))
-    for c in con.execute("""SELECT iniciada_em, ultimo_toque_em, caminho, erp_codigo, nome_perfil
-                             FROM atendimento.conversas WHERE (wa_id = %s OR bsuid = ANY(%s)) AND iniciada_em >= %s
-                             ORDER BY id""", (wa_id or "", bsuids, desde)).fetchall():
-        itens.append((c["iniciada_em"], "  [atendimento] abriu (%s%s); caminho: %s" % (
-            c["nome_perfil"] or "sem nome", (", cadastro %s" % c["erp_codigo"]) if c["erp_codigo"] else "",
-            " > ".join(c["caminho"] or []) or "-")))
-    for m in con.execute("""SELECT recebido_em, tipo, legenda, perguntas_feitas, classe_bastidor, classe_produto,
-                                   classe_fase, data_dita, data_presumida, fechado_em, desistiu_em, atv, lote, grupo_id, id
-                              FROM atendimento.material_de_campo WHERE wa_id = %s AND recebido_em >= %s ORDER BY id""",
-                         (wa_id or "", desde)).fetchall():
-        classe = ", ".join(x for x in [BASTIDORES.get(m["classe_bastidor"] or "", m["classe_bastidor"]),
-                                       m["classe_produto"], FASES.get(m["classe_fase"] or "", m["classe_fase"])] if x)
-        estado = "desistiu" if m["desistiu_em"] else ("fechado" if m["fechado_em"] else "aberto")
-        itens.append((m["recebido_em"], "  [campo] %s #%s (grupo %s): legenda %r; perguntas %s; classe: %s; data %s%s; %s%s" % (
-            m["tipo"], m["id"], m["grupo_id"], m["legenda"] or "", list(m["perguntas_feitas"] or []) or "-",
-            classe or "a classificar", m["data_dita"] or "-", " (presumida)" if m["data_presumida"] else "",
-            estado, (", %s" % m["atv"]) if m["atv"] else "")))
-    # #1098: a candidatura do Trabalhe conosco -- quando chegou, se teve triagem, se foi a Fran e o
-    # retorno dela. NUNCA o conteudo do PDF (o papel de leitura nem tem a coluna).
-    for k in con.execute("""SELECT id, recebida_em, pdf_nome, pdf_bytes, declarou, triagem_em, triagem_erro,
-                                   fran_em, fran_erro, feedback, feedback_texto, apagada_em
-                              FROM atendimento.candidaturas WHERE (wa_id = %s OR bsuid = ANY(%s)) AND recebida_em >= %s
-                             ORDER BY id""", (wa_id or "", bsuids, desde)).fetchall():
-        triagem = "sem triagem (%s)" % k["triagem_erro"] if k["triagem_erro"] else ("triada" if k["triagem_em"] else "na fila")
-        fran = ("na Fran" if k["fran_em"] else ("não foi: %s" % k["fran_erro"] if k["fran_erro"] else "a mandar"))
-        retorno = (", Fran: triagem %s%s" % (k["feedback"], (" (%r)" % k["feedback_texto"]) if k["feedback_texto"] else "")
-                   if k["feedback"] else "")
-        itens.append((k["recebida_em"], "  [vaga] currículo #%s %r (%s KB, declarou %s): %s; %s%s%s" % (
-            k["id"], k["pdf_nome"], (k["pdf_bytes"] or 0) // 1024, k["declarou"] or "-", triagem, fran, retorno,
-            "; apagado em %s" % _hora(k["apagada_em"]) if k["apagada_em"] else "")))
-    for f in con.execute("""SELECT recebido_em, texto, usada_em FROM atendimento.campo_frases
-                             WHERE wa_id = %s AND recebido_em >= %s ORDER BY id""", (wa_id or "", desde)).fetchall():
-        itens.append((f["recebido_em"], "  [campo] frase guardada %r%s" % (f["texto"], " (usada)" if f["usada_em"] else "")))
-    itens.sort(key=lambda x: (x[0] if x[0].tzinfo else x[0].replace(tzinfo=timezone.utc)))
+    e o canal de campo. Devolve as linhas prontas para imprimir (a montagem e `backend.leitura.itens`)."""
+    wa_id, bsuids, lista = itens(con, wa_id, bsuid, desde)
     cabeca = "Conversa de %s%s%s" % (wa_id or "?", (" / " + ", ".join(bsuids)) if bsuids else "",
-                                     "" if not itens else " (%d linhas)" % len(itens))
-    if not itens:
-        return [cabeca, "  nenhuma mensagem no período" if (wa_id and _bsuids_de(con, wa_id) or bsuid) else "  número não reconhecido: nunca escreveu"]
-    return [cabeca] + ["%s %s" % (_hora(t), linha) for t, linha in itens]
+                                     "" if not lista else " (%d linhas)" % len(lista))
+    if not lista:
+        return [cabeca, "  nenhuma mensagem no período" if (wa_id and bsuids_de(con, wa_id) or bsuid) else "  número não reconhecido: nunca escreveu"]
+    return [cabeca] + ["%s %s" % (_hora(i["quando"]), i["linha"]) for i in lista]
 
 
 def campo(con, dias: int = 7) -> list[str]:

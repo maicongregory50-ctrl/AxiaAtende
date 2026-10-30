@@ -117,3 +117,32 @@ def test_a_mensagem_atrasada_mostra_quando_foi_mandada(cfg, capsys, tmp_path):
     R.gravar(c, aviso([m], numero=EQUIPE, bsuid="BR.equipe"))
     assert L.main(["--numero", EQUIPE, "--dsn", c.dsn(), "--log", str(tmp_path / "l.jsonl")]) == 0
     assert "Qualidade, amostrando Nabo (mandada " in capsys.readouterr().out
+
+
+def test_1205_o_texto_guardado_aparece_e_o_antigo_fica_em_resumo(cfg, capsys, tmp_path):
+    """A COPERMAP, 28/10: o convite foi ao numero COM o nono digito e a saudacao veio SEM ele; os dois
+    estao na mesma conversa. O envio com texto guardado mostra o texto; o de antes, so o resumo."""
+    from backend.leitura import itens
+    cliente = "554988116066"
+    with conexao(cfg) as con:
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo, status, enviada_em) VALUES
+                         ('wamid.c1', '5549988116066', 'modelo', 'direta informativo', 'lida', now() - interval '2 hours'),
+                         ('wamid.c2', %s, 'lista', 'menu principal', 'lida', now() - interval '1 hour'),
+                         ('wamid.c3', %s, 'texto', 'antigo', 'entregue', now() - interval '3 hours')""", (cliente, cliente))
+        con.execute("""INSERT INTO atendimento.enviadas_texto (wamid, tipo, texto, opcoes, modelo, variaveis) VALUES
+                         ('wamid.c1', 'modelo', '', NULL, 'informativo_curto', ARRAY['Alex']),
+                         ('wamid.c2', 'lista', 'Como podemos ajudar?',
+                          '{"botao": "Ver opções", "linhas": [{"titulo": "Fretes", "descricao": ""}]}'::jsonb, NULL, NULL)""")
+    R.gravar(cfg, aviso([texto("wamid.e1", "Copermap Compras Como posso lhe ajudar?", numero=cliente)],
+                        numero=cliente, bsuid="BR.copermap"))
+    with conexao(cfg) as con:
+        _, _, lista = itens(con, cliente)
+    nos = [(i["texto"], i["opcoes"], i["resumo"]) for i in lista if i["lado"] == "nos"]
+    assert nos == [("antigo", [], True),
+                   ("Olá, Alex! Informativo da Sementes Renascer.", [], False),
+                   ("Como podemos ajudar?", ["Fretes"], False)]
+    assert [i["texto"] for i in lista if i["lado"] == "cliente"] == ["Copermap Compras Como posso lhe ajudar?"]
+    assert L.main(["--numero", cliente, "--dsn", cfg.dsn(), "--log", str(tmp_path / "l.jsonl")]) == 0
+    saida = capsys.readouterr().out
+    assert "← [lista, lida] menu principal | 'Como podemos ajudar?' ['Fretes']" in saida
+    assert "← [texto, entregue] antigo\n" in saida

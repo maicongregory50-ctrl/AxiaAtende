@@ -202,7 +202,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
     cfg = cfg or config.carregar()
     if saida is None and cfg.meta_token:
         from .saida import SaidaMeta
-        saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token)
+        from .texto_enviado import guardar_no_banco   # #1205: o texto exato de cada envio
+        saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg))
     if ia is None and cfg.anthropic_chave:
         from .ia import IA
         ia = IA(cfg)

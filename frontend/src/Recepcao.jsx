@@ -4,8 +4,11 @@
 //        WhatsApp Web de quem esta na tela. O endereco vem PRONTO do servidor, no campo `conversar`:
 //        esta tela nao sabe formar endereco de WhatsApp, e e de proposito -- sem o campo nao ha link
 //        (nunca um link morto), e tirar o campo do backend apaga o recurso inteiro daqui.
+// #1205: clicar na linha (fora da coluna QUEM, que continua sendo o link) abre a JANELA com a conversa
+//        inteira da pessoa, so para ler. O texto do nosso lado e o exato desde 30/10/2026; o de antes
+//        e o resumo, e a janela diz isso. Cada abertura fica registrada no servidor.
 // Manual: docs/manuais/recepcao.md.
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { pegar, quando, hora } from './api.js'
 
 // os papeis da casa em azul, os de fora em verde (maquete aprovada do #969)
@@ -62,6 +65,65 @@ const ESTADO = {
 // a nota da pesquisa, em tres botoes (#969, 11/10/2026): o Ruim tambem avisa o gestor
 const NOTA = { 3: ['Bom', 'v'], 2: ['Normal', ''], 1: ['Ruim · você foi avisado', 'r'] }
 
+const ENTREGA = { aceita: 'aceita', enviada: 'enviada', entregue: 'entregue', lida: 'lida', falhou: 'falhou' }
+
+// #1205: a janela da conversa. So le: nao ha campo de resposta, e e de proposito (#989).
+function Janela({ id, fechar }) {
+  const [c, setC] = useState(null)
+  const [erro, setErro] = useState('')
+  const destaque = useRef(null)
+
+  useEffect(() => {
+    pegar('/recepcao/conversa/' + id).then(setC).catch((e) => setErro(e.message))
+    const tecla = (e) => { if (e.key === 'Escape') fechar() }
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [id])
+
+  useEffect(() => {   // abre ja no atendimento clicado
+    if (destaque.current) destaque.current.scrollIntoView({ block: 'start' })
+  }, [c])
+
+  let primeiro = true
+  return (
+    <div className="janela-fundo" onClick={fechar}>
+      <div className="janela" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="janela-topo">
+          <div>
+            <b>{c ? c.pessoa.nome : 'Conversa'}</b>{c && c.pessoa.codigo && <span className="cod"> · {c.pessoa.codigo}</span>}
+            {c && <span className="leve"> {c.pessoa.numero}</span>}
+          </div>
+          <button className="fantasma" onClick={fechar} aria-label="Fechar">✕</button>
+        </div>
+        <div className="janela-corpo">
+          {erro && <p className="aviso erro">{erro}</p>}
+          {!c && !erro && <p className="leve">Lendo…</p>}
+          {c && c.itens.length === 0 && <p className="leve">Nenhuma mensagem desta pessoa.</p>}
+          {c && c.itens.map((i, k) => {
+            let ref = null
+            if (i.destaque && primeiro) { ref = destaque; primeiro = false }
+            if (i.lado === 'marco') {
+              return <div key={k} ref={ref} className={'marco' + (i.destaque ? ' em-destaque' : '')}>
+                <span>{quando(i.quando)} · {i.texto}</span></div>
+            }
+            return (
+              <div key={k} ref={ref} className={'balao ' + i.lado + (i.destaque ? ' em-destaque' : '') + (i.resumo ? ' resumo' : '')}>
+                <div className="balao-texto">{i.texto || <span className="leve">(sem texto)</span>}</div>
+                {i.opcoes.length > 0 && <div className="balao-opcoes">{i.opcoes.map((o) => <span key={o}>{o}</span>)}</div>}
+                <div className="balao-pe">
+                  {i.resumo && <span title="Envio de antes de 30/10/2026: o texto exato não era guardado">resumo · </span>}
+                  {hora(i.quando)}
+                  {i.lado === 'nos' && i.estado && <span className={i.estado === 'falhou' ? 'falhou' : ''}> · {ENTREGA[i.estado] || i.estado}</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Recepcao() {
   const [dias, setDias] = useState(7)
   const [motivo, setMotivo] = useState('')
@@ -69,6 +131,7 @@ export default function Recepcao() {
   const [quem, setQuem] = useState('')
   const [d, setD] = useState(null)
   const [erro, setErro] = useState('')
+  const [aberta, setAberta] = useState(null)   // #1205: o id da conversa na janela
 
   useEffect(() => {
     const q = new URLSearchParams({ dias, motivo, situacao, quem })
@@ -120,9 +183,10 @@ export default function Recepcao() {
             <tbody>
               {d.linhas.length === 0 && <tr><td colSpan={5} className="vazio">Ninguém chamou neste período.</td></tr>}
               {d.linhas.map((l, i) => (
-                <tr key={i}>
+                <tr key={i} className="abre" onClick={() => setAberta(l.id)} title="Ler a conversa">
                   <td>{quando(l.quando)}</td>
-                  <td><Quem l={l} /></td>
+                  {/* a coluna QUEM continua sendo o link do WhatsApp Web: o clique nela nao abre a janela */}
+                  <td onClick={(e) => e.stopPropagation()} className="sem-janela"><Quem l={l} /></td>
                   <td>{l.caminho.join(' › ') || <span className="leve">— só chegou</span>}{l.ia === true && <span className="leve"> · IA acertou</span>}</td>
                   <td>{l.destino || <span className="leve">—</span>}</td>
                   <td><span className={'selo ' + ESTADO[l.estado][1]}>
@@ -135,6 +199,7 @@ export default function Recepcao() {
           </table>
         </>
       )}
+      {aberta && <Janela id={aberta} fechar={() => setAberta(null)} />}
     </section>
   )
 }
