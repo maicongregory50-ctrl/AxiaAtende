@@ -66,6 +66,7 @@ EXEMPLOS_AVISO = {
     "aviso_plano_sem_registro": ["7", "14/10/2026"],     # #926, o Controle do plano
     # #1142: o resumo do lote ao representante -- {{2}} e contado na hora ("1 cliente seu")
     "aviso_lote_do_representante": ["Djeison", "3 clientes seus", "o plantio do Trigo Mourisco"],
+    "aviso_auditoria_estoque": ["Matriz", "13/10/2026"],     # #350, a auditoria de estoque
 }
 
 

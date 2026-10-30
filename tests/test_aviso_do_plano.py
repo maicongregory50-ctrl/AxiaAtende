@@ -83,6 +83,7 @@ def test_a_024_vai_volta_e_vai(ligado):
                        VALUES ('plano_sem_registro', 'X', '5549991505565', '7|14/10')""")
         # a ordem das voltas e a inversa da das idas: a 039 (#1188), a 033 (#1142), a 032 (#1090) e a
         # 025 (#1098) mexem nos mesmos CHECKs
+        con.execute((pasta / "049_aviso_auditoria_estoque_VOLTA.sql").read_text(encoding="utf-8"))   # #350
         con.execute((pasta / "045_informativo_so_ola_VOLTA.sql").read_text(encoding="utf-8")
                     .replace("BEGIN;", "").replace("COMMIT;", ""))
         con.execute((pasta / "044_informativo_sem_link_VOLTA.sql").read_text(encoding="utf-8")

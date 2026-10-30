@@ -207,3 +207,37 @@ def estado_do_pedido(cfg, token: str, pedido_id: int, estado: str, motivo: str =
         raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ErpIndisponivel("o ERP não respondeu") from None
+
+
+def auditoria_pendentes(cfg) -> dict:
+    """#350: os avisos de auditoria de estoque vencida que o ERP deixou PENDENTE, num token so.
+    Devolve {"pendentes": [{"id", "partes": [filial, ultima lista]}], "token": ...}."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        token = _token(cfg)
+        return {"pendentes": _pedir(base + "/relatorios/auditoria-estoque/agente/pendentes", token=token),
+                "token": token}
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão AUD.AVISO",
+                  404: "o ERP ainda não tem a auditoria de estoque (#350)"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+def estado_do_aviso_auditoria(cfg, token: str, aviso_id: int, estado: str, motivo: str = "", wamid: str = "") -> None:
+    """Devolve ao ERP ENVIADO ou FALHOU do aviso da auditoria. 404 = ja respondido."""
+    corpo = {"estado": estado, "motivo": motivo[:500] or None, "ref_externa": wamid[:120] or None}
+    try:
+        _pedir(cfg.erp_url.rstrip("/") + "/relatorios/auditoria-estoque/agente/avisos/%d/estado" % int(aviso_id),
+               corpo, token=token)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return
+        raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
