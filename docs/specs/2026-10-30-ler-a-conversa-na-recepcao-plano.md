@@ -90,6 +90,12 @@ Restart-Service axiaatende-recepcionista; Restart-Service axiaatende-backend
 Se o restart do `332f4ea` (esconder a linha do portão) ainda não foi feito, este o cobre.
 Sem bloco `pos-entrega`: os serviços do AxiaAtende não estão no catálogo da Porta-Ação.
 
+> **Emenda da execução (30/10/2026): a linha acima estava ERRADA.** Os dois serviços do AxiaAtende
+> estão no catálogo da Porta-Ação desde o #973 (29/10/2026, `$SERVICOS` em
+> `C:\AxiaSecurity\scripts\porta_acao.ps1`). O restart **não** é mão do dono: a sessão pede
+> `reiniciar` pela porta (`portas.pedir(portas.ACAO, "reiniciar", {"servico": ..., "motivo": ...})`),
+> o recepcionista primeiro. Foi assim que a execução reiniciou, às 10:14, a pedido do dono.
+
 ## Riscos de execução identificados
 - **Passos 1–8**: só repositório e banco de teste; parar no meio deixa código não commitado, sem efeito em produção.
 - **Restart do recepcionista antes do backend**: o recepcionista aplica a 047 ao subir e passa a
