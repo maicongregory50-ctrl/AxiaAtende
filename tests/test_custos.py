@@ -149,6 +149,7 @@ def _povoar(cfg):
         con.execute("INSERT INTO atendimento.precos (servico, item, vale_desde, por_mensagem) VALUES ('meta', 'marketing', '2026-10-01', 0.0625)")
         con.execute("INSERT INTO atendimento.meta_conferencia (dia, situacao) VALUES ('2026-10-20', 'ok'), ('2026-10-21', 'sem_acesso')")
         con.execute("INSERT INTO atendimento.meta_cobrado (dia, categoria, volume, custo, moeda) VALUES ('2026-10-20', 'marketing', 3, 0.19, 'USD')")
+        con.execute("INSERT INTO atendimento.meta_cobrado (dia, categoria, volume, custo, moeda) VALUES ('2026-10-20', 'service', 9, 0, 'USD')")
         con.execute("INSERT INTO casa.usuarios (login, nome, senha_hash) VALUES ('maicon', 'Maicon', %s), ('fran', 'Fran', %s)",
                     (seguranca.gerar_hash("senha-de-teste-1"), seguranca.gerar_hash("senha-de-teste-1")))
     seguranca.limpar_erros("maicon")
@@ -194,6 +195,7 @@ def test_a_conta_por_funcao_com_sem_preco_e_sem_funcao(cfg):
     dias = {x["dia"]: x for x in d["meta_dias"]}
     assert dias["2026-10-20"]["quantidade"] == 4 and abs(dias["2026-10-20"]["calculado"] - 0.1875) < 1e-9
     assert dias["2026-10-20"]["sem_preco"] == 1 and dias["2026-10-20"]["cobrado"] == 0.19
+    assert dias["2026-10-20"]["cobrado_volume"] == 3          # as 9 de servico, gratis, nao contam
     assert dias["2026-10-21"]["situacao"] == "sem_acesso" and dias["2026-10-21"]["cobrado"] is None
 
 

@@ -136,7 +136,9 @@ def montar(con, inicio: date, fim: date) -> dict:
     conferencia = {r["dia"]: dict(r) for r in con.execute(
         "SELECT dia, situacao, detalhe FROM atendimento.meta_conferencia WHERE dia >= %s AND dia < %s", (inicio, fim))}
     cobrado: dict = {}
-    for r in con.execute("""SELECT dia, sum(custo) AS custo, sum(volume) AS volume, max(moeda) AS moeda
+    # o volume que se compara e o das mensagens COBRADAS: as de servico vem na leitura com custo zero
+    for r in con.execute("""SELECT dia, sum(custo) AS custo, coalesce(sum(volume) FILTER (WHERE custo > 0), 0) AS volume,
+                                   max(moeda) AS moeda
                               FROM atendimento.meta_cobrado WHERE dia >= %s AND dia < %s GROUP BY dia""", (inicio, fim)):
         cobrado[r["dia"]] = r
     dias = []
