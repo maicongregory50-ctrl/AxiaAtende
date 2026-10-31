@@ -28,10 +28,19 @@ quanto ela pesa. A aba some para qualquer outro login.
    que já apareceu) → a data em que o preço passou a valer → o valor → **Lançar preço**. O preço antigo
    continua valendo para os dias anteriores.
 
-**Antes de tudo, lance os preços que faltam.** A tela nasce com o preço do Claude (Haiku 5.5). Os da Meta
-(por mensagem: marketing, utility, marketing_lite) e os do Gemini (por milhão de tokens, um por modelo)
-são seus: pegue na tabela de preços da Meta para o Brasil e na do Google, ou na fatura. Sem eles, a tela
-mostra "sem preço".
+**Os preços já vêm lançados** (31/10/2026), marcados "(semente)" na aba Preços:
+
+- **Meta**, por mensagem, em dólar (a conta é faturada em dólar): marketing **US$ 0,0625** e utilidade
+  **US$ 0,0068**, conferidos contra o que a própria Meta cobrou da nossa conta em 28, 29 e 30/10, com
+  diferença zero. marketing_lite e autenticação pela tabela da Meta.
+- **Claude** (Haiku 5.5): US$ 0,10 por milhão de tokens de entrada e US$ 0,50 de saída.
+- **Gemini**: o do olhar sobre a foto (gemini-3.8-flash), US$ 0,75 e 3,75 até 31/12/2026, e **US$ 1,50 e
+  7,50 a partir de 01/01/2027**. Esse aumento já está lançado, e a tela troca sozinha na virada. O do
+  editor (gemini-2.5-flash-image), US$ 0,30 de entrada e US$ 30,00 de saída, que é o preço do token de
+  imagem (cerca de US$ 0,039 por imagem).
+
+Só é preciso lançar preço quando a Meta ou o Google mudarem a tabela, ou quando aparecer um modelo novo
+como "sem preço" (o nome na tela é o que o Google devolveu; lance com esse nome).
 
 ## O que significa cada sinal
 
