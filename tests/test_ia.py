@@ -209,3 +209,60 @@ def test_ler_visita_com_campanha_motivo_pelo_nome_e_falha_vira_none():
     assert r["ofereceu"] is True and r["motivo_id"] == 3 and "Inverno" in c.pedidos[0]["system"]
     assert IAmod.IA(cliente=ClienteFalso(erro=TimeoutError())).ler_visita("x", ficha, motivos, date(2026, 10, 23)) is None
     assert IAmod.IA(cliente=ClienteFalso(resposta("nao e json"))).ler_visita("x", ficha, motivos, date(2026, 10, 23)) is None
+
+
+# ── #1223: o custo de cada chamada ───────────────────────────────────────────────────────────────
+
+def _com_uso(texto, stop="end_turn", entrada=812, saida=9):
+    r = resposta(texto, stop)
+    r.usage = SimpleNamespace(input_tokens=entrada, output_tokens=saida)
+    return r
+
+
+def test_a_chamada_respondida_anota_funcao_modelo_e_tokens():
+    anotado = []
+    c = ClienteFalso(_com_uso('{"chave": "fretes"}'))
+    ia = IAmod.IA(cliente=c, registrar=lambda *a: anotado.append(a))
+    assert ia.classificar("quero cotar um frete", OPCOES) == "fretes"
+    assert anotado == [("triagem", "claude-haiku-5-5", 812, 9)]
+
+
+def test_a_resposta_descartada_tambem_e_anotada_porque_foi_paga():
+    anotado = []
+    c = ClienteFalso(_com_uso("", stop="refusal"))
+    assert IAmod.IA(cliente=c, registrar=lambda *a: anotado.append(a)).classificar("oi", OPCOES) is None
+    assert [a[0] for a in anotado] == ["triagem"]
+
+
+def test_erro_de_rede_nao_anota_nada():
+    anotado = []
+    c = ClienteFalso(erro=TimeoutError())
+    assert IAmod.IA(cliente=c, registrar=lambda *a: anotado.append(a)).classificar("frete", OPCOES) is None
+    assert anotado == []
+
+
+def test_anotar_que_falha_nao_muda_a_resposta():
+    def quebra(*a):
+        raise RuntimeError("banco fora")
+    c = ClienteFalso(_com_uso('{"chave": "fretes"}'))
+    assert IAmod.IA(cliente=c, registrar=quebra).classificar("frete", OPCOES) == "fretes"
+
+
+def test_cada_metodo_anota_a_sua_funcao(cfg):
+    from datetime import date
+    from backend import uso_ia
+    reg = uso_ia.guardar_no_banco(cfg)
+    ia = IAmod.IA(cliente=ClienteFalso(_com_uso('{"bastidor": "nenhum", "produto": "nenhum", "fase": "nenhuma"}')),
+                  registrar=reg)
+    ia.ler_campo("a lavoura", ["Aveia"])
+    ia._cliente = ClienteFalso(_com_uso('{"requisitos": [], "resumo": "", "legivel": true}'))
+    ia.triar(b"%PDF", {"titulo": "Vaga", "requisitos": ["morar em Maravilha"]})
+    ia._cliente = ClienteFalso(_com_uso(json.dumps({"meio": "nenhum", "quando": "", "ofereceu": "nao",
+                                                    "resposta": "nenhuma", "motivo": "nenhum", "interesse": "",
+                                                    "retomar": "", "pedido": "", "anotacao": ""})))
+    ia.ler_visita("liguei pra ele", {"nome": "Fulano"}, [], date(2026, 10, 31))
+    with conexao(cfg) as con:
+        linhas = con.execute("SELECT origem, servico, funcao, modelo, entrada, saida FROM atendimento.uso_ia"
+                             " ORDER BY id").fetchall()
+    assert [l["funcao"] for l in linhas] == ["campo", "curriculo", "visita"]
+    assert all(l["origem"] == "axiaatende" and l["servico"] == "claude" and l["entrada"] == 812 for l in linhas)

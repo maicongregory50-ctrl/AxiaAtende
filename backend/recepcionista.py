@@ -174,6 +174,12 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
                 vaga.limpar(con, momento)
     except Exception as falha:  # noqa: BLE001
         print("vaga: %s: %s" % (type(falha).__name__, falha), flush=True)
+    try:   # #1223: o que a Meta diz ter cobrado (uma vez por dia, depois das 06:00); nunca segura o resto
+        from . import custos_meta
+        with conexao(cfg) as con:
+            custos_meta.conferir(cfg, con, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("custos: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #1037: quem mandou a logo fica sabendo que ela chegou ao marketing (so dentro das 24 h)
         from . import logos
         with conexao(cfg) as con:
@@ -206,7 +212,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
         saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg))
     if ia is None and cfg.anthropic_chave:
         from .ia import IA
-        ia = IA(cfg)
+        from .uso_ia import guardar_no_banco as uso_no_banco   # #1223: o custo de cada chamada
+        ia = IA(cfg, registrar=uso_no_banco(cfg))
     if envio is None and saida is not None:
         from .envio import Envio
         envio = Envio(ler_nota=getattr(saida, "nota", None))

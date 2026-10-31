@@ -19,6 +19,10 @@ resposta fora do esquema devolvem None, e a pessoa recebe o menu.
 
 A CHAVE e a do proprio AxiaAtende, com teto de gasto (G3 do plano), lida do .env.recepcionista.
 Pela API paga, nunca pela assinatura: e servico ao publico.
+
+O CUSTO (#1223): cada chamada que a API respondeu anota funcao, modelo e tokens por `registrar`
+(backend/uso_ia.py), inclusive a resposta descartada (recusa, fora do esquema): foi paga igual. Erro
+de rede sem resposta nao tem uso e nao anota. Anotar nunca muda o que o metodo devolve.
 """
 import json
 
@@ -62,11 +66,23 @@ def _lista(opcoes: list[dict]) -> str:
 
 
 class IA:
-    def __init__(self, cfg=None, cliente=None):
+    def __init__(self, cfg=None, cliente=None, registrar=None):
         if cliente is None:
             import anthropic   # so o recepcionista importa
             cliente = anthropic.Anthropic(api_key=cfg.anthropic_chave, timeout=TEMPO_S, max_retries=0)
         self._cliente = cliente
+        self._registrar = registrar
+
+    def _anotar(self, funcao: str, r) -> None:
+        """#1223: o uso que a API devolveu. Sem `registrar`, ou sem `usage`, nada; erro vira log."""
+        uso = getattr(r, "usage", None)
+        if self._registrar is None or uso is None:
+            return
+        try:
+            self._registrar(funcao, MODELO, getattr(uso, "input_tokens", 0) or 0,
+                            getattr(uso, "output_tokens", 0) or 0)
+        except Exception as falha:   # noqa: BLE001 -- o custo nunca derruba a resposta
+            print("ia: uso de %s nao anotado: %s" % (funcao, type(falha).__name__), flush=True)
 
     def __repr__(self):   # nunca a chave
         return "IA(%s)" % MODELO
@@ -93,6 +109,7 @@ class IA:
             )
         except Exception:   # noqa: BLE001 -- tempo, rede, 4xx, 5xx: o menu resolve
             return None
+        self._anotar("triagem", r)
         if getattr(r, "stop_reason", None) != "end_turn":
             return None   # recusa, corte por tamanho: o menu resolve
         try:
@@ -153,6 +170,7 @@ class IA:
                     "required": ["bastidor", "produto", "fase"], "additionalProperties": False}}})
         except Exception:   # noqa: BLE001 -- sem leitura, o atendente pergunta
             return None
+        self._anotar("campo", r)
         if getattr(r, "stop_reason", None) != "end_turn":
             return None
         try:
@@ -217,6 +235,7 @@ class IA:
                     "required": ["requisitos", "resumo", "legivel"], "additionalProperties": False}}})
         except Exception:   # noqa: BLE001 -- sem triagem, o curriculo vai a Fran igual
             return None
+        self._anotar("curriculo", r)
         if getattr(r, "stop_reason", None) != "end_turn":
             return None
         try:
@@ -298,6 +317,7 @@ class IA:
                     "additionalProperties": False}}})
         except Exception:   # noqa: BLE001 -- sem leitura, a OlivIA pergunta tudo por botao
             return None
+        self._anotar("visita", r)
         if getattr(r, "stop_reason", None) != "end_turn":
             return None
         try:

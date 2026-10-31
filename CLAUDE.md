@@ -10,8 +10,10 @@
 
 ## O que é
 
-O atendimento da Renascer no WhatsApp, pelo número **49 3664 0121**, no lugar do Opa Suite (a OlivIA).
-Duas funções, e só elas:
+O atendimento da Renascer no WhatsApp, pelo número **49 3664 0121**, no lugar do Opa Suite. A atendente
+virtual se chama **OlivIA** (dono, 31/10/2026, em todos os projetos): é a IA de `backend/ia.py`, quatro
+chamadas pagas pela API da Anthropic, e o custo dela, com o da Meta e o do Gemini, está na tela **Custos**
+(#1223, só para o login do dono). Duas funções, e só elas:
 
 1. **O recepcionista.** Quem chama recebe o menu de motivos, **tudo por botão**, e termina no link do
    WhatsApp de quem atende (tela Destinos). Quem escreve em vez de tocar recebe a proposta da IA e
@@ -21,7 +23,8 @@ Duas funções, e só elas:
    cliente. Quem toca "Quero receber" recebe as imagens na janela de 24h, sem custo; quem toca "Não
    quero receber" sai da lista e o responsável dele é avisado.
 
-Três telas, no computador: **Recepção**, **Envios** e **Destinos**.
+Três telas, no computador: **Recepção**, **Envios** e **Destinos**. Mais a tela **Custos** (#1223), que só
+aparece para quem está em `AXIAATENDE_CUSTOS_LOGINS` no XML do serviço das telas.
 
 **É o único projeto da casa que qualquer pessoa da internet alcança com lógica.** A vitrine do
 AxiaMarketing só entrega imagem; o recepcionista daqui recebe e responde mensagem de qualquer um. Por

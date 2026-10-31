@@ -208,6 +208,20 @@ Manual novo: `docs/manuais/custos.md`, com linha no `INDICE.md`.
 **Manuais que passam a dizer algo errado:** `docs/manuais/envios.md`, se tratar o "Custo US$" como o
 gasto. O plano confere e diz que aquele é a previsão, e que o fato está em Custos.
 
+## Emenda de 31/10/2026, no plano: o Gemini é EMPURRADO, não lido
+
+Ao escrever o plano, a leitura do código mostrou que a seta da casa é a outra: **o AxiaMarketing chama o
+AxiaAtende** (`127.0.0.1:8009`, com a chave do pedido que já existe), e o Atende nunca chama o Marketing.
+As rotas da 8006 exigem login, e ler dali pediria uma credencial nova do Atende para o Marketing (R3:
+"cria"). **Decisão do dono:** o AxiaMarketing grava o uso real de cada chamada na tabela dele e o
+**empurra** ao Atende (`POST /pedido/uso-ia`); se o Atende estiver fora, a linha vai na próxima chamada.
+Onde esta spec diz "rota local de leitura no AxiaMarketing" e "a tela do AxiaAtende lê dali", vale isto.
+Nenhum segredo novo; o R3 continua **conforme**.
+
+E um achado que muda a Decisão 1: **o registro do modelo por mensagem já existia** desde 30/10 (#1205,
+`enviadas_texto.modelo`, gravado pela `SaidaMeta`). Para a Meta não nasce registro novo: o custo é uma
+leitura que junta o `pricing` do aviso, o modelo e o `uso` do cadastro.
+
 ## Próximo passo
 
 `/writing-plans`. O AxiaAtende não tem raiz de leitura para o PLANEJADOR (#976), então o plano é

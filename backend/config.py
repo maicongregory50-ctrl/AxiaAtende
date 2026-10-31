@@ -92,6 +92,9 @@ class Config:
     erp_url: str = "http://127.0.0.1:8001"
     erp_agente: str = "ATENDIMENTO"
     erp_segredo: str = field(default="", repr=False)
+    # #1223: quem ve a tela Custos (`AXIAATENDE_CUSTOS_LOGINS=maicon` no XML das telas, separados por
+    # virgula). Vazio = ninguem: a tela nasce fechada. Nao e segredo, e o login nao e senha.
+    custos_logins: tuple = ()
 
     def dsn(self) -> str:
         partes = ["host=%s" % self.banco_host, "port=%d" % self.banco_porta,
@@ -173,6 +176,8 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
     if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
         base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele
     base.update(ambiente=ambiente, banco_host="127.0.0.1", processo=processo,
-                porteiro=os.environ.get("AXIAATENDE_PORTEIRO", "off").strip().lower() == "on")
+                porteiro=os.environ.get("AXIAATENDE_PORTEIRO", "off").strip().lower() == "on",
+                custos_logins=tuple(x.strip().lower() for x in os.environ.get("AXIAATENDE_CUSTOS_LOGINS", "").split(",")
+                                    if x.strip()))
     base.update(trocas)
     return Config(**base)

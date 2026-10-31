@@ -11,6 +11,8 @@
   <env name="AXIAATENDE_PROCESSO" value="telas"/>
   <!-- local = so http://127.0.0.1:8009 no proprio servidor. As telas nunca saem para a internet. -->
   <env name="AXIAATENDE_SAIDA" value="local"/>
+  <!-- #1223: quem ve a tela Custos (logins separados por virgula). Vazio ou ausente = ninguem. -->
+  <env name="AXIAATENDE_CUSTOS_LOGINS" value="maicon"/>
   <logpath>C:\Logs\AxiaAtende</logpath>
   <log mode="roll-by-size">
     <sizeThreshold>10240</sizeThreshold>

@@ -55,7 +55,7 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **O mesmo número não aparece duas vezes** | uma pessoa recebe **uma vez por envio**, mesmo sendo contato de vários cadastros. O banco recusa a segunda, e quem monta o pedido já junta por número antes |
 | **Sem aceite** (só na comunicação direta) | o cliente nunca aceitou: precisa tocar "Quero receber" num material antes |
 | **Na fila** | ainda vai receber, num dos próximos lotes |
-| **Custo US$** | o valor estimado das mensagens pagas deste envio (cerca de US$ 0,07 cada) |
+| **Custo US$** | a PREVISÃO das mensagens pagas deste envio (cerca de US$ 0,07 cada). O custo de fato, depois das mensagens saírem, com o preço que você lançou, está na aba **Custos** (#1223) |
 | **"sem WhatsApp"** | o cadastro não tem celular válido |
 | **"recusou antes" / "já recebeu esta peça"** | não recebe de novo |
 | **"fora: teto do mês (já recebeu duas)"** (#1163) | o **comprador** já recebeu duas mensagens nossas neste mês. Conta **um por envio recebido** (o convite do material ou a mensagem da direta, de qualquer envio); as imagens depois do "Quero receber" são parte do mesmo envio e não contam de novo. Ele não recebe esta, e volta a receber no mês seguinte. O mês é o do calendário, em Brasília, e a conta é feita na hora em que o lote sai. O técnico e o contato sem papel não entram no teto |

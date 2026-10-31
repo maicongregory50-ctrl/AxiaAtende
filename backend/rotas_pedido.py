@@ -46,6 +46,20 @@ class Cliente(BaseModel):
     responsavel_canal: Literal["representante", "corretor", "dono", "flutuante"] | None = None
 
 
+class UsoIA(BaseModel):
+    """#1223: uma chamada ao Gemini feita no AxiaMarketing, com o id da linha de la."""
+    id: int
+    em: datetime
+    funcao: str = Field(min_length=1, max_length=40)
+    modelo: str = Field(min_length=1, max_length=80)
+    entrada: int = Field(ge=0)
+    saida: int = Field(ge=0)
+
+
+class LoteUsoIA(BaseModel):
+    usos: list[UsoIA] = Field(min_length=1, max_length=200)
+
+
 class Pedido(BaseModel):
     pedido_ref: str = Field(min_length=1, max_length=120)
     tipo: Literal["material", "direta"] = "material"
@@ -217,5 +231,21 @@ def rotas(cfg) -> APIRouter:
         return {"situacao": situacao, "criado_em": a["criado_em"], "enviado_em": a["enviado_em"],
                 "erro": a["erro"], "guardado": a["guardado_em"] is not None and not a["enviado_em"],
                 "nao_visto": a["nao_visto_em"] is not None}
+
+    @r.post("/pedido/uso-ia")
+    def receber_uso_ia(lote: LoteUsoIA, x_axiaatende_chave: str | None = Header(default=None)):
+        """#1223 (emenda do dono, 31/10/2026): o AxiaMarketing EMPURRA o uso real do Gemini, com a mesma
+        chave do pedido, e a tela Custos daqui o soma. A seta da casa nao inverte: o Atende nunca chama o
+        Marketing. Idempotente por (origem, id): o lote reenviado depois de uma queda vira nada novo, e
+        a resposta devolve TODOS os ids do lote, para o Marketing marcar como entregues."""
+        conferir(x_axiaatende_chave)
+        with conexao(cfg) as con:
+            for u in lote.usos:
+                con.execute(
+                    """INSERT INTO atendimento.uso_ia (em, origem, id_origem, servico, funcao, modelo, entrada, saida)
+                       VALUES (%s, 'axiamarketing', %s, 'gemini', %s, %s, %s, %s)
+                       ON CONFLICT (origem, id_origem) DO NOTHING""",
+                    (u.em, u.id, u.funcao, u.modelo, u.entrada, u.saida))
+        return {"aceitos": [u.id for u in lote.usos]}
 
     return r
