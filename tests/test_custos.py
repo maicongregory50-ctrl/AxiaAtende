@@ -127,6 +127,8 @@ def _status_pago(wamid, categoria, quando="2026-10-20 10:00-03"):
 
 def _povoar(cfg):
     with conexao(cfg) as con:
+        # as sementes da 051 saem: estes testes provam o "sem preco", e lancam os proprios precos
+        con.execute("DELETE FROM atendimento.precos WHERE servico IN ('meta', 'gemini')")
         for linha in (_status_pago("w.modelo", "marketing"), _status_pago("w.aviso", "utility"),
                       _status_pago("w.resumo", "marketing"), _status_pago("w.nada", "marketing"),
                       _status_pago("w.setembro", "marketing", "2026-09-30 10:00-03")):
@@ -210,3 +212,13 @@ def test_preco_novo_e_linha_nova_e_a_mesma_data_e_recusada(cfg):
         assert aviso["sem_preco"] == 0 and aviso["valor"] == 0.0068
     finally:
         c.__exit__(None, None, None)
+
+
+def test_a_051_traz_os_precos_oficiais_e_a_virada_do_gemini(cfg):
+    from datetime import date as d
+    with conexao(cfg) as con:
+        precos = {(p["servico"], p["item"], p["vale_desde"]): p for p in con.execute("SELECT * FROM atendimento.precos")}
+    assert float(precos[("meta", "marketing", d(2026, 10, 1))]["por_mensagem"]) == 0.0625
+    assert float(precos[("meta", "utility", d(2026, 10, 1))]["por_mensagem"]) == 0.0068
+    assert float(precos[("gemini", "gemini-3.8-flash", d(2027, 1, 1))]["por_milhao_saida"]) == 7.50
+    assert all(p["criado_por"] is None for p in precos.values())
