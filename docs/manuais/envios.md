@@ -154,6 +154,13 @@ Quem recebe é o destino do ajuste `status_do_dia_para`, que nasceu igual ao do 
 O Status do dia **não tem modelo**: com a chave do porteiro desligada, ele só sai dentro das 24 h, e
 fora delas fica com **Erro** ("janela de 24 h fechada e porteiro desligado").
 
+## 4.2 Chamados no WhatsApp (desde novembro de 2026, #1222)
+
+A tabela **Chamados no WhatsApp · últimos 30 dias** mostra o que o chamado mandou à equipe e o que a
+equipe respondeu: → saiu, ← voltou. "esperando" ainda não saiu (a pessoa não escreveu, ou a junção de
+minutos); "esperando o Ver" espera o toque na reabertura; "no chamado" já entrou no ERP; "erro" diz o
+motivo. O passo a passo de quem recebe está em [chamado-no-whatsapp.md](chamado-no-whatsapp.md).
+
 ## 4b. Quando o cliente que recebeu um envio escreve (#1189)
 
 O cliente que recebeu um envio da carteira nos últimos 30 dias e escreve ao número da empresa **não

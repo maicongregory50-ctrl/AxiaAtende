@@ -222,9 +222,22 @@ def rotas(cfg, usuario) -> APIRouter:
             nota = con.execute("SELECT nota, lida_em FROM atendimento.nota_qualidade ORDER BY lida_em DESC LIMIT 1").fetchone()
             avisos = con.execute("""SELECT * FROM atendimento.avisos WHERE criado_em > now() - interval '30 days'
                                      ORDER BY id DESC LIMIT 200""").fetchall()
+            # #1222: o chamado no WhatsApp -- o que saiu e o que voltou, com o estado de cada mensagem
+            chamados = con.execute("""SELECT m.id, m.sentido, m.classe, m.estado, m.resultado, m.erro,
+                                             left(m.texto, 140) AS texto, m.criado_em,
+                                             coalesce(m.entregue_em, m.enviada_em) AS em,
+                                             p.referencia, p.titulo, p.para_whatsapp, p.espera
+                                        FROM atendimento.pendencias_mensagens m
+                                        JOIN atendimento.pendencias p ON p.id = m.pendencia_id
+                                       WHERE m.criado_em > now() - interval '30 days'
+                                       ORDER BY m.id DESC LIMIT 200""").fetchall()
         return {"envios": [{**dict(e), "aprovado_em": e["aprovado_em"].isoformat()} for e in lista],
                 "nota": dict(nota, lida_em=nota["lida_em"].isoformat()) if nota else None,
-                "avisos": [estado_do_aviso(a) for a in avisos]}
+                "avisos": [estado_do_aviso(a) for a in avisos],
+                "chamados": [{**{k: c[k] for k in ("id", "sentido", "classe", "estado", "resultado", "erro", "texto",
+                                                   "referencia", "titulo", "espera")},
+                              "numero": mascarar(c["para_whatsapp"]), "criado_em": c["criado_em"].isoformat(),
+                              "em": c["em"].isoformat() if c["em"] else None} for c in chamados]}
 
     @r.get("/envios/{envio_id}")
     def envio(envio_id: int, responsavel: str = "", resposta: str = ""):

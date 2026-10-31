@@ -25,12 +25,12 @@ O QUE VOLTA NO TOQUE (o `id` do botao ou da linha), e a unica coisa que o motor 
     reabrir:<numero>  o Ver da reabertura dos avisos internos (#1188, tratado pelo modulo de envio)
 """
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda, clientes_do_dia, internos, logos, vaga
-from .envio import primeiro_nome
+from . import agenda, clientes_do_dia, internos, logos, pendencias, vaga
+from .envio import com_nove, primeiro_nome
 from .saida import MAX_BOTOES, Opcao, Saida
 
 FUSO = ZoneInfo("America/Sao_Paulo")
@@ -667,7 +667,8 @@ def portao_do_cliente(con, saida: Saida, ia, e: Entrada, agora: datetime, envio,
     return True
 
 
-def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo=None) -> None:
+def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo=None,
+           pular_pendencias: bool = False) -> None:
     """Uma mensagem que chegou. `envio` trata as respostas ao convite da carteira (Fase E);
     `campo` (#970) toma a foto ou o video de equipe/representante e as respostas as perguntas dele,
     antes de qualquer conversa de atendimento abrir."""
@@ -680,7 +681,29 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     if e.toque and e.toque.startswith("reabrir:"):
         if envio is not None:
             envio.tratar_reabrir(con, saida, e, agora)
+        if p.wa_id and com_nove(p.wa_id) == com_nove(e.toque.partition(":")[2]):
+            pendencias.soltar_agora(con, saida, p.wa_id, agora)   # #1222: o chamado que esperava o Ver
         return
+    # #1222: o chamado no WhatsApp, no TOPO da corrente -- a resposta CITADA a uma mensagem de
+    # pendencia, os toques `pend:` e o motivo do "Nao ficou bom" nao tem duvida, e nenhum filtro
+    # abaixo pode toma-los (o texto de interno viraria a legenda da proxima foto). "Outro assunto"
+    # devolve o texto, e a corrente roda de novo sem este degrau.
+    if not pular_pendencias:
+        r = pendencias.tratar(con, saida, e, agora)
+        if isinstance(r, str):
+            tratar(con, saida, ia, replace(e, texto=r, toque=None, contexto=None), agora, envio, campo,
+                   pular_pendencias=True)
+            return
+        if r:
+            return
+        # o "Bom dia" que encontra mensagem esperando: so as mensagens, sem o menu da casa (decisao 7)
+        if (e.texto and not e.toque and p.wa_id and internos.pede_menu(e.texto) and pendencias.ligado(con)
+                and internos.e_interno(con, p.wa_id)):
+            soltos = pendencias.soltar_agora(con, saida, p.wa_id, agora) if pendencias.tem_esperando(con, p.wa_id) else 0
+            if envio is not None:
+                soltos += envio.soltar_guardados(con, saida, com_nove(p.wa_id), agora)
+            if soltos:
+                return
     # #1098: o retorno da Fran sobre a triagem vem ANTES do canal de campo -- ela e "da casa", e o
     # comentario dela depois de "Triagem errada" viraria a frase da proxima foto. A conversa de vaga
     # vem antes tambem: o PDF do candidato nao e logo, e a foto dele nao e material de campo.
@@ -710,8 +733,13 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         # trava, nao gosto.
         if logos.responder(con, saida, e, agora):
             return
+        # #1222: no lugar do pega-tudo -- quem tem chamado esperando resposta e escreveu sem citar
+        if not pular_pendencias and pendencias.oferecer(con, saida, ia, e, agora):
+            return
         if campo.texto_de_interno(con, saida, e, agora):
             return
+    elif not pular_pendencias and pendencias.oferecer(con, saida, ia, e, agora):
+        return
     # #1189: o CLIENTE da carteira que escreve vai ao representante e ao menu dele, nunca ao fluxo
     # geral. Depois do canal de campo e dos clientes do dia (que sao da equipe) e antes de tudo o que
     # abre conversa.

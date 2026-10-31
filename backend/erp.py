@@ -241,3 +241,60 @@ def estado_do_aviso_auditoria(cfg, token: str, aviso_id: int, estado: str, motiv
         raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ErpIndisponivel("o ERP não respondeu") from None
+
+
+# ── #1222: o chamado no WhatsApp (as rotas /demandas/whatsapp do ERP, atividade SUP.WPP) ─────────
+
+class ErpRecusou(ErpIndisponivel):
+    """O ERP respondeu, e disse nao (403 numero errado, 400 o chamado nao esta na entrega). Nao adianta
+    tentar de novo: a mensagem fica com o erro."""
+
+
+def _whatsapp(url: str, corpo: dict | None, token: str) -> dict:
+    try:
+        return _pedir(url, corpo, token=token)
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 403, 404, 422):
+            try:
+                detalhe = json.loads(e.read().decode("utf-8")).get("detail")
+            except Exception:  # noqa: BLE001
+                detalhe = None
+            raise ErpRecusou(str(detalhe or "o ERP recusou (%d)" % e.code)[:300]) from None
+        motivo = {401: "o ERP recusou o agente (segredo)"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+def chamados_saida(cfg, depois: int | None) -> dict:
+    """O que chegou aos autores depois do evento `depois`, num token so. Sem `depois`, so o cursor."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/") + "/demandas/whatsapp"
+    try:
+        token = _token(cfg)
+    except urllib.error.HTTPError:
+        raise ErpIndisponivel("o ERP recusou o agente (segredo)") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    r = _whatsapp(base + "/saida" + ("" if depois is None else "?depois=%d" % int(depois)), None, token)
+    return {"linhas": r["linhas"], "cursor": r["cursor"], "token": token}
+
+
+def chamados_estado(cfg, token: str, ids: list[int]) -> list[dict]:
+    if not ids:
+        return []
+    url = cfg.erp_url.rstrip("/") + "/demandas/whatsapp/estado?ids=" + ",".join(str(int(i)) for i in ids)
+    return _whatsapp(url, None, token)["demandas"]
+
+
+def chamado_resposta(cfg, token: str, demanda_id: int, numero: str, texto: str) -> None:
+    _whatsapp(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/resposta" % int(demanda_id),
+              {"numero": numero, "texto": texto}, token)
+
+
+def chamado_validar(cfg, token: str, demanda_id: int, numero: str, resultado: str, motivo: str | None) -> None:
+    _whatsapp(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/validar" % int(demanda_id),
+              {"numero": numero, "resultado": resultado, "motivo": motivo}, token)

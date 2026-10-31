@@ -14,6 +14,7 @@ const FUNCAO = {
   aviso_lote_do_representante: 'Aviso: resumo do lote', aviso_status_do_dia: 'Aviso: status do dia',
   aviso_auditoria_estoque: 'Aviso: auditoria de estoque',
   triagem: 'OlivIA · triagem do motivo', campo: 'OlivIA · material de campo', visita: 'OlivIA · registro de visita',
+  pendencia: 'OlivIA · de qual chamado é a resposta',
   edicao: 'Edição de imagem', olhar_foto: 'Olhar sobre a foto',
 }
 const FONTE = { resumo: 'pelo resumo', nenhum: '', registro: '', axiaatende: '', axiamarketing: '' }

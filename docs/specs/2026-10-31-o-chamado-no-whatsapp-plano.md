@@ -18,6 +18,18 @@
    constante exportada, presa por teste.
 3. **Número da migração do Atende: 051.** A 050 é do #1223 (`050_custos.sql`), em paralelo.
 
+## O que a execução ajustou (31/10/2026)
+
+- A atividade do agente chama-se `SUP.WPP` (cadeia SUP, ao lado das outras da fila), e não `DEM.WPP`.
+- A agenda do atendimento **não** mudou: o número do autor vem em cada linha de `/saida`, e o ERP
+  confere o número na volta; o Atende não precisa saber quem é quem.
+- A migração é a **052** (`052_pendencias.sql`): o #1223 gravou a `051_precos_oficiais.sql` no meio.
+- A regra das rotas mora em `backend/services/demandas_whatsapp_service.py` (testável sem o `.env`),
+  e o router só traduz para HTTP. Há uma quarta rota, `GET /estado`, para o Atende fechar a espera que
+  deixou de valer.
+- A resposta pelo WhatsApp é gravada com executor = o autor (quem teclou foi ele), com o texto
+  começando por "(pelo WhatsApp)": é o que acende "resposta nova" e acorda o fio.
+
 ## Passos
 
 **ERP (C:\AxiaGestao)**

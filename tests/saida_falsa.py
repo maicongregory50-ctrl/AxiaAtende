@@ -103,6 +103,13 @@ class IAFalsa:
             raise TimeoutError("a IA demorou")
         return getattr(self, "triagem", None)
 
+    def escolher_pendencia(self, texto, pendencias):
+        """#1222: `self.pendencia` e o id devolvido (None = "nenhuma")."""
+        self.pendencias_vistas = getattr(self, "pendencias_vistas", []) + [[p["id"] for p in pendencias]]
+        if self.falha:
+            return None
+        return getattr(self, "pendencia", None)
+
     def classificar(self, texto, opcoes):
         self.perguntas.append(texto)
         self.opcoes = getattr(self, "opcoes", []) + [[o["chave"] for o in opcoes]]   # #988: o que ela viu

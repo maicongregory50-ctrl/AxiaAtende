@@ -158,6 +158,12 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
             print("vigia: %s" % type(falha).__name__, flush=True)
     if envio is not None:
         envio.rotina(cfg, saida, momento)
+    try:   # #1222: o chamado no WhatsApp -- o que espera sair (juncao, janela, reabertura); desligado, nada
+        from . import pendencias
+        with conexao(cfg) as con:
+            pendencias.mandar(con, saida, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("pendencias: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #970: os avisos do canal de campo, so dentro da janela de 24 h; nunca seguram o resto
         from .campo import Campo
         with conexao(cfg) as con:

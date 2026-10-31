@@ -26,6 +26,17 @@ const TIPO_AVISO = {
   lote_do_representante: 'Resumo do lote', status_do_dia: 'Status do dia', auditoria_estoque: 'Auditoria de estoque',
 }
 
+// #1222: o chamado no WhatsApp. O que sai (informativo, pergunta, entrega) e o que volta (resposta, validacao).
+const ESTADO_CHAMADO = {
+  esperando: ['esperando', 'a'], guardada: ['esperando o Ver', 'a'], enviada: ['enviada', 'v'],
+  escolher: ['confirmando o chamado', 'a'], a_entregar: ['indo ao chamado', 'a'], entregue: ['no chamado', 'v'],
+  descartada: ['descartada', ''], erro: ['erro', 'r'],
+}
+const CLASSE_CHAMADO = {
+  informativo: 'Aviso', pergunta: 'Pergunta', entrega: 'Entrega', resposta: 'Resposta',
+  validacao: 'Ficou bom / Não ficou bom',
+}
+
 // #1199 (dono, 29/10/2026): "precisamos melhorar os filtros e ordenar as colunas; nao existe filtro por
 // situacao". A situacao que a linha MOSTRA (com o "responsavel sem WhatsApp" do #1197), e a ordem por
 // coluna, tudo na tela: a lista do envio ja vem inteira.
@@ -173,6 +184,28 @@ export default function Envios() {
                     {a.estado === 'erro' && <span className="leve"> {a.erro}</span>}</td>
                   <td>{a.em ? quando(a.em) : <span className="leve">—</span>}</td>
                   <td>{quando(a.criado_em)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {lista && lista.chamados && lista.chamados.length > 0 && (
+        <>
+          <h2>Chamados no WhatsApp · últimos 30 dias</h2>
+          <table className="tabela">
+            <thead><tr><th>Chamado</th><th>Para</th><th></th><th>O quê</th><th>Situação</th><th>Quando</th></tr></thead>
+            <tbody>
+              {lista.chamados.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.referencia} <span className="leve">{c.titulo}</span></td>
+                  <td><span className="leve">{c.numero}</span></td>
+                  <td>{c.sentido === 'saiu' ? '→' : '←'}</td>
+                  <td>{CLASSE_CHAMADO[c.classe] || c.classe}{c.resultado === 'nao_ficou_bom' ? ': não ficou bom' : ''}
+                    <div className="leve">{c.texto}</div></td>
+                  <td><span className={'selo ' + (ESTADO_CHAMADO[c.estado] || ['', ''])[1]}>{(ESTADO_CHAMADO[c.estado] || [c.estado])[0]}</span>
+                    {c.estado === 'erro' && <span className="leve"> {c.erro}</span>}</td>
+                  <td>{quando(c.em || c.criado_em)}</td>
                 </tr>
               ))}
             </tbody>

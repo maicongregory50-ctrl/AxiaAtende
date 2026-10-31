@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agenda, auditoria_erp, clientes_erp, config, eventos_erp, logistica_erp, migracoes, retomadas_erp, seguranca
+from . import agenda, auditoria_erp, clientes_erp, pendencias_erp, config, eventos_erp, logistica_erp, migracoes, retomadas_erp, seguranca
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -114,6 +114,18 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             if parar.wait(auditoria_erp.INTERVALO_SEGUNDOS):
                 return
 
+    def chamados_no_whatsapp():
+        """#1222: o chamado no WhatsApp -- traz do ERP o que chega aos autores, leva a resposta (1 min)."""
+        while True:
+            try:
+                r = pendencias_erp.volta(cfg)
+                if "erro" in r:
+                    print("pendencias: %s" % r["erro"], flush=True)
+            except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
+                print("pendencias: %s: %s" % (type(falha).__name__, falha), flush=True)
+            if parar.wait(pendencias_erp.INTERVALO_SEGUNDOS):
+                return
+
     @asynccontextmanager
     async def vida(app: FastAPI):
         migracoes.aplicar(cfg)
@@ -123,6 +135,7 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             threading.Thread(target=meus_clientes, name="meus-clientes", daemon=True).start()
             threading.Thread(target=pedidos_de_cte, name="logistica", daemon=True).start()
             threading.Thread(target=avisos_da_auditoria, name="auditoria", daemon=True).start()
+            threading.Thread(target=chamados_no_whatsapp, name="pendencias", daemon=True).start()
         yield
         parar.set()
 
