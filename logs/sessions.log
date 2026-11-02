@@ -21,3 +21,4 @@
 [2026-10-27][ATENDE-END] #1163: teto de duas por mes ao comprador no laco do lote (034), POST /pedido/teto; 350 testes
 [2026-10-29][ATENDE-END] #1188: o porteiro dos avisos internos (039, chave AXIAATENDE_PORTEIRO off; texto dentro das 24 h, fora uma reabertura reabrir_avisos com o Ver, 7 dias = nao visto); merge em master com #1189/#1192, 392 testes. Falta o dono: restart, --ver/--propor, e a chave so com o modelo aprovado
 [2026-10-30][ATENDE-END] #1204 (saudacao do WhatsApp Business como automatica; conversa.origem, 046; a do portao retroativo fora da Recepcao) e #1205 (janela da conversa na Recepcao + texto exato de cada envio por wamid, 047; restart pela Porta-Acao 10:14); 442 testes. Falta: o 1o texto guardado em producao e devolver o #1205
+[2026-11-02][ATENDE-END] #1223 fechado: tela Custos (Meta/Claude/Gemini por funcao, conferencia diaria com a Meta batendo), precos oficiais na 051, OlivIA e cobranca no inventario; Gemini a provar no primeiro uso
