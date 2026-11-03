@@ -192,6 +192,12 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
             logos.mandar_avisos(con, saida, momento)
     except Exception as falha:  # noqa: BLE001
         print("logos: %s" % type(falha).__name__, flush=True)
+    try:   # #1238: o .ogg transcrito ha mais de 7 dias sai do disco; o texto fica
+        from . import audio
+        with conexao(cfg) as con:
+            audio.limpar(cfg, con, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("audio: limpeza: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #1128: a ficha do frete ao WhatsApp da Logistica do ERP (so dentro das 24 h, sem modelo)
         from . import logistica_erp
         with conexao(cfg) as con:
@@ -254,6 +260,10 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
         t = threading.Thread(target=laco, name="trabalhador", daemon=True) if trabalhador else None
         if t:
             t.start()
+            # #1238: a transcricao de audio de interno, numa thread propria (o motor nunca espera a CPU).
+            # Ela confere `audio.transcrever` a cada volta: desligada, nao carrega modelo nenhum.
+            from . import audio
+            threading.Thread(target=audio.laco, args=(cfg, parar), name="transcritor", daemon=True).start()
         yield
         parar.set()
 
@@ -267,6 +277,9 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 r = con.execute("""SELECT count(*) FILTER (WHERE processado_em IS NULL) AS pendentes,
                                           max(recebido_em) AS ultimo FROM atendimento.eventos_meta""").fetchone()
                 endereco = vigia.estado(con)
+                from . import audio, roteador   # #1238: as duas chaves e a fila da transcricao
+                rot = {"ligado": roteador.ligado(con)}
+                aud = audio.saude(cfg, con)
         except Exception as erro:  # noqa: BLE001
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
@@ -279,6 +292,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 # cala nao ser ela mesma um fracasso silencioso. Zero nao quer dizer desligada: quer
                 # dizer que ninguem esbarrou nela, ou que o servico acabou de subir.
                 "calados": dict(motor.calados),
+                "roteador": rot, "audio": aud,
                 # o nome publico la fora (vigia.py): None = ainda nao conferido
                 "endereco": endereco and {"situacao": endereco["situacao"], "desde": endereco["desde"].isoformat(),
                                           "conferido_em": endereco["conferido_em"].isoformat()}}

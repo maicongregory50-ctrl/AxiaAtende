@@ -29,7 +29,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda, clientes_do_dia, internos, logos, pendencias, roteador, vaga
+from . import agenda, audio, clientes_do_dia, internos, logos, pendencias, roteador, vaga
 from .envio import com_nove, primeiro_nome
 from .saida import MAX_BOTOES, Opcao, Saida
 
@@ -77,6 +77,13 @@ class Documento:
 
 
 @dataclass
+class Audio:
+    """#1238: o audio que veio na mensagem. So o de interno e transcrito (backend/audio.py)."""
+    id: str
+    mime: str = ""
+
+
+@dataclass
 class Entrada:
     """O que a pessoa fez, ja lido do aviso da Meta."""
     wamid: str
@@ -89,6 +96,7 @@ class Entrada:
     anuncio: str | None = None    # #1098: o `referral.source_id` de quem chegou por um anuncio
     enviado_em: datetime | None = None   # #1099: a hora em que a pessoa MANDOU (`msg.timestamp`)
     tipo: str = ""                # o `type` da Meta: text, interactive, button, image, reaction, sticker...
+    audio: Audio | None = None    # #1238: o audio (so o de interno e transcrito)
 
 
 # ── leitura do aviso ────────────────────────────────────────────────────────
@@ -126,6 +134,10 @@ def ler_mensagem(valor: dict, msg: dict) -> Entrada:
             e.documento = Documento(id=d["id"], mime=d.get("mime_type", ""),
                                     nome_arquivo=d.get("filename", "") or "",
                                     legenda=d.get("caption", "") or "")
+    elif tipo == "audio":   # #1238: so o de interno, com `audio.transcrever` ligado, vira texto
+        a = msg.get("audio") or {}
+        if a.get("id"):
+            e.audio = Audio(id=a["id"], mime=a.get("mime_type", "") or "")
     return e
 
 
@@ -788,6 +800,10 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # nao e da equipe, localizacao, contato e documento recebem uma linha curta, nunca as
     # boas-vindas com o menu inteiro -- o menu vem quando a pessoa escrever.
     if e.tipo == "reaction":
+        return
+    # #1238: o audio de quem e da casa, com `audio.transcrever` ligado: baixado e na fila da transcricao,
+    # sem resposta agora (ela vem com o texto). De fora, chave desligada ou download falho: o de sempre.
+    if e.audio is not None and campo is not None and audio.receber(con, saida, e, agora, campo.pasta):
         return
     if not e.texto and not e.toque:
         # quem e da equipe com o canal de campo ligado nao recebe esta linha: o que ele manda e

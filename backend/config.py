@@ -63,6 +63,10 @@ class Config:
     # O material do canal de campo (#970): a foto ou o video que a equipe mandou, baixado da Meta
     # pelo recepcionista (LocalService escreve aqui; o instalar.ps1 da a permissao) e lido pelas telas.
     campo_pasta: Path = Path(r"C:\Dados\AxiaAtende\campo")
+    # #1238: o modelo local de transcricao de audio (faster-whisper large-v3-turbo, 1,6 GB), copiado pelo
+    # dono do cache do perfil dele. Pode ser a pasta do modelo ou a copia inteira do cache do Hugging Face
+    # (com `snapshots\<hash>` dentro): `audio.achar_modelo` acha o `model.bin` nos dois casos.
+    audio_modelo_pasta: Path = Path(r"C:\Dados\AxiaAtende\modelos")
     logs: Path = Path(r"C:\Logs\AxiaAtende")
     tela: Path = RAIZ / "frontend" / "dist"
     cookie_seguro: bool = False
@@ -172,6 +176,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
                                      r"C:\Dados\AxiaAtende\%s\logs" % ambiente)),
             envios_pasta=Path(r"C:\Dados\AxiaAtende\%s\envios" % ambiente),
             campo_pasta=Path(r"C:\Dados\AxiaAtende\%s\campo" % ambiente),
+            audio_modelo_pasta=Path(r"C:\Dados\AxiaAtende\%s\modelos" % ambiente),
         )
     if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
         base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele
