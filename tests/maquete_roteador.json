@@ -1,0 +1,501 @@
+[
+ {
+  "n": 1,
+  "texto": "Ok, recebi",
+  "abertos": [
+   "chamado",
+   "cliente"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nOk, recebi\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 2,
+  "texto": "blz, legal.",
+  "abertos": [
+   "chamado",
+   "cliente"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nblz, legal.\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 3,
+  "texto": "sim, ficou claro, pode seguir",
+  "abertos": [
+   "chamado"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nsim, ficou claro, pode seguir\n</mensagem>",
+   "numeros": [
+    "1"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 4,
+  "texto": "o 1222 pode fechar",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "2",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\no 1222 pode fechar\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 5,
+  "texto": "não entendi a pergunta, qual passo?",
+  "abertos": [
+   "chamado"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nnão entendi a pergunta, qual passo?\n</mensagem>",
+   "numeros": [
+    "1"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 6,
+  "texto": "a resposta é sim, pode publicar",
+  "abertos": [
+   "chamado",
+   "cliente"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\na resposta é sim, pode publicar\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 7,
+  "texto": "ok",
+  "abertos": [
+   "chamado",
+   "cliente",
+   "curriculo"
+  ],
+  "esperado": "chamado",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n3. Currículo de Joana — perguntamos: \"O que ela errou?\" (a triagem) — há 50 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:10 nós: vaga: triagem errada\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nok\n</mensagem>",
+   "numeros": [
+    "1",
+    "2",
+    "3"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 9,
+  "texto": "centeio florindo, lavoura do Arno",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "foto",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\ncenteio florindo, lavoura do Arno\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 10,
+  "texto": "isso é aveia preta, já em semente",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "foto",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nisso é aveia preta, já em semente\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 11,
+  "texto": "a foto é da UBS, ensaque do centeio",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "foto",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\na foto é da UBS, ensaque do centeio\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 12,
+  "texto": "tá verde ainda, perfilhando",
+  "abertos": [
+   "foto",
+   "chamado"
+  ],
+  "esperado": "foto",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\ntá verde ainda, perfilhando\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 13,
+  "texto": "colheitadeira na área do Ivo",
+  "abertos": [
+   "foto"
+  ],
+  "esperado": "foto",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\ncolheitadeira na área do Ivo\n</mensagem>",
+   "numeros": [
+    "1"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 14,
+  "texto": "a Plantagro quer preço do +Palha",
+  "abertos": [
+   "chamado",
+   "cliente",
+   "foto"
+  ],
+  "esperado": "cliente",
+  "numero_esperado": "3",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n3. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\na Plantagro quer preço do +Palha\n</mensagem>",
+   "numeros": [
+    "1",
+    "2",
+    "3"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 15,
+  "texto": "liguei pra ele, vai pensar até sexta",
+  "abertos": [
+   "foto",
+   "cliente"
+  ],
+  "esperado": "cliente",
+  "numero_esperado": "2",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nliguei pra ele, vai pensar até sexta\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 16,
+  "texto": "não atendeu, tento amanhã",
+  "abertos": [
+   "cliente"
+  ],
+  "esperado": "cliente",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n\nA MENSAGEM QUE CHEGOU AGORA (há 40 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nnão atendeu, tento amanhã\n</mensagem>",
+   "numeros": [
+    "1"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 17,
+  "texto": "ele comprou 20 sacos de aveia, pedido 5512",
+  "abertos": [
+   "cliente",
+   "chamado"
+  ],
+  "esperado": "cliente",
+  "numero_esperado": "2",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nele comprou 20 sacos de aveia, pedido 5512\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 18,
+  "texto": "(áudio) o pessoal da Plantagro pediu a proposta por email",
+  "abertos": [
+   "chamado",
+   "logo",
+   "cliente"
+  ],
+  "esperado": "cliente",
+  "numero_esperado": "3",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Logo logo.pdf — perguntamos: \"de qual cliente é a logo?\" — há 20 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n3. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:40 nós: logo: Recebi a logo *logo.pdf*. De qual cliente ela é? Me diga o *nome do cliente*\n\nA MENSAGEM QUE CHEGOU AGORA (há 20 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\n(áudio) o pessoal da Plantagro pediu a proposta por email\n</mensagem>",
+   "numeros": [
+    "1",
+    "2",
+    "3"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 19,
+  "texto": "é da Cooperpasso",
+  "abertos": [
+   "chamado",
+   "logo"
+  ],
+  "esperado": "logo",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Logo logo.pdf — perguntamos: \"de qual cliente é a logo?\" — há 20 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:40 nós: logo: Recebi a logo *logo.pdf*. De qual cliente ela é? Me diga o *nome do cliente*\n\nA MENSAGEM QUE CHEGOU AGORA (há 20 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\né da Cooperpasso\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 20,
+  "texto": "Cooperpasso",
+  "abertos": [
+   "logo",
+   "cliente"
+  ],
+  "esperado": "logo",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Logo logo.pdf — perguntamos: \"de qual cliente é a logo?\" — há 20 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:40 nós: logo: Recebi a logo *logo.pdf*. De qual cliente ela é? Me diga o *nome do cliente*\n\nA MENSAGEM QUE CHEGOU AGORA (há 20 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nCooperpasso\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 21,
+  "texto": "4655",
+  "abertos": [
+   "logo"
+  ],
+  "esperado": "logo",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Logo logo.pdf — perguntamos: \"de qual cliente é a logo?\" — há 20 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:40 nós: logo: Recebi a logo *logo.pdf*. De qual cliente ela é? Me diga o *nome do cliente*\n\nA MENSAGEM QUE CHEGOU AGORA (há 20 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\n4655\n</mensagem>",
+   "numeros": [
+    "1"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 22,
+  "texto": "Agro Real Insumos",
+  "abertos": [
+   "logo",
+   "foto"
+  ],
+  "esperado": "logo",
+  "numero_esperado": "2",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Logo logo.pdf — perguntamos: \"de qual cliente é a logo?\" — há 20 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:40 nós: logo: Recebi a logo *logo.pdf*. De qual cliente ela é? Me diga o *nome do cliente*\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nAgro Real Insumos\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 23,
+  "texto": "não sei o código, é a Copermap",
+  "abertos": [
+   "logo",
+   "chamado"
+  ],
+  "esperado": "logo",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Logo logo.pdf — perguntamos: \"de qual cliente é a logo?\" — há 20 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:40 nós: logo: Recebi a logo *logo.pdf*. De qual cliente ela é? Me diga o *nome do cliente*\n\nA MENSAGEM QUE CHEGOU AGORA (há 20 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nnão sei o código, é a Copermap\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 24,
+  "texto": "ela não viu que a moça mora em Maravilha",
+  "abertos": [
+   "curriculo",
+   "chamado"
+  ],
+  "esperado": "curriculo",
+  "numero_esperado": "2",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Currículo de Joana — perguntamos: \"O que ela errou?\" (a triagem) — há 50 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:10 nós: vaga: triagem errada\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nela não viu que a moça mora em Maravilha\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 25,
+  "texto": "vou almoçar e depois vejo",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "nenhum",
+  "numero_esperado": "nenhum",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nvou almoçar e depois vejo\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 26,
+  "texto": "preciso falar com o Benedito sobre o frete de amanhã",
+  "abertos": [
+   "chamado",
+   "cliente"
+  ],
+  "esperado": "nenhum",
+  "numero_esperado": "nenhum",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n\nA MENSAGEM QUE CHEGOU AGORA (há 30 min depois da última mensagem nossa; sem registro depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\npreciso falar com o Benedito sobre o frete de amanhã\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 27,
+  "texto": "pode ser às 14h a reunião",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "nenhum",
+  "numero_esperado": "nenhum",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n2. Chamado 1222 · Chamado no WhatsApp — esperando a resposta dela; a última nossa: \"Ficou claro o passo 3?\" — há 30 min\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\npode ser às 14h a reunião\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": false
+  }
+ },
+ {
+  "n": 29,
+  "texto": "não, era sobre a foto",
+  "abertos": [
+   "chamado",
+   "foto"
+  ],
+  "esperado": "correcao",
+  "numero_esperado": "1",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — esperando a legenda — há 10 min\n\nA MENSAGEM ANTERIOR DELA (\"trigo na Linha Bonita\") foi encaminhada há 60 s para: Chamado 1222 · Chamado no WhatsApp. Se ela agora diz que foi para o lugar errado, é \"correcao\".\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:30 nós: pendencias: Chamado 1222 · Chamado no WhatsApp — Ficou claro o passo 3?\n09:50 ela: [foto]\n09:50 nós: Recebi.\n09:59 ela: trigo na Linha Bonita\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nnão, era sobre a foto\n</mensagem>",
+   "numeros": [
+    "1"
+   ],
+   "pode_corrigir": true
+  }
+ },
+ {
+  "n": 30,
+  "texto": "era do cliente, não da foto",
+  "abertos": [
+   "foto",
+   "cliente"
+  ],
+  "esperado": "correcao",
+  "numero_esperado": "2",
+  "retrato": {
+   "texto": "ASSUNTOS ABERTOS DELA (o número é o que você responde):\n1. Foto de 09:50 — legenda até aqui: \"Plantagro\" — há 10 min\n2. Cliente PLANTAGRO (Meus clientes) — mandamos a ficha e pedimos: \"Quando falar com ele, me conte aqui como foi.\" — há 40 min\n\nA MENSAGEM ANTERIOR DELA (\"Plantagro\") foi encaminhada há 60 s para: Foto de 09:50. Se ela agora diz que foi para o lugar errado, é \"correcao\".\n\nAS ÚLTIMAS 24 H DELA COM A EMPRESA (a mais antiga primeiro):\n09:20 nós: clientes: Quando falar com ele, me conte aqui como foi.\n09:20 nós: clientes: ficha com link Chamar Junior (PLANTAGRO, Tangará/SC)\n09:50 ela: [foto]\n09:50 nós: Recebi.\n09:59 ela: Plantagro\n\nA MENSAGEM QUE CHEGOU AGORA (há 9 min depois da última mensagem nossa; há 10 min depois da última foto, vídeo, documento ou áudio dela):\n<mensagem>\nera do cliente, não da foto\n</mensagem>",
+   "numeros": [
+    "1",
+    "2"
+   ],
+   "pode_corrigir": true
+  }
+ }
+]
