@@ -27,3 +27,4 @@
 [2026-11-03][ATENDE-END] #1237 janela de 24 h pela hora da mensagem (699d22d), restart recepcionista e backend, entregue e fechado; leitura do dia da DJ AGRO (PDF lido como logo sem resposta, foto catalogada sem legenda, 5 resumos de lote)
 [2026-11-03][ATENDE-END] #1238 a logo pergunta o nome do cliente (859b307, migracao 053, restart dos dois); leitura em sombra da DJ AGRO e o audio (faster-whisper no cache do dono) registrados no chamado
 [2026-11-03][ATENDE-END] #1238 brainstorm (spec ce0cddd, doc 2123) e plano (9004d03, doc 2144) do roteador com contexto + audio local; executa em outra sessao; freio 81eebd0 no ar (foto esperando legenda vence a oferta)
+[2026-11-03][ATENDE-END] #1238 plano ate o passo 16: roteador com contexto + audio local no ar, chaves desligadas; falta o dono (modelo, pip, ensaio real, ligar)
