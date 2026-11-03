@@ -717,8 +717,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # devolve o texto a corrente sem este degrau (`pular_pendencias`), e ai o cliente o recebe como
     # sempre. Sem chamado esperando, `oferecer` devolve False sem chamar a IA e nada muda. A oferta roda
     # UMA vez por mensagem: `ofereceu` impede os degraus de baixo de perguntar a IA de novo.
+    # ...e NAO roda quando ha foto ou video da pessoa esperando o texto dela (03/11, 14:08: a oferta
+    # roubou a legenda de um video mandado 26 s antes). Ai o texto segue para o campo, como sempre.
     ofereceu = False
-    if not pular_pendencias and e.texto and not e.toque:
+    if (not pular_pendencias and e.texto and not e.toque
+            and not (campo is not None and campo.espera_texto(con, p.wa_id, agora))):
         if pendencias.oferecer(con, saida, ia, e, agora):
             return
         ofereceu = True

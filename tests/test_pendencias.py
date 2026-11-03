@@ -324,6 +324,32 @@ def test_com_cliente_aberto_a_olivia_pergunta_antes_e_outro_assunto_devolve_ao_c
     assert [m["estado"] for m in mensagens(ligado, "entrou")] == ["descartada"]
 
 
+def test_foto_esperando_legenda_vence_a_oferta_do_chamado(ligado, tmp_path):
+    """03/11/2026, 14:08: o dono mandou um video e 26 s depois a legenda; a oferta do chamado roubou a
+    legenda. Com foto esperando texto, o texto e da foto, e a oferta nem roda."""
+    from backend import campo as C
+    from tests.avisos_meta import aviso, na_hora
+    from tests.test_campo import ligar
+    _enviada(ligado, [linha(101, "pergunta")])
+    ligar(ligado)
+    with conexao(ligado) as con:
+        con.execute("INSERT INTO atendimento.destinos (nome, whatsapp) VALUES ('Fran', %s)", (FRAN,))
+    s = saida()
+    campo = C.Campo(tmp_path, None)
+    foto = {"from": FRAN_META, "id": "wamid.foto", "type": "image", "image": {"id": "mid-foto", "mime_type": "image/jpeg"}}
+    from backend import recepcionista as R
+    R.gravar(ligado, aviso([na_hora(foto, AGORA)], numero=FRAN_META, bsuid="BR.f"))
+    R.processar_pendentes(ligado, s, None, agora=AGORA, campo=campo)
+    e = motor.Entrada(wamid="wamid.leg", tipo="text", pessoa=motor.Pessoa(bsuid="BR.f", wa_id=FRAN_META, nome="Fran"),
+                      texto="Vistoria pre colheita IPR 89", toque=None, contexto=None)
+    with conexao(ligado) as con:
+        motor.tratar(con, s, IAFalsa(), e, AGORA + timedelta(seconds=26), Envio(), campo)
+    assert not any("É sobre" in x[2] for x in s.enviadas)
+    with conexao(ligado) as con:
+        assert con.execute("SELECT legenda FROM atendimento.material_de_campo ORDER BY id DESC LIMIT 1").fetchone()["legenda"] == "Vistoria pre colheita IPR 89"
+    assert mensagens(ligado, "entrou") == []
+
+
 def test_sem_chamado_esperando_o_cliente_aberto_segue_como_sempre(ligado):
     rid = _cliente_aberto(ligado)
     ia = IAFalsa()

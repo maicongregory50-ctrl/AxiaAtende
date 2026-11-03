@@ -570,6 +570,18 @@ class Campo:
 
     # ── as respostas ─────────────────────────────────────────────────────────
 
+    def espera_texto(self, con, wa_id, agora) -> bool:
+        """Ha foto ou video desta pessoa esperando o texto dela (pergunta pendente, ou conversa aberta
+        que tomaria o texto solto como legenda)? #1238, 03/11/2026: a oferta do chamado roubou a legenda
+        de um video mandado 26 s antes; enquanto o roteador com contexto nao existe, texto de quem tem
+        foto esperando e da foto. E a regra de proximidade na forma mais simples."""
+        if not wa_id or not ligado(con):
+            return False
+        if self._pendente(con, wa_id, agora):
+            return True
+        lider = self._lider(con, wa_id, agora)
+        return bool(lider and lider["fechado_em"] is None)
+
     def _pendente(self, con, wa_id, agora):
         return con.execute("""SELECT * FROM atendimento.material_de_campo
                                WHERE wa_id = %s AND pergunta_pendente IS NOT NULL AND recebido_em > %s
