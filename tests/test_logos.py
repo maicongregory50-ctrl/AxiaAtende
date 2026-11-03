@@ -135,6 +135,40 @@ def test_mais_de_um_cadastro_vira_lista_e_o_toque_escolhe(ligado):
     assert _logos(ligado)[0]["erp_codigo"] == 5895                     # toque velho: engolido
 
 
+def test_varios_codigos_sao_um_grupo_com_a_mesma_logo(ligado):
+    """03/11/2026, 14:55: "4543, 4346, 4344; 4649 e 5010, um grupo economico, logo de todos e essa"."""
+    _sou_da_casa(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, documento("wamid.1"))
+    passo(ligado, s, texto("wamid.2", "4543, 4346, 4344; 4649 e 5010, um grupo economico, logo de todos é essa."),
+          agora=AGORA + timedelta(minutes=1))
+    assert s.ultima[2].startswith("Anotado: a mesma logo para 5 clientes (4543, 4346, 4344, 4649, 5010)")
+    passo(ligado, s, texto("wamid.3", "Sollo"), agora=AGORA + timedelta(minutes=2))
+    linhas = _logos(ligado)
+    assert [l["erp_codigo"] for l in linhas] == [4543, 4346, 4344, 4649, 5010]
+    assert {l["nome_marca"] for l in linhas} == {"Sollo"} and all(l["pergunta_pendente"] is None for l in linhas)
+    assert len({l["sha256"] for l in linhas}) == 1 and len({l["arquivo"] for l in linhas}) == 1
+    with conexao(ligado) as con:
+        assert len(L.a_puxar(con, AGORA + timedelta(minutes=3))) == 5
+
+
+def test_a_logo_esperando_vence_o_cliente_aberto(ligado):
+    """O mesmo caso: a resposta a pergunta da logo nao vira anotacao do cliente aberto em Meus clientes."""
+    _sou_da_casa(ligado)
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.ajustes SET valor = 'true'::jsonb WHERE chave = 'clientes.ligado'")
+        con.execute("""INSERT INTO atendimento.clientes_consultores (wa_id, comercial_id, nome) VALUES (%s, 42, 'Maicon')
+                       ON CONFLICT (wa_id) DO UPDATE SET comercial_id = 42, ativo = true""", (NUMERO,))
+        con.execute("""INSERT INTO atendimento.clientes_registros (wa_id, para, comercial_id, codigo, ficha, criado_em)
+                       VALUES (%s, %s, 42, 4461, '{"nome": "X"}', %s)""", (NUMERO, NUMERO, AGORA - timedelta(minutes=5)))
+    s = SaidaFalsa()
+    passo(ligado, s, documento("wamid.1"))
+    passo(ligado, s, texto("wamid.2", "7322"), agora=AGORA + timedelta(minutes=1))
+    assert s.ultima[2].startswith("Anotado, cliente 7322")
+    with conexao(ligado) as con:
+        assert con.execute("SELECT textos FROM atendimento.clientes_registros").fetchone()["textos"] == ""
+
+
 def test_o_codigo_continua_valendo(ligado):
     _sou_da_casa(ligado)
     _agenda(ligado)

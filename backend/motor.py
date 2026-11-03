@@ -725,6 +725,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         if pendencias.oferecer(con, saida, ia, e, agora):
             return
         ofereceu = True
+    # #1238 (03/11/2026, 14:55): a logo que ESPERA o cliente vence o cliente aberto de Meus clientes --
+    # a resposta "4543, 4346..." a pergunta da logo virou anotacao de contato. A logo perguntou por
+    # ultimo; e a proximidade na forma mais simples, ate o roteador existir. Sem logo esperando, False.
+    if logos.responder(con, saida, e, agora):
+        return
     # #1090 etapa 3: os toques `cli:` e o texto do consultor que tem um cliente ABERTO. Antes do canal
     # de campo, que tomaria o texto como a frase da proxima foto; sem cliente aberto, devolve False e o
     # texto segue para la como sempre.

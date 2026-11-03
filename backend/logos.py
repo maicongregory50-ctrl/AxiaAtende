@@ -42,6 +42,8 @@ FORMATOS = {"application/pdf": "pdf", "image/svg+xml": "svg", "svg": "svg",
 RECEBI = ("Recebi a logo{arquivo}. De qual cliente ela é? Me diga o *nome do cliente* (ou o código dele "
           "no ERP, se souber).")
 PERGUNTA_MARCA = ("Anotado, cliente {codigo}. E o *nome da marca*, como ela deve aparecer na arte?")
+PERGUNTA_MARCA_GRUPO = ("Anotado: a mesma logo para {n} clientes ({codigos}). E o *nome da marca*, como ela "
+                        "deve aparecer na arte?")
 PERGUNTA_MARCA_NOME = ("Anotado: *{nome}* ({codigo}). E o *nome da marca*, como ela deve aparecer na arte?")
 QUAL_DESTES = "Achei mais de um cadastro para *{dito}*. Qual é?"
 NAO_ACHEI = ("Não achei *{dito}* no cadastro. Me diga o nome como está no sistema, ou o código do "
@@ -192,9 +194,9 @@ def responder(con, saida, e, agora: datetime) -> bool:
         return False
 
     if linha["pergunta_pendente"] == "erp_codigo":
-        so_numero = re.fullmatch(r"\D*(\d{1,9})\D*", texto)
-        if so_numero:   # o codigo continua valendo para quem o souber
-            _cliente_escolhido(con, saida, e.pessoa.para, linha["id"], int(so_numero.group(1)), None)
+        codigos = [int(c) for c in re.findall(r"\d{3,9}", texto)]
+        if codigos:   # o codigo continua valendo para quem o souber -- e VARIOS codigos sao um grupo (dono, 03/11)
+            _cliente_escolhido(con, saida, e.pessoa.para, linha["id"], codigos[0], None, codigos[1:], linha)
             return True
         # #1238: o NOME do cliente, resolvido pela agenda do ERP
         achados = clientes_por_nome(con, texto)
@@ -222,18 +224,36 @@ def responder(con, saida, e, agora: datetime) -> bool:
                (MUITOS if achados else NAO_ACHEI).format(dito=texto[:60]))
         return True
 
-    # nome_marca: o que a pessoa escrever vale, e o dialogo termina aqui
+    # nome_marca: o que a pessoa escrever vale, e o dialogo termina aqui. Vale tambem para as copias do
+    # grupo economico (mesmo wamid com ":<codigo>"): uma marca, varios clientes.
     con.execute("""UPDATE atendimento.logos_de_cliente
                       SET nome_marca = %s, pergunta_pendente = NULL, completada_em = %s
-                    WHERE id = %s""", (texto[:120], agora, linha["id"]))
+                    WHERE id = %s OR wamid LIKE %s""", (texto[:120], agora, linha["id"], linha["wamid"] + ":%"))
     _dizer(con, saida, e.pessoa.para, GUARDADA.format(marca=texto[:120]))
     return True
 
 
-def _cliente_escolhido(con, saida, para, logo_id: int, codigo: int, nome: str | None) -> None:
+def _cliente_escolhido(con, saida, para, logo_id: int, codigo: int, nome: str | None,
+                       outros: list[int] | None = None, linha=None) -> None:
     con.execute("""UPDATE atendimento.logos_de_cliente
                       SET erp_codigo = %s, pergunta_pendente = 'nome_marca', insistiu = false
                     WHERE id = %s""", (codigo, logo_id))
+    outros = [c for c in dict.fromkeys(outros or []) if c != codigo]
+    if outros and linha is not None:
+        # #1238 (dono, 03/11/2026): "um grupo economico, logo de todos e essa". Uma logo, varios clientes:
+        # uma linha por cliente, com o MESMO arquivo, para o marketing cadastrar uma parceira por codigo.
+        # So a primeira pergunta a marca; a resposta vale para as copias (wamid "<original>:<codigo>").
+        for c in outros:
+            con.execute("""INSERT INTO atendimento.logos_de_cliente
+                               (bsuid, wa_id, enviada_por, wamid, nome_arquivo, arquivo, sha256, mime, formato,
+                                erp_codigo, nome_marca, pergunta_pendente, recebida_em, erro, cliente_dito)
+                           SELECT bsuid, wa_id, enviada_por, wamid || ':' || %s, nome_arquivo, arquivo, sha256, mime,
+                                  formato, %s, '', NULL, recebida_em, erro, cliente_dito
+                             FROM atendimento.logos_de_cliente WHERE id = %s
+                           ON CONFLICT (wamid) DO NOTHING""", (str(c), c, logo_id))
+        _dizer(con, saida, para, PERGUNTA_MARCA_GRUPO.format(n=len(outros) + 1,
+                                                         codigos=", ".join(str(c) for c in [codigo] + outros)))
+        return
     _dizer(con, saida, para, PERGUNTA_MARCA_NOME.format(nome=nome, codigo=codigo) if nome
            else PERGUNTA_MARCA.format(codigo=codigo))
 
