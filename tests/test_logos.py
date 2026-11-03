@@ -85,12 +85,63 @@ def test_a_logo_fica_guardada_sem_o_codigo(ligado):
     s = SaidaFalsa()
     passo(ligado, s, documento("wamid.1"))
     passo(ligado, s, texto("wamid.2", "nao sei agora"), agora=AGORA + timedelta(minutes=1))
-    assert "Não achei um código" in s.ultima[2]
+    assert "Não achei *nao sei agora*" in s.ultima[2]
     passo(ligado, s, texto("wamid.3", "nao sei mesmo"), agora=AGORA + timedelta(minutes=2))
     assert "guardada" in s.ultima[2]
     linha = _logos(ligado)[0]
     assert linha["erp_codigo"] is None and linha["pergunta_pendente"] is None   # guardada, nao perdida
     assert linha["arquivo"] is not None or linha["erro"] != ""
+
+
+def _agenda(cfg):
+    """Tres cadastros do ERP, como a agenda os guarda (#1238: a logo resolve o cliente pelo nome)."""
+    with conexao(cfg) as con:
+        for i, (codigo, nome) in enumerate([(4686, "AGRO BEDIN"), (5895, "AGRO PASTO"), (7322, "AGRO CALIFÓRNIA")]):
+            con.execute("""INSERT INTO atendimento.agenda (numero, codigo, nome, papeis, contato_setor, contato_nome)
+                           VALUES (%s, %s, %s, ARRAY['cliente'], '', '')""", ("55499900000%d" % i, codigo, nome))
+        con.execute("INSERT INTO atendimento.agenda_leitura (linhas) VALUES (3)")
+
+
+def test_o_nome_do_cliente_resolve_o_codigo(ligado):
+    """#1238 (dono, 03/11/2026): pedir o codigo ficou ruim. O nome, sem acento e sem caixa, resolve."""
+    _sou_da_casa(ligado)
+    _agenda(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, documento("wamid.1"))
+    assert "*nome do cliente*" in s.ultima[2]
+    passo(ligado, s, texto("wamid.2", "agro california"), agora=AGORA + timedelta(minutes=1))
+    assert s.ultima[2].startswith("Anotado: *AGRO CALIFÓRNIA* (7322)")
+    passo(ligado, s, texto("wamid.3", "Califórnia Sementes"), agora=AGORA + timedelta(minutes=2))
+    linha = _logos(ligado)[0]
+    assert (linha["erp_codigo"], linha["nome_marca"], linha["cliente_dito"]) == (7322, "Califórnia Sementes", "agro california")
+    assert linha["pergunta_pendente"] is None
+
+
+def test_mais_de_um_cadastro_vira_lista_e_o_toque_escolhe(ligado):
+    from tests.avisos_meta import toque
+    _sou_da_casa(ligado)
+    _agenda(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, documento("wamid.1"))
+    passo(ligado, s, texto("wamid.2", "agro"), agora=AGORA + timedelta(minutes=1))
+    tipo, _, pergunta, opcoes = s.ultima
+    assert tipo == "lista" and "mais de um cadastro" in pergunta
+    assert [o[1] for o in opcoes] == ["AGRO BEDIN", "AGRO CALIFÓRNIA", "AGRO PASTO"]
+    lid = _logos(ligado)[0]["id"]
+    passo(ligado, s, toque("wamid.3", "logo:cli:%d:5895" % lid, lista=True), agora=AGORA + timedelta(minutes=2))
+    assert s.ultima[2].startswith("Anotado: *AGRO PASTO* (5895)")
+    assert _logos(ligado)[0]["erp_codigo"] == 5895
+    passo(ligado, s, toque("wamid.4", "logo:cli:%d:4686" % lid, lista=True), agora=AGORA + timedelta(minutes=3))
+    assert _logos(ligado)[0]["erp_codigo"] == 5895                     # toque velho: engolido
+
+
+def test_o_codigo_continua_valendo(ligado):
+    _sou_da_casa(ligado)
+    _agenda(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, documento("wamid.1"))
+    passo(ligado, s, texto("wamid.2", "código 7322"), agora=AGORA + timedelta(minutes=1))
+    assert s.ultima[2].startswith("Anotado, cliente 7322")
 
 
 def test_pede_menu_escapa_da_pergunta_e_a_logo_fica(ligado):

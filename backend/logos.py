@@ -36,13 +36,20 @@ from .campo import JANELA, ultima_mensagem_de
 FORMATOS = {"application/pdf": "pdf", "image/svg+xml": "svg", "svg": "svg",
             "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg"}
 
-RECEBI = ("Recebi a logo{arquivo}. De qual cliente ela é? Me diga o *código dele no ERP* — é por ele "
-          "que o marketing liga a parceira (o nome não serve).")
+# #1238 (dono, 03/11/2026, lendo o dia da DJ AGRO): pedir o CODIGO ficou ruim -- quem manda a logo sabe o
+# nome do cliente, nao o numero. A pergunta pede o nome, o cadastro (a agenda do ERP que o Atende ja
+# tem) resolve o codigo, e o codigo continua valendo para quem o souber.
+RECEBI = ("Recebi a logo{arquivo}. De qual cliente ela é? Me diga o *nome do cliente* (ou o código dele "
+          "no ERP, se souber).")
 PERGUNTA_MARCA = ("Anotado, cliente {codigo}. E o *nome da marca*, como ela deve aparecer na arte?")
+PERGUNTA_MARCA_NOME = ("Anotado: *{nome}* ({codigo}). E o *nome da marca*, como ela deve aparecer na arte?")
+QUAL_DESTES = "Achei mais de um cadastro para *{dito}*. Qual é?"
+NAO_ACHEI = ("Não achei *{dito}* no cadastro. Me diga o nome como está no sistema, ou o código do "
+             "cliente; se não souber agora, deixo a logo guardada e alguém completa depois.")
+MUITOS = ("*{dito}* bate com muitos cadastros. Me diga um nome mais completo, ou o código do cliente.")
+LIMITE_LISTA = 10          # a lista interativa da Meta tem ate 10 linhas
 GUARDADA = ("Pronto: a logo de {marca} está guardada. A *autorização de uso* é na tela Parceiras — "
             "sem ela nenhuma arte sai com a marca do cliente, e eu não autorizo nada por aqui.")
-SEM_CODIGO = ("Não achei um código aí. Me diga só os números do código do cliente no ERP; se não "
-              "souber agora, deixo a logo guardada e alguém completa depois.")
 GUARDADA_SEM_CLIENTE = ("Deixei a logo guardada sem o cliente. Ela não se perde: alguém completa "
                         "depois, na tela Parceiras.")
 # #1037: o que o marketing fez com ela, dito a quem mandou (so dentro das 24 h)
@@ -82,6 +89,29 @@ def _formato(mime: str, nome_arquivo: str) -> str | None:
         return f
     ext = (nome_arquivo or "").rsplit(".", 1)[-1].lower()
     return ext if ext in ("pdf", "svg", "png", "jpg") else None
+
+
+def _chave(texto: str) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode().lower()
+    return " ".join(re.sub(r"[^a-z0-9 ]", " ", t).split())
+
+
+def clientes_por_nome(con, dito: str) -> list[dict]:
+    """Os cadastros da agenda cujo nome contem TODAS as palavras ditas (sem acento, sem caixa). Nome
+    exato vence: se algum bate inteiro, so ele volta. Sem papel: a logo pode ser de qualquer parceiro."""
+    chave = _chave(dito)
+    palavras = chave.split()
+    if not palavras:
+        return []
+    achados, exatos = {}, {}
+    for r in con.execute("SELECT DISTINCT codigo, nome FROM atendimento.agenda ORDER BY nome").fetchall():
+        nome = _chave(r["nome"])
+        if nome == chave:
+            exatos[r["codigo"]] = dict(r)
+        elif all(p in nome for p in palavras):
+            achados[r["codigo"]] = dict(r)
+    return list(exatos.values()) if exatos else list(achados.values())
 
 
 def pendente(con, bsuid: str):
@@ -147,6 +177,9 @@ def responder(con, saida, e, agora: datetime) -> bool:
     `campo.responder`, para nao roubar a resposta de uma pergunta de foto que ja estava aberta.
     """
     texto = (e.texto or "").strip()
+    toque = e.toque or ""
+    if toque.startswith("logo:cli:"):
+        return _toque_cliente(con, saida, e, toque)
     if not texto or e.toque:
         return False
     linha = pendente(con, e.pessoa.bsuid)
@@ -159,21 +192,34 @@ def responder(con, saida, e, agora: datetime) -> bool:
         return False
 
     if linha["pergunta_pendente"] == "erp_codigo":
-        digitos = re.sub(r"\D", "", texto)
-        if not digitos or len(digitos) > 9:
-            if linha["insistiu"]:
-                con.execute("""UPDATE atendimento.logos_de_cliente
-                                  SET pergunta_pendente = NULL WHERE id = %s""", (linha["id"],))
-                _dizer(con, saida, e.pessoa.para, GUARDADA_SEM_CLIENTE)
-                return True
-            con.execute("UPDATE atendimento.logos_de_cliente SET insistiu = true WHERE id = %s",
-                        (linha["id"],))
-            _dizer(con, saida, e.pessoa.para, SEM_CODIGO)
+        so_numero = re.fullmatch(r"\D*(\d{1,9})\D*", texto)
+        if so_numero:   # o codigo continua valendo para quem o souber
+            _cliente_escolhido(con, saida, e.pessoa.para, linha["id"], int(so_numero.group(1)), None)
             return True
-        con.execute("""UPDATE atendimento.logos_de_cliente
-                          SET erp_codigo = %s, pergunta_pendente = 'nome_marca', insistiu = false
-                        WHERE id = %s""", (int(digitos), linha["id"]))
-        _dizer(con, saida, e.pessoa.para, PERGUNTA_MARCA.format(codigo=int(digitos)))
+        # #1238: o NOME do cliente, resolvido pela agenda do ERP
+        achados = clientes_por_nome(con, texto)
+        con.execute("UPDATE atendimento.logos_de_cliente SET cliente_dito = %s WHERE id = %s",
+                    (texto[:120], linha["id"]))
+        if len(achados) == 1:
+            _cliente_escolhido(con, saida, e.pessoa.para, linha["id"], achados[0]["codigo"], achados[0]["nome"])
+            return True
+        if 1 < len(achados) <= LIMITE_LISTA:
+            from .saida import Opcao
+            w = saida.lista(e.pessoa.para, QUAL_DESTES.format(dito=texto[:60]), "Escolher",
+                            [Opcao("logo:cli:%d:%d" % (linha["id"], a["codigo"]), a["nome"][:24], a["nome"][24:96])
+                             for a in achados])
+            con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
+                           VALUES (%s, %s, 'lista', %s) ON CONFLICT (wamid) DO NOTHING""",
+                        (w, e.pessoa.para, ("logo: qual destes: " + texto)[:200]))
+            return True
+        if linha["insistiu"]:
+            con.execute("""UPDATE atendimento.logos_de_cliente
+                              SET pergunta_pendente = NULL WHERE id = %s""", (linha["id"],))
+            _dizer(con, saida, e.pessoa.para, GUARDADA_SEM_CLIENTE)
+            return True
+        con.execute("UPDATE atendimento.logos_de_cliente SET insistiu = true WHERE id = %s", (linha["id"],))
+        _dizer(con, saida, e.pessoa.para,
+               (MUITOS if achados else NAO_ACHEI).format(dito=texto[:60]))
         return True
 
     # nome_marca: o que a pessoa escrever vale, e o dialogo termina aqui
@@ -181,6 +227,30 @@ def responder(con, saida, e, agora: datetime) -> bool:
                       SET nome_marca = %s, pergunta_pendente = NULL, completada_em = %s
                     WHERE id = %s""", (texto[:120], agora, linha["id"]))
     _dizer(con, saida, e.pessoa.para, GUARDADA.format(marca=texto[:120]))
+    return True
+
+
+def _cliente_escolhido(con, saida, para, logo_id: int, codigo: int, nome: str | None) -> None:
+    con.execute("""UPDATE atendimento.logos_de_cliente
+                      SET erp_codigo = %s, pergunta_pendente = 'nome_marca', insistiu = false
+                    WHERE id = %s""", (codigo, logo_id))
+    _dizer(con, saida, para, PERGUNTA_MARCA_NOME.format(nome=nome, codigo=codigo) if nome
+           else PERGUNTA_MARCA.format(codigo=codigo))
+
+
+def _toque_cliente(con, saida, e, toque: str) -> bool:
+    """`logo:cli:<logo>:<codigo>`: a escolha na lista "Qual e?". Toque velho ou de outra pessoa: engole."""
+    partes = toque.split(":")
+    if len(partes) != 4 or not (partes[2].isdigit() and partes[3].isdigit()):
+        return True
+    linha = con.execute("""SELECT * FROM atendimento.logos_de_cliente
+                            WHERE id = %s AND bsuid = %s AND pergunta_pendente = 'erp_codigo'""",
+                        (int(partes[2]), e.pessoa.bsuid)).fetchone()
+    if not linha:
+        return True
+    codigo = int(partes[3])
+    nome = con.execute("SELECT nome FROM atendimento.agenda WHERE codigo = %s LIMIT 1", (codigo,)).fetchone()
+    _cliente_escolhido(con, saida, e.pessoa.para, linha["id"], codigo, nome["nome"] if nome else None)
     return True
 
 
@@ -194,7 +264,7 @@ def a_puxar(con, agora: datetime) -> list[dict]:
     """
     return [dict(r) for r in con.execute(
         """SELECT id, enviada_por, nome_arquivo, arquivo IS NOT NULL AS tem_arquivo, sha256, formato,
-                  erp_codigo, nome_marca, recebida_em, erro
+                  erp_codigo, nome_marca, cliente_dito, recebida_em, erro
              FROM atendimento.logos_de_cliente
             WHERE puxada_em IS NULL AND (pergunta_pendente IS NULL OR recebida_em < %s)
             ORDER BY id""", (agora - ABANDONADA,)).fetchall()]
