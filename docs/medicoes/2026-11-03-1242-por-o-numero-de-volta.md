@@ -5,6 +5,24 @@ O que a leitura das 17:43 mostrou (`tmp\numero_meta_2026-11-03_1743.txt`): a con
 (WABA 1442233593867052) é sua, verificada e aprovada, mas está **sem número nenhum**; o número antigo
 (id 725888737278277) não existe mais; o app "Direct Opa! Suite" continua inscrito no webhook da conta.
 
+## Os links diretos (montados com os ids lidos da sua conta)
+
+Portfólio (Business ID) **571906881636731** · conta do WhatsApp (WABA) **1442233593867052** · app
+**AxiaAtende** 1136509615470343. Se um link abrir outra tela, siga o caminho de menu escrito ao lado.
+
+| Para quê | Link |
+|---|---|
+| A conta do WhatsApp nas Configurações do negócio (abas Parceiros, Usuários, Apps; renomear) | https://business.facebook.com/settings/whatsapp-business-accounts/1442233593867052?business_id=571906881636731 |
+| Parceiros do portfólio (o Opa/IXC, se estiver como parceiro) | https://business.facebook.com/settings/partners?business_id=571906881636731 |
+| Usuários do sistema | https://business.facebook.com/settings/system-users?business_id=571906881636731 |
+| Apps conectados ao portfólio (o "Direct Opa! Suite") | https://business.facebook.com/settings/apps?business_id=571906881636731 |
+| WhatsApp Manager → Números de telefone (adicionar o número, verificação, PIN) | https://business.facebook.com/wa/manage/phone-numbers/?business_id=571906881636731&waba_id=1442233593867052 |
+| WhatsApp Manager → visão geral da conta (qualidade, limites, nome) | https://business.facebook.com/wa/manage/home/?business_id=571906881636731&waba_id=1442233593867052 |
+| WhatsApp Manager → Modelos de mensagem (conferir que continuam aprovados) | https://business.facebook.com/wa/manage/message-templates/?business_id=571906881636731&waba_id=1442233593867052 |
+| App AxiaAtende → WhatsApp → Configuração da API (registrar o número, se ficar Desconectado) | https://developers.facebook.com/apps/1136509615470343/whatsapp-business/wa-dev-console/ |
+| App AxiaAtende → WhatsApp → Configuração (webhook e campos inscritos) | https://developers.facebook.com/apps/1136509615470343/whatsapp-business/wa-settings/ |
+| Verificação do negócio / Central de segurança | https://business.facebook.com/settings/security?business_id=571906881636731 |
+
 ## 0. Antes de começar (10 min)
 
 - Entrar em `business.facebook.com` com uma conta que seja **administradora do portfólio** Sementes
