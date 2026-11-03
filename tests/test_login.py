@@ -74,4 +74,4 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
                               "045_informativo_so_ola.sql", "046_origem_da_conversa.sql",
                               "047_texto_do_envio.sql", "048_status_do_dia.sql",
                               "049_aviso_auditoria_estoque.sql", "050_custos.sql", "051_precos_oficiais.sql",
-                              "052_pendencias.sql"]
+                              "052_pendencias.sql", "053_logo_pelo_nome.sql", "054_roteador_e_audio.sql"]
