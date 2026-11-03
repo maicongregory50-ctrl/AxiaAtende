@@ -259,7 +259,8 @@ def test_toque_de_outro_numero_nao_mexe(ligado):
 
 
 def test_sem_citar_a_olivia_propoe_e_a_pessoa_confirma(ligado):
-    _enviada(ligado, [linha(101, "pergunta")])
+    # dois chamados esperando: e a OlivIA quem escolhe (com um so, a pergunta sai sem ela)
+    _enviada(ligado, [linha(101, "pergunta"), linha(102, "pergunta", demanda=351, titulo="Outro chamado")])
     pid = pendencia(ligado)["id"]
     ia = IAFalsa()
     ia.pendencia = pid
@@ -297,7 +298,7 @@ def test_com_cliente_aberto_a_olivia_pergunta_antes_e_outro_assunto_devolve_ao_c
     chega(ligado, s, texto="Ok, recebi", ia=ia)
     tipo, _, texto, botoes = s.enviadas[-1]
     assert tipo == "botoes" and texto.startswith("É sobre o Chamado 350")   # a oferta veio antes do cliente
-    assert len(ia.pendencias_vistas) == 1                                   # e a IA foi perguntada UMA vez
+    assert getattr(ia, "pendencias_vistas", []) == []                       # um chamado so: sem IA
     with conexao(ligado) as con:
         assert con.execute("SELECT textos FROM atendimento.clientes_registros WHERE id = %s", (rid,)).fetchone()["textos"] == ""
     chega(ligado, s, toque=botoes[2][0])                                    # Outro assunto: o texto volta a corrente
@@ -316,13 +317,25 @@ def test_sem_chamado_esperando_o_cliente_aberto_segue_como_sempre(ligado):
         assert con.execute("SELECT textos FROM atendimento.clientes_registros WHERE id = %s", (rid,)).fetchone()["textos"] == "Junior quer preços"
 
 
-def test_nenhuma_segue_a_corrente_de_sempre(ligado):
+def test_com_um_chamado_so_a_pergunta_sai_sem_ia(ligado):
+    """03/11/2026: a OlivIA disse "nenhuma" a um "blz, legal." com um chamado so esperando. Com um, nao ha
+    o que escolher: pergunta direto, e sem IA nenhuma (ia=None) tambem."""
     _enviada(ligado, [linha(101, "pergunta")])
+    s = saida()
+    chega(ligado, s, texto="blz, legal.", ia=None)
+    tipo, _, texto, botoes = s.enviadas[-1]
+    assert tipo == "botoes" and texto == "É sobre o Chamado 350 · Auditoria de estoque?"
+    chega(ligado, s, toque=botoes[2][0])                                    # Outro assunto
+    assert [m["estado"] for m in mensagens(ligado, "entrou")] == ["descartada"]
+
+
+def test_nenhuma_segue_a_corrente_de_sempre(ligado):
+    _enviada(ligado, [linha(101, "pergunta"), linha(102, "pergunta", demanda=351, titulo="Outro chamado")])
     ia = IAFalsa()                       # pendencia = None: "nenhuma"
     ia.resposta = None
     s = saida()
     chega(ligado, s, texto="preciso de um boleto", ia=ia)
-    assert ia.pendencias_vistas and mensagens(ligado, "entrou") == []
+    assert sorted(ia.pendencias_vistas[0]) == [1, 2] and mensagens(ligado, "entrou") == []   # a IA viu as duas
     assert not any("É sobre" in x[2] for x in s.enviadas)               # seguiu o caminho de hoje
 
 

@@ -314,18 +314,25 @@ def tratar(con, saida, e, agora: datetime):
 
 
 def oferecer(con, saida, ia, e, agora: datetime) -> bool:
-    """O degrau no lugar do pega-tudo: texto SEM citar de quem tem pendencia esperando. A OlivIA propoe
-    uma (lista fechada, ou "nenhuma") e a pessoa confirma. "Nenhuma", ou IA fora: False, e a corrente
-    segue como hoje."""
-    if ia is None or not e.texto or e.toque or not ligado(con):
+    """O degrau no lugar do pega-tudo: texto SEM citar de quem tem pendencia esperando. Com UMA
+    pendencia esperando nao ha o que escolher: a pergunta "E sobre o ...?" sai direto, sem IA (prova de
+    03/11/2026: a OlivIA respondeu "nenhuma" a um "blz, legal." e o texto caiu no cliente aberto). Com
+    duas ou mais, a OlivIA propoe uma (lista fechada, ou "nenhuma") e a pessoa confirma. "Nenhuma", ou
+    IA fora: False, e a corrente segue como hoje. O botao "Outro assunto" e a saida nos dois casos."""
+    if not e.texto or e.toque or not ligado(con):
         return False
     pend = _pendencias_da_pessoa(con, e.pessoa.wa_id or "")
     if not pend:
         return False
-    escolhida = ia.escolher_pendencia(e.texto, [{"id": p["id"], "rotulo": rotulo(p)} for p in pend])
-    p = next((x for x in pend if x["id"] == escolhida), None)
-    if not p:
-        return False
+    if len(pend) == 1:
+        p = pend[0]
+    else:
+        if ia is None:
+            return False
+        escolhida = ia.escolher_pendencia(e.texto, [{"id": p["id"], "rotulo": rotulo(p)} for p in pend])
+        p = next((x for x in pend if x["id"] == escolhida), None)
+        if not p:
+            return False
     mid = _entrou(con, p["id"], "resposta", e.texto, estado="escolher")
     w = saida.botoes(e.pessoa.para, "É sobre o %s?" % rotulo(p),
                      [Opcao("pend:sim:%d" % mid, "Sim"), Opcao("pend:lista:%d" % mid, "Outro chamado"),

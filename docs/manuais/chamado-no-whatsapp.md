@@ -24,8 +24,9 @@ alguma coisa a você.
 4. Se é **a entrega** ("já está no ar"), teste e toque:
    - **Ficou bom**: o chamado fecha, em seu nome;
    - **Não ficou bom**: escreva em uma linha o que falta. O chamado volta para ajuste.
-5. Se você escrever **sem deslizar** e tiver pergunta ou entrega esperando, a OlivIA pergunta
-   *"É sobre o Chamado 1217 · ...?"*:
+5. Se você escrever **sem deslizar** e tiver pergunta ou entrega esperando, o sistema pergunta
+   *"É sobre o Chamado 1217 · ...?"* (com um chamado só esperando, pergunta direto; com dois ou mais,
+   a OlivIA escolhe o mais provável e pergunta):
    - **Sim**: entra no chamado;
    - **Outro chamado**: aparece a lista dos seus chamados que esperam resposta;
    - **Outro assunto**: segue o atendimento de sempre (o menu da casa, a foto do campo).
