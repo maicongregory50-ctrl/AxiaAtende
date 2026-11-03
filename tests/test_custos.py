@@ -224,3 +224,17 @@ def test_a_051_traz_os_precos_oficiais_e_a_virada_do_gemini(cfg):
     assert float(precos[("meta", "utility", d(2026, 10, 1))]["por_mensagem"]) == 0.0068
     assert float(precos[("gemini", "gemini-3.8-flash", d(2027, 1, 1))]["por_milhao_saida"]) == 7.50
     assert all(p["criado_por"] is None for p in precos.values())
+
+
+def test_o_transcritor_local_aparece_com_custo_zero_e_a_duracao(cfg):
+    """#1238: o audio transcrito na maquina conta audios e minutos, pelo preco zero da 054."""
+    from backend.rotas_custos import montar
+    with conexao(cfg) as con:
+        for segundos in (30, 90):
+            con.execute("""INSERT INTO atendimento.uso_ia (em, origem, servico, funcao, modelo, entrada, saida)
+                           VALUES ('2026-11-03 10:00-03', 'axiaatende', 'local', 'audio',
+                                   'faster-whisper-large-v3-turbo', %s, 100)""", (segundos,))
+        d = montar(con, date(2026, 11, 1), date(2026, 12, 1))
+    l = next(x for x in d["linhas"] if x["servico"] == "local")
+    assert (l["funcao"], l["quantidade"], l["unidade"], l["entrada"], l["valor"], l["sem_preco"]) == \
+        ("audio", 2, "áudios", 120, 0.0, 0)

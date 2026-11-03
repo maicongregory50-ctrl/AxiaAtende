@@ -75,7 +75,7 @@ SELECT u.servico, u.funcao, u.modelo, u.entrada, u.saida, u.origem,
 
 
 class Preco(BaseModel):
-    servico: str = Field(pattern="^(meta|claude|gemini)$")
+    servico: str = Field(pattern="^(meta|claude|gemini|local)$")   # local: o transcritor de audio (#1238)
     item: str = Field(min_length=1, max_length=80)
     vale_desde: date
     por_mensagem: Decimal | None = Field(default=None, ge=0)
@@ -127,9 +127,10 @@ def montar(con, inicio: date, fim: date) -> dict:
             valor = None
         else:
             valor = (Decimal(r["entrada"]) * r["por_milhao_entrada"] + Decimal(r["saida"]) * r["por_milhao_saida"]) / 1_000_000
+        # #1238: o transcritor local conta AUDIOS, e a `entrada` dele e a duracao em segundos (mede CPU, nao dinheiro)
         _soma(linhas, (r["servico"], r["funcao"], r["modelo"], r["origem"]), 1, valor, r["moeda"],
               {"servico": r["servico"], "funcao": r["funcao"], "item": r["modelo"], "fonte": r["origem"],
-               "unidade": "chamadas", "entrada": 0, "saida": 0})
+               "unidade": "áudios" if r["servico"] == "local" else "chamadas", "entrada": 0, "saida": 0})
         l = linhas[(r["servico"], r["funcao"], r["modelo"], r["origem"])]
         l["entrada"] += r["entrada"]
         l["saida"] += r["saida"]
@@ -190,7 +191,7 @@ def rotas(cfg, usuario) -> APIRouter:
             itens = {"meta": [x["c"] for x in con.execute(
                          """SELECT DISTINCT corpo->'pricing'->>'category' AS c FROM atendimento.eventos_meta
                              WHERE tipo = 'status' AND (corpo->'pricing'->>'billable')::boolean ORDER BY 1""")],
-                     "claude": [], "gemini": []}
+                     "claude": [], "gemini": [], "local": []}
             for x in con.execute("SELECT DISTINCT servico, modelo FROM atendimento.uso_ia ORDER BY 2"):
                 itens[x["servico"]].append(x["modelo"])
         return {"precos": linhas, "itens": itens}

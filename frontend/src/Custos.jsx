@@ -4,7 +4,8 @@
 import React, { useEffect, useState } from 'react'
 import { mandar, pegar } from './api.js'
 
-const SERVICO = { meta: 'Meta (WhatsApp)', claude: 'Claude (OlivIA)', gemini: 'Gemini (Marketing)' }
+const SERVICO = { meta: 'Meta (WhatsApp)', claude: 'Claude (OlivIA)', gemini: 'Gemini (Marketing)',
+                  local: 'Na máquina (áudio)' }   // #1238: o transcritor local, custo zero
 const FUNCAO = {
   convite: 'Convite da carteira', direta: 'Comunicação direta', reabertura: 'Reabertura dos avisos',
   curriculo: 'Currículo para a Fran', sem_funcao: 'sem função',
@@ -15,6 +16,7 @@ const FUNCAO = {
   aviso_auditoria_estoque: 'Aviso: auditoria de estoque',
   triagem: 'OlivIA · triagem do motivo', campo: 'OlivIA · material de campo', visita: 'OlivIA · registro de visita',
   pendencia: 'OlivIA · de qual chamado é a resposta',
+  roteador: 'OlivIA · assunto da mensagem da equipe', audio: 'Transcrição de áudio da equipe',
   edicao: 'Edição de imagem', olhar_foto: 'Olhar sobre a foto',
 }
 const FONTE = { resumo: 'pelo resumo', nenhum: '', registro: '', axiaatende: '', axiamarketing: '' }
@@ -68,7 +70,8 @@ function Precos({ voltar }) {
     <>
       <div className="filtros"><button className="secundario" onClick={voltar}>← Voltar aos custos</button></div>
       <p className="sub">Preço novo é linha nova: o antigo continua valendo para os dias de antes. Meta: valor por
-        mensagem, na categoria que a Meta cobra. Claude e Gemini: valor por milhão de tokens.</p>
+        mensagem, na categoria que a Meta cobra. Claude e Gemini: valor por milhão de tokens. Na máquina: zero (o
+        modelo roda aqui; a linha existe para a duração aparecer).</p>
       {erro && <p className="aviso erro">{erro}</p>}
       {ok && <p className="aviso ok">{ok}</p>}
       <form className="filtros" onSubmit={lancar}>
@@ -159,7 +162,9 @@ export default function Custos() {
                           {FONTE[l.fonte] && <span className="selo estado-cancelada">{FONTE[l.fonte]}</span>}</td>
                         <td>{l.item}</td>
                         <td>{l.quantidade} {l.unidade}{l.unidade === 'chamadas' &&
-                          <span className="leve"> · {l.entrada.toLocaleString('pt-BR')} / {l.saida.toLocaleString('pt-BR')} tokens</span>}</td>
+                          <span className="leve"> · {l.entrada.toLocaleString('pt-BR')} / {l.saida.toLocaleString('pt-BR')} tokens</span>}
+                          {l.servico === 'local' &&
+                          <span className="leve"> · {Math.round(l.entrada / 60).toLocaleString('pt-BR')} min de áudio</span>}</td>
                         <td><Valor l={l} /></td>
                       </tr>))}
                   </tbody>

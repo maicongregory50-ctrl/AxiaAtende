@@ -19,7 +19,7 @@ quanto ela pesa. A aba some para qualquer outro login.
 ## O caminho comum
 
 1. Abrir **Custos** no menu à esquerda.
-2. Escolher o mês nas setas (abre no mês corrente). Os três cartões do alto dão o total de cada serviço.
+2. Escolher o mês nas setas (abre no mês corrente). Os cartões do alto dão o total de cada serviço.
 3. Ler a tabela: uma linha por função, com o serviço, o item (a categoria que a Meta cobrou, ou o modelo
    de IA), a quantidade (mensagens ou chamadas, com os tokens) e o valor.
 4. Na Meta, descer até **Calculado × cobrado, por dia** e comparar o valor calculado aqui com o que a
@@ -41,6 +41,15 @@ quanto ela pesa. A aba some para qualquer outro login.
 
 Só é preciso lançar preço quando a Meta ou o Google mudarem a tabela, ou quando aparecer um modelo novo
 como "sem preço" (o nome na tela é o que o Google devolveu; lance com esse nome).
+
+**Duas funções da equipe** (#1238, 03/11/2026), que só aparecem depois de ligadas:
+
+- **OlivIA · assunto da mensagem da equipe** (Claude): quando alguém da casa escreve no WhatsApp sem
+  responder a uma mensagem e tem algum assunto em andamento, a OlivIA lê a conversa e decide de que assunto
+  a mensagem fala. É uma chamada por mensagem, de centavos por mês.
+- **Transcrição de áudio da equipe** (cartão **Na máquina (áudio)**): o áudio da equipe vira texto aqui,
+  no servidor, sem serviço pago. O valor é **zero de verdade**, não "sem preço". A quantidade é de áudios, e
+  ao lado vão os **minutos de áudio** transcritos, que mostram quanto o servidor trabalhou.
 
 ## O que significa cada sinal
 
