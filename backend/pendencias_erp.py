@@ -63,13 +63,16 @@ def receber(con, linhas: list[dict], agora: datetime) -> int:
     return novas
 
 
-def _a_entregar(con) -> list[dict]:
+def _a_entregar(con, agora: datetime) -> list[dict]:
+    # #1238: a resposta que o roteador encaminhou espera a carencia (`entregar_apos`) -- e o tempo da
+    # correcao escrita. Nula (citacao, botao, tudo o que ja existia) vai na volta seguinte, como sempre.
     return [dict(r) for r in con.execute(
         """SELECT m.id, m.classe, m.texto, m.resultado, p.referencia, p.para_whatsapp
              FROM atendimento.pendencias_mensagens m
              JOIN atendimento.pendencias p ON p.id = m.pendencia_id
             WHERE m.sentido = 'entrou' AND m.estado = 'a_entregar' AND p.tipo = 'chamado'
-            ORDER BY m.id""").fetchall()]
+              AND (m.entregar_apos IS NULL OR m.entregar_apos <= %s)
+            ORDER BY m.id""", (agora,)).fetchall()]
 
 
 def conferir(con, demandas: list[dict], agora: datetime) -> int:
@@ -112,7 +115,7 @@ def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=
         with con.transaction():   # o cursor so anda junto com o que foi gravado
             novas = receber(con, r["linhas"], agora) if isinstance(cursor, int) else 0
             _gravar_cursor(con, r["cursor"])
-        entregar = _a_entregar(con)
+        entregar = _a_entregar(con, agora)
         esperando = [int(x["referencia"]) for x in con.execute(
             "SELECT DISTINCT referencia FROM atendimento.pendencias WHERE tipo = 'chamado' AND espera IS NOT NULL"
         ).fetchall()]

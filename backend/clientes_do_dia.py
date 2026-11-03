@@ -96,6 +96,12 @@ def _aberto(con, wa_id: str, agora: datetime):
                            ORDER BY id DESC LIMIT 1""", (wa_id, agora - VIVO)).fetchone()
 
 
+def aberto(con, wa_id: str | None, agora: datetime):
+    """#1238: o cliente aberto do consultor, para o retrato do roteador (so leitura). None sem consultor."""
+    c = consultor(con, wa_id)
+    return _aberto(con, c["wa_id"], agora) if c else None
+
+
 # ── a ficha ──────────────────────────────────────────────────────────────────
 
 def _data_br(v) -> str:

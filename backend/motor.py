@@ -29,7 +29,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import agenda, clientes_do_dia, internos, logos, pendencias, vaga
+from . import agenda, clientes_do_dia, internos, logos, pendencias, roteador, vaga
 from .envio import com_nove, primeiro_nome
 from .saida import MAX_BOTOES, Opcao, Saida
 
@@ -684,6 +684,14 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         if p.wa_id and com_nove(p.wa_id) == com_nove(e.toque.partition(":")[2]):
             pendencias.soltar_agora(con, saida, p.wa_id, agora)   # #1222: o chamado que esperava o Ver
         return
+    # #1238: os botoes da duvida do roteador ("E sobre ...?", a lista dos assuntos). "Outro assunto"
+    # devolve o texto guardado, e a corrente roda de novo sem o roteador e sem a oferta do chamado.
+    if e.toque and e.toque.startswith("rot:"):
+        r = roteador.tocar(con, saida, ia, e, agora, campo)
+        if isinstance(r, str):
+            tratar(con, saida, ia, replace(e, texto=r, toque=None, contexto=None), agora, envio, campo,
+                   pular_pendencias=True)
+        return
     # #1222: o chamado no WhatsApp, no TOPO da corrente -- a resposta CITADA a uma mensagem de
     # pendencia, os toques `pend:` e o motivo do "Nao ficou bom" nao tem duvida, e nenhum filtro
     # abaixo pode toma-los (o texto de interno viraria a legenda da proxima foto). "Outro assunto"
@@ -704,6 +712,16 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
                 soltos += envio.soltar_guardados(con, saida, com_nove(p.wa_id), agora)
             if soltos:
                 return
+    # #1238: o ROTEADOR com contexto por contato. So com a chave ligada, para interno, texto sem citar e
+    # sem toque (a citacao ja foi resolvida acima, sem duvida), e sem o "bom dia" que pede o menu da casa.
+    # A foto ou o video de ate 2 min com o grupo aberto vence antes de perguntar a OlivIA (spec). Sem
+    # assunto aberto, ou "nenhum" com um assunto so, a corrente de baixo segue como sempre.
+    if (not pular_pendencias and e.texto and not e.toque and not e.contexto and roteador.ligado(con)
+            and not internos.pede_menu(e.texto) and internos.e_interno(con, p.wa_id)):
+        if campo is not None and roteador.foto_primeiro(con, saida, e, agora, campo):
+            return
+        if roteador.aplicar(con, saida, ia, e, agora, campo):
+            return
     # #1098: o retorno da Fran sobre a triagem vem ANTES do canal de campo -- ela e "da casa", e o
     # comentario dela depois de "Triagem errada" viraria a frase da proxima foto. A conversa de vaga
     # vem antes tambem: o PDF do candidato nao e logo, e a foto dele nao e material de campo.

@@ -188,11 +188,12 @@ def _pendencias_da_pessoa(con, numero: str, so_esperando: bool = True) -> list[d
 
 
 def _entrou(con, pendencia_id: int, classe: str, texto: str, estado: str = "a_entregar",
-            resultado: str | None = None) -> int:
+            resultado: str | None = None, entregar_apos: datetime | None = None) -> int:
+    # `entregar_apos` (#1238): a carencia da correcao escrita. Nula = as telas levam na volta seguinte.
     return con.execute("""INSERT INTO atendimento.pendencias_mensagens
-                              (pendencia_id, sentido, classe, texto, estado, resultado)
-                          VALUES (%s, 'entrou', %s, %s, %s, %s) RETURNING id""",
-                       (pendencia_id, classe, texto[:4000], estado, resultado)).fetchone()["id"]
+                              (pendencia_id, sentido, classe, texto, estado, resultado, entregar_apos)
+                          VALUES (%s, 'entrou', %s, %s, %s, %s, %s) RETURNING id""",
+                       (pendencia_id, classe, texto[:4000], estado, resultado, entregar_apos)).fetchone()["id"]
 
 
 def _responder(con, saida, para, texto, resumo):
@@ -200,18 +201,28 @@ def _responder(con, saida, para, texto, resumo):
     _enviada(con, w, para, "texto", resumo)
 
 
-def _anotar_resposta(con, saida, para, p, texto, agora) -> None:
-    _entrou(con, p["id"], "resposta", texto)
+def _anotar_resposta(con, saida, para, p, texto, agora, entregar_apos: datetime | None = None) -> int:
+    mid = _entrou(con, p["id"], "resposta", texto, entregar_apos=entregar_apos)
     con.execute("""UPDATE atendimento.pendencias SET espera = CASE WHEN espera = 'resposta' THEN NULL ELSE espera END,
                           ultima_em = %s WHERE id = %s""", (agora, p["id"]))
     _responder(con, saida, para, "Anotado no %s. ✓" % rotulo(p).split(" · ")[0].lower(),
                "pendencia %d: anotado" % p["id"])
+    return mid
+
+
+# #1238: a porta do roteador -- o texto que a OlivIA encaminhou a um chamado entra como a resposta citada
+# entraria, com a carencia da correcao escrita (`entregar_apos`). Devolve o id da mensagem que entrou.
+anotar_resposta = _anotar_resposta
+pendencias_da_pessoa = _pendencias_da_pessoa
 
 
 def _pendencia(con, pid: int, numero: str):
     """A pendencia, so se for DESTE numero: um toque de outro numero nao mexe no assunto de ninguem."""
     p = con.execute("SELECT * FROM atendimento.pendencias WHERE id = %s", (pid,)).fetchone()
     return dict(p) if p and p["para_whatsapp"] == com_nove(numero) else None
+
+
+pendencia = _pendencia   # #1238: o roteador confere o dono do chamado pelo mesmo caminho do toque
 
 
 def _lista_de_escolha(con, saida, para, numero, mid) -> None:

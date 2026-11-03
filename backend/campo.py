@@ -582,6 +582,25 @@ class Campo:
         lider = self._lider(con, wa_id, agora)
         return bool(lider and lider["fechado_em"] is None)
 
+    def foto_agora(self, con, wa_id, agora, ate: timedelta = timedelta(minutes=2)):
+        """#1238: a foto ou o video desta pessoa chegou ha ate `ate` e o grupo esta aberto -- o texto que vem
+        agora e dele, antes de o roteador perguntar a OlivIA (a spec: "foto esperando legenda vence tudo em
+        ate 2 minutos"; e o caso mais frequente e o mais caro de errar). Devolve o lider, ou None."""
+        if not wa_id or not ligado(con):
+            return None
+        lider = self._lider(con, wa_id, agora)
+        if not lider or lider["fechado_em"] is not None:
+            return None
+        ultima = con.execute("SELECT max(recebido_em) AS em FROM atendimento.material_de_campo WHERE grupo_id = %s",
+                             (lider["grupo_id"],)).fetchone()["em"]
+        return lider if ultima is not None and agora - ultima <= ate else None
+
+    def aplicar_texto(self, con, saida, e, agora: datetime) -> bool:
+        """#1238: o texto que o roteador encaminhou a foto aberta. E o mesmo caminho do texto solto e da
+        resposta a pergunta pendente (`responder`), sem toque e sem citacao -- nada muda no que ele faz."""
+        from dataclasses import replace
+        return self.responder(con, saida, replace(e, toque=None, contexto=None), agora)
+
     def _pendente(self, con, wa_id, agora):
         return con.execute("""SELECT * FROM atendimento.material_de_campo
                                WHERE wa_id = %s AND pergunta_pendente IS NOT NULL AND recebido_em > %s
@@ -846,6 +865,19 @@ class Campo:
                 con.execute("UPDATE atendimento.material_de_campo SET %s = %%s, %s = %%s WHERE id = %%s"
                             % (campo, carimbo), (estado, agora, r["id"]))
         return feitos
+
+
+def assunto_aberto(con, wa_id: str | None, agora: datetime):
+    """#1238: a foto ou o video desta pessoa com conversa aberta (pergunta pendente, ou grupo aberto que
+    tomaria o texto solto como legenda), para o retrato do roteador. So leitura; None sem nada aberto."""
+    if not wa_id or not ligado(con):
+        return None
+    c = Campo(Path("."))
+    r = c._pendente(con, wa_id, agora)
+    if r:
+        return c._linha(con, r["grupo_id"]) or r
+    lider = c._lider(con, wa_id, agora)
+    return lider if lider and lider["fechado_em"] is None else None
 
 
 def ultima_mensagem_de(con, wa_id: str | None) -> datetime | None:
