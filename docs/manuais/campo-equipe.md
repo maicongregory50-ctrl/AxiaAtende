@@ -21,6 +21,11 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
    Quem está no piloto do Relacionamento vê também **📋 Meus clientes** (#1090, 23/10/2026; manual
    `meus-clientes.md`). Enquanto um cliente seu estiver aberto ali, o que você escreve é sobre ele, e
    não a frase da próxima foto; depois do Confere, do Depois ou do Parar, volta a ser.
+   **Com mais de um assunto aberto** (#1238; manual `roteador.md`) — uma foto esperando a legenda, um
+   chamado esperando a sua resposta, um cliente aberto —, o sistema lê a conversa e leva o texto ao
+   assunto de que ele fala; na dúvida, pergunta com botões. A frase escrita **até dois minutos depois
+   da foto** continua sendo dela, sem pergunta. Entrou no lugar errado? Escreva *"não, era sobre a
+   foto"* e ele corrige.
    A primeira opção só explica o que está escrito abaixo; a segunda mostra o atendimento que o
    cliente recebe, que é por onde se pega o contato de um colega. Antes desta data, um "oi" seu
    trazia o menu de **cliente**.

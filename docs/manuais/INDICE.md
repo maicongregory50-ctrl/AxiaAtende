@@ -10,6 +10,7 @@
 | [trabalhe-conosco.md](trabalhe-conosco.md) | o Trabalhe conosco: o candidato que chega pelo anúncio da vaga, o currículo só em PDF, a pré-triagem que vai à Fran um a um, "Triagem certa / errada" e os 12 meses (#1098) |
 | [leitura-da-sessao.md](leitura-da-sessao.md) | para a sessão e o dono: ler o que aconteceu numa conversa do WhatsApp, o canal de campo da semana e as últimas conversas, pelo papel só-leitura do banco; onde cada leitura fica registrada (#981) |
 | [chamado-no-whatsapp.md](chamado-no-whatsapp.md) | para quem abre chamado: o que chega ao WhatsApp (aviso, pergunta, entrega), responder deslizando a mensagem, Ficou bom / Não ficou bom, a OlivIA perguntando de qual chamado é, o WhatsApp no cadastro do usuário (#1222) |
+| [roteador.md](roteador.md) | para a equipe: escrever no WhatsApp da empresa sem deslizar e o sistema entender o assunto (o chamado, a foto, o cliente do dia, a logo, o currículo), a correção escrita ("não, era sobre a foto"), a dúvida por botão, e o áudio transcrito na máquina (#1238) |
 | [custos.md](custos.md) | os Custos, só para o dono: quanto cada função paga por uso custa no mês (Meta, Claude da OlivIA, Gemini do Marketing), o calculado × cobrado da Meta, "sem preço" e "sem função", e o lançamento de preços (#1223) |
 
 ---

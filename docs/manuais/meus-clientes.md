@@ -26,6 +26,9 @@ entre uma visita e outra.
 3. Depois de falar, conte aqui **por escrito**, do seu jeito, em uma ou mais mensagens:
    *"liguei pro Márcio, vão querer +Palha e aveia no inverno, passo lá dia 5 com preço"*.
    A OlivIA responde **"Recebi."** e espera você parar de escrever (meio minuto).
+   Se você tiver outro assunto aberto ao mesmo tempo (um chamado esperando resposta, uma foto
+   esperando a legenda), o sistema lê de qual deles a mensagem fala (#1238; manual `roteador.md`): o
+   nome do cliente na frase ajuda. Entrou no lugar errado? Escreva *"isso era do cliente"*.
 4. Se faltar alguma coisa, ela pergunta com botões, uma por vez: **como foi** (visita, ligação,
    WhatsApp), **se ofereceu a campanha**, **a resposta**, e, em recusa, **o motivo**.
 5. Vem o cartão **"Confere?"** com o registro montado. Toque **✅ Confere**. Em seguida vem
@@ -53,7 +56,9 @@ entre uma visita e outra.
 
 - **Não grava nada sem o seu Confere.**
 - **Não manda nada ao cliente:** quem fala com ele é você.
-- **Não entende áudio, foto nem print** nesta primeira versão (vem na segunda).
+- **Não entende foto nem print** nesta primeira versão. O **áudio** passa a valer como texto quando a
+  transcrição da equipe estiver ligada (#1238): ele vira *"(áudio) …"* e entra como se você tivesse
+  escrito.
 - **Não muda o responsável nem a fila:** a ordem é a do Relacionamento.
 - **Não chama você sozinha de manhã:** por enquanto, a conversa abre quando você escreve.
 

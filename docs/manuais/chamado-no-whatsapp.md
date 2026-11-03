@@ -24,12 +24,15 @@ alguma coisa a você.
 4. Se é **a entrega** ("já está no ar"), teste e toque:
    - **Ficou bom**: o chamado fecha, em seu nome;
    - **Não ficou bom**: escreva em uma linha o que falta. O chamado volta para ajuste.
-5. Se você escrever **sem deslizar** e tiver pergunta ou entrega esperando, o sistema pergunta
-   *"É sobre o Chamado 1217 · ...?"* (com um chamado só esperando, pergunta direto; com dois ou mais,
-   a OlivIA escolhe o mais provável e pergunta):
+5. Se você escrever **sem deslizar** e tiver pergunta ou entrega esperando, **quando estiver claro de
+   que assunto você fala, a resposta entra direto no chamado** e volta **"Anotado no chamado 1217. ✓"**
+   (#1238; manual `roteador.md`). Ela espera alguns minutos antes de ir ao sistema: se entrou no lugar
+   errado, escreva na sequência *"não, era sobre a foto"* e o sistema tira do chamado. Na dúvida, ele
+   pergunta *"É sobre o Chamado 1217 · ...?"*:
    - **Sim**: entra no chamado;
-   - **Outro chamado**: aparece a lista dos seus chamados que esperam resposta;
+   - **Ver os assuntos** (ou **Outro chamado**): aparece a lista dos seus assuntos abertos;
    - **Outro assunto**: segue o atendimento de sempre (o menu da casa, a foto do campo).
+   Enquanto o roteador estiver desligado, vale o de antes: o sistema sempre pergunta.
 
 ## 4. O que significa cada sinal
 
@@ -52,7 +55,8 @@ quê (por exemplo, o número não é o de quem abriu o chamado).
 ## 5. O que esta função NÃO faz
 
 - Não abre chamado novo pelo WhatsApp: para isso, continue usando o sistema.
-- Não lê áudio, foto ou arquivo como resposta de chamado: só texto e os botões.
+- Não lê foto ou arquivo como resposta de chamado: só texto, os botões e, para a equipe, o **áudio**
+  transcrito na máquina (#1238, quando a transcrição estiver ligada).
 - Não manda aviso fora de hora por conta própria: o que é só aviso espera você escrever para a empresa.
 - Não manda o detalhe técnico: só a parte do comentário escrita para quem pediu.
 
@@ -66,5 +70,7 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
 - A chave `pendencias.ligado` (em `atendimento.ajustes`) liga e desliga tudo. Desligada, nada sai e
   nenhuma resposta é tomada; o atendimento volta a ser o de antes.
 - `pendencias.juntar_minutos` (10) é quanto tempo a junção espera a rajada acabar.
+- `roteador.ligado` e `roteador.carencia_minutos` (3): a resposta sem deslizar que entra direto, e a
+  espera antes de ir ao ERP (manual `roteador.md`).
 - A volta das telas traz do ERP a cada minuto e leva as respostas; o recepcionista manda e lê.
 - Resposta que o ERP recusa fica com o erro na tela Envios; não é tentada de novo.
