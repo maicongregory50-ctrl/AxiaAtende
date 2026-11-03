@@ -266,3 +266,45 @@ def test_cada_metodo_anota_a_sua_funcao(cfg):
                              " ORDER BY id").fetchall()
     assert [l["funcao"] for l in linhas] == ["campo", "curriculo", "visita"]
     assert all(l["origem"] == "axiaatende" and l["servico"] == "claude" and l["entrada"] == 812 for l in linhas)
+
+
+# ── #1238: o roteador de assunto da equipe ──────────────────────────────────────────────────────
+
+RETRATO = {"texto": "Assuntos abertos:\n1. Chamado 1222\n2. Foto de 14:08\n\nMensagem:\n<mensagem>\nok recebi\n</mensagem>",
+           "numeros": ["1", "2"], "pode_corrigir": False}
+
+
+def test_rotear_devolve_o_destino_da_lista_e_anota_o_uso():
+    uso = []
+    c = ClienteFalso(resposta('{"destino": "1", "confianca": "alta", "sinal": "proximidade", "destino_certo": "nenhum"}'))
+    c.resposta.usage = SimpleNamespace(input_tokens=900, output_tokens=20)
+    r = IAmod.IA(cliente=c, registrar=lambda *a: uso.append(a)).rotear(RETRATO)
+    assert r == {"destino": "1", "confianca": "alta", "sinal": "proximidade", "destino_certo": "nenhum"}
+    p = c.pedidos[0]
+    assert p["max_tokens"] == 128 and "tools" not in p
+    assert p["output_config"]["format"]["schema"]["properties"]["destino"]["enum"] == ["1", "2", "nenhum"]
+    assert uso == [("roteador", "claude-haiku-5-5", 900, 20)]
+
+
+def test_rotear_so_oferece_correcao_quando_pode():
+    c = ClienteFalso(resposta('{"destino": "correcao", "confianca": "alta", "sinal": "correcao", "destino_certo": "2"}'))
+    r = IAmod.IA(cliente=c).rotear(dict(RETRATO, pode_corrigir=True))
+    assert r["destino"] == "correcao" and r["destino_certo"] == "2"
+    assert "correcao" in c.pedidos[0]["output_config"]["format"]["schema"]["properties"]["destino"]["enum"]
+    sem = ClienteFalso(resposta('{"destino": "correcao", "confianca": "alta", "sinal": "correcao", "destino_certo": "2"}'))
+    assert IAmod.IA(cliente=sem).rotear(RETRATO)["destino"] == "nenhum"
+
+
+@pytest.mark.parametrize("r", [
+    resposta('{"destino": "7", "confianca": "alta", "sinal": "nomeado", "destino_certo": "nenhum"}'),
+    resposta("isto nao e json"),
+    resposta('{"destino": "1", "confianca": "alta", "sinal": "nomeado", "destino_certo": "nenhum"}', stop="refusal"),
+])
+def test_rotear_fora_da_lista_vira_nenhum(r):
+    assert IAmod.IA(cliente=ClienteFalso(r)).rotear(RETRATO)["destino"] == "nenhum"
+
+
+def test_rotear_erro_ou_tempo_vira_nenhum_e_sem_assunto_nem_pergunta():
+    assert IAmod.IA(cliente=ClienteFalso(erro=TimeoutError())).rotear(RETRATO)["destino"] == "nenhum"
+    c = ClienteFalso(resposta('{"destino": "1"}'))
+    assert IAmod.IA(cliente=c).rotear(dict(RETRATO, numeros=[]))["destino"] == "nenhum" and c.pedidos == []

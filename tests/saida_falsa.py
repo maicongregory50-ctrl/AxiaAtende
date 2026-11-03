@@ -103,6 +103,18 @@ class IAFalsa:
             raise TimeoutError("a IA demorou")
         return getattr(self, "triagem", None)
 
+    def rotear(self, retrato):
+        """#1238: `self.roteador` e o dicionario devolvido (ou uma lista, um por chamada); `self.retratos`
+        guarda o que ela viu. Sem `roteador`, "nenhum"."""
+        self.retratos = getattr(self, "retratos", []) + [retrato]
+        nenhum = {"destino": "nenhum", "confianca": None, "sinal": "nenhum", "destino_certo": "nenhum"}
+        if self.falha:
+            return nenhum
+        r = getattr(self, "roteador", None)
+        if isinstance(r, list):
+            r = r.pop(0) if r else None
+        return dict(nenhum, **r) if r else nenhum
+
     def escolher_pendencia(self, texto, pendencias):
         """#1222: `self.pendencia` e o id devolvido (None = "nenhuma")."""
         self.pendencias_vistas = getattr(self, "pendencias_vistas", []) + [[p["id"] for p in pendencias]]
