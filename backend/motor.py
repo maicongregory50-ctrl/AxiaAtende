@@ -711,6 +711,17 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         return
     if vaga.tratar(con, saida, ia, e, agora):
         return
+    # #1222 (prova de 03/11/2026): quem tinha chamado esperando resposta E um cliente aberto escrevia sem
+    # citar, e o cliente aberto tomava o texto como anotacao de contato antes de a OlivIA perguntar de
+    # qual chamado era. Com chamado esperando, a oferta vem ANTES do cliente aberto; "Outro assunto"
+    # devolve o texto a corrente sem este degrau (`pular_pendencias`), e ai o cliente o recebe como
+    # sempre. Sem chamado esperando, `oferecer` devolve False sem chamar a IA e nada muda. A oferta roda
+    # UMA vez por mensagem: `ofereceu` impede os degraus de baixo de perguntar a IA de novo.
+    ofereceu = False
+    if not pular_pendencias and e.texto and not e.toque:
+        if pendencias.oferecer(con, saida, ia, e, agora):
+            return
+        ofereceu = True
     # #1090 etapa 3: os toques `cli:` e o texto do consultor que tem um cliente ABERTO. Antes do canal
     # de campo, que tomaria o texto como a frase da proxima foto; sem cliente aberto, devolve False e o
     # texto segue para la como sempre.
@@ -734,11 +745,12 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         if logos.responder(con, saida, e, agora):
             return
         # #1222: no lugar do pega-tudo -- quem tem chamado esperando resposta e escreveu sem citar
-        if not pular_pendencias and pendencias.oferecer(con, saida, ia, e, agora):
+        # (desde 03/11 a oferta ja rodou acima, antes do cliente aberto; aqui so se ainda nao rodou)
+        if not pular_pendencias and not ofereceu and pendencias.oferecer(con, saida, ia, e, agora):
             return
         if campo.texto_de_interno(con, saida, e, agora):
             return
-    elif not pular_pendencias and pendencias.oferecer(con, saida, ia, e, agora):
+    elif not pular_pendencias and not ofereceu and pendencias.oferecer(con, saida, ia, e, agora):
         return
     # #1189: o CLIENTE da carteira que escreve vai ao representante e ao menu dele, nunca ao fluxo
     # geral. Depois do canal de campo e dos clientes do dia (que sao da equipe) e antes de tudo o que

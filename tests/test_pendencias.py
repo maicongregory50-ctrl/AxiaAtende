@@ -273,6 +273,49 @@ def test_sem_citar_a_olivia_propoe_e_a_pessoa_confirma(ligado):
     assert [m["estado"] for m in mensagens(ligado, "entrou")] == ["descartada", "a_entregar"]
 
 
+def _cliente_aberto(cfg):
+    """O consultor do piloto com um cliente ABERTO ha pouco (clientes_do_dia), no mesmo numero da Fran."""
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.ajustes SET valor = 'true'::jsonb WHERE chave = 'clientes.ligado'")
+        con.execute("""INSERT INTO atendimento.clientes_consultores (wa_id, comercial_id, nome) VALUES (%s, 42, 'Fran')
+                       ON CONFLICT (wa_id) DO UPDATE SET comercial_id = 42, ativo = true""", (FRAN,))
+        con.execute("""INSERT INTO atendimento.clientes_registros (wa_id, para, comercial_id, codigo, ficha, criado_em)
+                       VALUES (%s, %s, 42, 4461, '{"nome": "COOPERPASSO"}', %s)""",
+                    (FRAN, FRAN_META, AGORA - timedelta(minutes=30)))
+        return con.execute("SELECT * FROM atendimento.clientes_registros ORDER BY id DESC LIMIT 1").fetchone()["id"]
+
+
+def test_com_cliente_aberto_a_olivia_pergunta_antes_e_outro_assunto_devolve_ao_cliente(ligado):
+    """A prova de 03/11/2026: o dono tinha o #1222 esperando resposta e um cliente aberto em Meus clientes;
+    o "Ok, recebi" sem citar virou anotacao de contato e a OlivIA nunca foi perguntada."""
+    _enviada(ligado, [linha(101, "pergunta")])
+    pid = pendencia(ligado)["id"]
+    rid = _cliente_aberto(ligado)
+    ia = IAFalsa()
+    ia.pendencia = pid
+    s = saida()
+    chega(ligado, s, texto="Ok, recebi", ia=ia)
+    tipo, _, texto, botoes = s.enviadas[-1]
+    assert tipo == "botoes" and texto.startswith("É sobre o Chamado 350")   # a oferta veio antes do cliente
+    assert len(ia.pendencias_vistas) == 1                                   # e a IA foi perguntada UMA vez
+    with conexao(ligado) as con:
+        assert con.execute("SELECT textos FROM atendimento.clientes_registros WHERE id = %s", (rid,)).fetchone()["textos"] == ""
+    chega(ligado, s, toque=botoes[2][0])                                    # Outro assunto: o texto volta a corrente
+    with conexao(ligado) as con:
+        assert con.execute("SELECT textos FROM atendimento.clientes_registros WHERE id = %s", (rid,)).fetchone()["textos"] == "Ok, recebi"
+    assert [m["estado"] for m in mensagens(ligado, "entrou")] == ["descartada"]
+
+
+def test_sem_chamado_esperando_o_cliente_aberto_segue_como_sempre(ligado):
+    rid = _cliente_aberto(ligado)
+    ia = IAFalsa()
+    s = saida()
+    chega(ligado, s, texto="Junior quer preços", ia=ia)
+    assert getattr(ia, 'pendencias_vistas', []) == []                                     # a IA nem foi perguntada
+    with conexao(ligado) as con:
+        assert con.execute("SELECT textos FROM atendimento.clientes_registros WHERE id = %s", (rid,)).fetchone()["textos"] == "Junior quer preços"
+
+
 def test_nenhuma_segue_a_corrente_de_sempre(ligado):
     _enviada(ligado, [linha(101, "pergunta")])
     ia = IAFalsa()                       # pendencia = None: "nenhuma"
