@@ -138,6 +138,42 @@ def _rotulo_link(ficha: dict) -> str:
     return r if len(r) <= LIMITE_LINK else "Chamar no WhatsApp"
 
 
+
+# ── o que Meus clientes manda fica em `enviadas` (#1236, 03/11/2026) ─────────
+# Na prova do #1222 o texto do dono foi parar aqui e o log de saida ficou em branco: este fluxo era o
+# unico que mandava pela Saida sem registrar. Sem o registro a tela Envios e a leitura da sessao nao
+# veem a conversa, e o status da Meta (entregue, lida) nao tem onde pousar. Mesmo molde do canal de
+# campo (#981) e do chamado (#1222). O link e gravado como `texto`: o CHECK da tabela nao tem `link`.
+
+def _enviada(con, w, para, tipo, resumo):
+    con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (wamid) DO NOTHING""", (w, para, tipo, (resumo or "")[:200]))
+
+
+def _texto(con, saida, para, texto):
+    w = saida.texto(para, texto)
+    _enviada(con, w, para, "texto", "clientes: " + texto)
+    return w
+
+
+def _botoes(con, saida, para, texto, opcoes):
+    w = saida.botoes(para, texto, opcoes)
+    _enviada(con, w, para, "botoes", "clientes: " + texto)
+    return w
+
+
+def _lista(con, saida, para, texto, botao, opcoes):
+    w = saida.lista(para, texto, botao, opcoes)
+    _enviada(con, w, para, "lista", "clientes: " + texto)
+    return w
+
+
+def _link(con, saida, para, texto, rotulo, url):
+    w = saida.link(para, texto, rotulo, url)
+    _enviada(con, w, para, "texto", "clientes: ficha com link " + rotulo)
+    return w
+
+
 def proximo(con, saida, c: dict, para: str, agora: datetime) -> bool:
     """Manda a ficha do proximo cliente (ou repete a do que esta aberto). False: nao havia cliente."""
     hoje = _hoje(agora)
@@ -145,7 +181,7 @@ def proximo(con, saida, c: dict, para: str, agora: datetime) -> bool:
     fila = con.execute("SELECT * FROM atendimento.clientes_fila WHERE comercial_id = %s ORDER BY posicao",
                        (c["comercial_id"],)).fetchall()
     if not fila:
-        saida.texto(para, SEM_FILA)
+        _texto(con, saida, para, SEM_FILA)
         return False
     feitos = {r["codigo"] for r in con.execute(
         """SELECT codigo FROM atendimento.clientes_registros
@@ -160,7 +196,7 @@ def proximo(con, saida, c: dict, para: str, agora: datetime) -> bool:
                     (c["wa_id"], agora - VIVO))
         livre = next((f for f in fila if f["codigo"] not in feitos), None)
         if livre is None:
-            saida.texto(para, ACABOU)
+            _texto(con, saida, para, ACABOU)
             return False
         reg = con.execute("""INSERT INTO atendimento.clientes_registros (wa_id, para, comercial_id, codigo, ficha, criado_em)
                              VALUES (%s, %s, %s, %s, %s, %s) RETURNING *""",
@@ -170,10 +206,10 @@ def proximo(con, saida, c: dict, para: str, agora: datetime) -> bool:
     texto = texto_da_ficha(ficha, ja + 1, max(len(fila), ja + 1))
     url = (ficha.get("contato") or {}).get("link_whatsapp")
     if url:
-        saida.link(para, texto, _rotulo_link(ficha), url)
+        _link(con, saida, para, texto, _rotulo_link(ficha), url)
     else:
-        saida.texto(para, texto)
-    saida.botoes(para, ME_CONTE, [Opcao("cli:depois:%d" % reg["id"], "⏭ Depois"),
+        _texto(con, saida, para, texto)
+    _botoes(con, saida, para, ME_CONTE, [Opcao("cli:depois:%d" % reg["id"], "⏭ Depois"),
                                   Opcao("cli:parar:%d" % reg["id"], "🛑 Parar por hoje")])
     return True
 
@@ -182,7 +218,7 @@ def do_menu(con, saida, pessoa, conversa, no, agora: datetime) -> None:
     """O toque em "📋 Meus clientes" (acao `clientes` do menu da casa)."""
     c = consultor(con, pessoa.wa_id)
     if not c:
-        saida.texto(pessoa.para, SEM_LIBERACAO)
+        _texto(con, saida, pessoa.para, SEM_LIBERACAO)
         return
     proximo(con, saida, c, pessoa.para, agora)
 
@@ -215,7 +251,7 @@ def tratar(con, saida, ia, e, agora: datetime) -> bool:
                       SET textos = %s, ultimo_texto_em = %s, lido = false, estado = 'aberto', pergunta = NULL
                     WHERE id = %s""", (textos[:4000], agora, reg["id"]))
     if primeiro or reg["estado"] == "conferir":
-        saida.texto(para, RECEBI)
+        _texto(con, saida, para, RECEBI)
     return True
 
 
@@ -239,17 +275,17 @@ def _toque(con, saida, ia, c: dict, para: str, toque: str, agora: datetime) -> N
         proximo(con, saida, c, para, agora)
     elif acao == "parar" and vivo:
         con.execute("UPDATE atendimento.clientes_registros SET estado = 'descartado' WHERE id = %s", (reg["id"],))
-        saida.texto(para, ATE_LOGO)
+        _texto(con, saida, para, ATE_LOGO)
     elif acao == "confere" and reg["estado"] == "conferir":
         con.execute("""UPDATE atendimento.clientes_registros
                           SET estado = 'confirmado', confirmado_em = %s, avisado = false, erro = NULL
                         WHERE id = %s""", (agora, reg["id"]))
-        saida.texto(para, ANOTADO)
+        _texto(con, saida, para, ANOTADO)
     elif acao == "corrigir" and vivo:
         con.execute("""UPDATE atendimento.clientes_registros
                           SET estado = 'aberto', textos = '', proposta = '{}'::jsonb, pergunta = NULL, lido = true
                         WHERE id = %s""", (reg["id"],))
-        saida.texto(para, CORRIGIR)
+        _texto(con, saida, para, CORRIGIR)
     elif acao in ("meio", "ofer", "resp", "motivo") and vivo:
         p = dict(reg["proposta"] or {})
         tocados = dict(p.get("_tocados") or {})
@@ -330,23 +366,23 @@ def seguir(con, saida, reg, para: str, agora: datetime) -> None:
                 (json.dumps(r), falta, "aberto" if falta else "conferir", rid))
     nome = ficha.get("nome") or "o cliente"
     if falta == "meio":
-        saida.botoes(para, "Com %s, foi como?" % nome,
+        _botoes(con, saida, para, "Com %s, foi como?" % nome,
                      [Opcao("cli:meio:%d:%s" % (rid, k), v) for k, v in MEIOS.items()])
     elif falta == "ofer":
         camp = ficha["campanha"]
-        saida.botoes(para, "Você ofereceu a campanha *%s*?" % (camp.get("nome") or camp.get("codigo")),
+        _botoes(con, saida, para, "Você ofereceu a campanha *%s*?" % (camp.get("nome") or camp.get("codigo")),
                      [Opcao("cli:ofer:%d:sim" % rid, "Sim, ofereci"), Opcao("cli:ofer:%d:nao" % rid, "Não, só conversa")])
     elif falta == "resp":
         lista = RESPOSTAS_OFERTA if r.get("ofereceu") else RESPOSTAS_CORTESIA
-        saida.lista(para, "E como foi a conversa com %s?" % nome, "Escolher",
+        _lista(con, saida, para, "E como foi a conversa com %s?" % nome, "Escolher",
                     [Opcao("cli:resp:%d:%s" % (rid, k), v, DESCRICAO_RESPOSTA.get(k, "")) for k, v in lista.items()])
     elif falta == "motivo":
         motivos = con.execute("SELECT * FROM atendimento.clientes_motivos ORDER BY id").fetchall()
-        saida.lista(para, "Qual o motivo da recusa?", "Escolher",
+        _lista(con, saida, para, "Qual o motivo da recusa?", "Escolher",
                     [Opcao("cli:motivo:%d:%d" % (rid, m["id"]), m["nome"][:24], m["nome"][24:72]) for m in motivos[:10]])
     else:
         nomes = {m["id"]: m["nome"] for m in con.execute("SELECT id, nome FROM atendimento.clientes_motivos").fetchall()}
-        saida.botoes(para, cartao(r, ficha, nomes), [Opcao("cli:confere:%d" % rid, "✅ Confere"),
+        _botoes(con, saida, para, cartao(r, ficha, nomes), [Opcao("cli:confere:%d" % rid, "✅ Confere"),
                                               Opcao("cli:corrigir:%d" % rid, "✏️ Corrigir")])
 
 
@@ -408,7 +444,7 @@ def rodar(con, saida, ia, agora: datetime) -> int:
         c = consultor(con, reg["wa_id"])
         if reg["estado"] == "gravado":
             con.execute("UPDATE atendimento.clientes_registros SET avisado = true WHERE id = %s", (reg["id"],))
-            saida.texto(reg["para"], "%s (%s)" % (GRAVADO, reg["ficha"].get("nome") or ""))
+            _texto(con, saida, reg["para"], "%s (%s)" % (GRAVADO, reg["ficha"].get("nome") or ""))
             if c:
                 proximo(con, saida, c, reg["para"], agora)
         else:
@@ -416,7 +452,7 @@ def rodar(con, saida, ia, agora: datetime) -> int:
                               SET avisado = true, estado = 'aberto', textos = '', proposta = '{}'::jsonb,
                                   pergunta = NULL, lido = true
                             WHERE id = %s""", (reg["id"],))
-            saida.texto(reg["para"], "O sistema não aceitou o registro de %s: %s\nMe escreva de novo como foi."
+            _texto(con, saida, reg["para"], "O sistema não aceitou o registro de %s: %s\nMe escreva de novo como foi."
                         % (reg["ficha"].get("nome") or "", reg["erro"] or "sem motivo"))
         feitos += 1
     return feitos

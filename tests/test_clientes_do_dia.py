@@ -102,6 +102,23 @@ def test_o_caminho_da_maquete(piloto):
     assert textos[0].startswith(K.GRAVADO) and "PLANTAGRO" in textos[1] and "*Cliente 2 de 2*" in textos[1]
 
 
+def test_o_que_meus_clientes_manda_fica_em_enviadas(piloto):
+    """#1236: na prova do #1222 o texto do dono foi parar aqui e o log de saida ficou em branco. Agora a
+    ficha com link, o "me conte", o "Recebi" e o cartao ficam em `enviadas`, como o canal de campo."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.visita = dict(LEITURA)
+    _abrir(piloto, s)
+    t = AGORA + timedelta(minutes=2)
+    passo(piloto, s, texto("w3", "liguei pro Márcio, vão querer +Palha", numero=EQUIPE), agora=t)
+    _rodar(piloto, s, ia, t + timedelta(seconds=31))
+    with conexao(piloto) as con:
+        linhas = con.execute("""SELECT tipo, resumo FROM atendimento.enviadas
+                                 WHERE resumo LIKE 'clientes:%%' ORDER BY id""").fetchall()
+    assert [(l["tipo"], l["resumo"][:18]) for l in linhas] == [
+        ("texto", "clientes: ficha co"), ("botoes", "clientes: " + K.ME_CONTE[:8]),
+        ("texto", "clientes: " + K.RECEBI[:8]), ("botoes", "clientes: Confere?")]
+
+
 def test_o_que_falta_e_perguntado_por_botao_uma_coisa_por_vez(piloto):
     s, ia = SaidaFalsa(), IAFalsa()
     ia.visita = dict(LEITURA, meio=None, resposta=None)
