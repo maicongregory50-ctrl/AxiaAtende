@@ -200,9 +200,12 @@ def _logo_completa(cfg, s, agora=AGORA):
 
 
 def _janela_em(cfg, quando):
-    """A janela conta da ultima mensagem DELA, que o banco carimba com o relogio real: fixa."""
+    """A janela conta da ultima mensagem DELA: fixa a chegada E a hora da mensagem (#1237 -- os ajudantes
+    poem um `timestamp` de um ano atras, e a janela passou a contar dele)."""
     with conexao(cfg) as con:
-        con.execute("UPDATE atendimento.eventos_meta SET recebido_em = %s", (quando,))
+        con.execute("""UPDATE atendimento.eventos_meta SET recebido_em = %s,
+                              corpo = jsonb_set(corpo, '{msg,timestamp}', to_jsonb(%s::text))""",
+                    (quando, str(int(quando.timestamp()))))
 
 
 def test_o_marketing_so_leva_o_dialogo_terminado_ou_largado(porta):

@@ -319,7 +319,10 @@ def test_dentro_da_janela_da_fran_vai_o_pdf_com_os_botoes(ligado):
     numero_fran = fran(ligado)["whatsapp"]
     R.gravar(ligado, aviso([texto("f1", "bom dia", numero=numero_fran)], numero=numero_fran, bsuid="BR.fran"))
     with conexao(ligado) as con:
-        con.execute("UPDATE atendimento.eventos_meta SET processado_em = now(), recebido_em = %s", (QUINTA_14H,))
+        # #1237: a janela conta da hora da MENSAGEM; o ajudante carimba um timestamp de um ano atras
+        con.execute("""UPDATE atendimento.eventos_meta SET processado_em = now(), recebido_em = %s,
+                              corpo = jsonb_set(corpo, '{msg,timestamp}', to_jsonb(%s::text))""",
+                    (QUINTA_14H, str(int(QUINTA_14H.timestamp()))))
     _um_curriculo(ligado, s)
     ia = IAFalsa()
     ia.triagem = TRIAGEM

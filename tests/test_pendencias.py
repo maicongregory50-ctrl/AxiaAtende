@@ -76,9 +76,12 @@ def receber(cfg, linhas):
     return e
 
 
-def falou(cfg, quando, numero=FRAN_META):
+def falou(cfg, quando, numero=FRAN_META, hora_meta=None):
+    """`quando` e a chegada do aviso; `hora_meta`, quando dada, e o `timestamp` da mensagem (#1237)."""
     corpo = {"contacts": [{"wa_id": numero, "user_id": "BR.f"}],
              "msg": {"from": numero, "id": "wamid.f.%s" % quando.timestamp(), "type": "text", "text": {"body": "oi"}}}
+    if hora_meta is not None:
+        corpo["msg"]["timestamp"] = str(int(hora_meta.timestamp()))
     with conexao(cfg) as con:
         con.execute("""INSERT INTO atendimento.eventos_meta (chave_meta, tipo, corpo, recebido_em, processado_em)
                        VALUES (%s, 'mensagem', %s, %s, %s)""", (corpo["msg"]["id"], json.dumps(corpo), quando, quando))
@@ -180,6 +183,20 @@ def test_fora_da_janela_o_informativo_espera_calado(ligado):
     falou(ligado, AGORA + timedelta(hours=1))                              # a Fran escreveu na terca
     s = mandar(ligado, AGORA + timedelta(hours=1))
     assert s.enviadas[0][0] == "texto" and "Só aviso" in s.enviadas[0][2]
+
+
+def test_a_janela_conta_da_hora_da_mensagem_e_nao_da_chegada_do_aviso(ligado):
+    """#1237: o Funnel ficou fora, a Meta reentregou o aviso agora, mas a mensagem e de 30 h atras: a
+    janela esta FECHADA (o informativo espera calado). E a mensagem de 1 h atras, entregue agora, abre."""
+    from backend.campo import ultima_mensagem_de
+    receber(ligado, [linha(101, "informativo", "A auditoria está no ar.")])
+    falou(ligado, AGORA, hora_meta=AGORA - timedelta(hours=30))          # reenvio atrasado
+    assert mandar(ligado).enviadas == []
+    with conexao(ligado) as con:
+        assert ultima_mensagem_de(con, FRAN_META) == AGORA - timedelta(hours=30)
+    falou(ligado, AGORA + timedelta(minutes=1), hora_meta=AGORA - timedelta(hours=1))
+    s = mandar(ligado, AGORA + timedelta(minutes=1))
+    assert s.enviadas and "Só aviso" in s.enviadas[0][2]
 
 
 def test_fora_da_janela_a_pergunta_leva_uma_reabertura_so(ligado):

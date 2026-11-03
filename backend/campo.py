@@ -837,10 +837,12 @@ class Campo:
 
 
 def ultima_mensagem_de(con, wa_id: str | None) -> datetime | None:
-    """Quando a pessoa falou pela ultima vez (a janela de 24 h da Meta conta dai)."""
+    """Quando a pessoa falou pela ultima vez (a janela de 24 h da Meta conta dai): a hora da MENSAGEM,
+    nao a da chegada do aviso (#1237, `envio.HORA_DA_MENSAGEM`)."""
     if not wa_id:
         return None
-    r = con.execute("""SELECT max(recebido_em) AS em FROM atendimento.eventos_meta
+    from .envio import HORA_DA_MENSAGEM
+    r = con.execute("SELECT max(" + HORA_DA_MENSAGEM + """) AS em FROM atendimento.eventos_meta
                         WHERE tipo = 'mensagem' AND corpo->'msg'->>'from' = %s""", (wa_id,)).fetchone()
     return r["em"] if r else None
 

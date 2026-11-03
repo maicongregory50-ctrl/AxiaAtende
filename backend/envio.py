@@ -254,15 +254,27 @@ NAO_VISTO = timedelta(days=7)
 LEGENDA_DA_IMAGEM = 1024   # o limite da Meta para a legenda de uma imagem (#1207)
 
 
+# #1237 (03/11/2026): a janela de 24 h conta da HORA DA MENSAGEM (`msg.timestamp`, que e como a Meta
+# conta), e nao da hora em que o aviso chegou. Com o Funnel fora do ar a Meta reenvia os avisos por
+# dias, e o reenvio chega com o timestamp original: medir pela chegada diria "janela aberta" quando a
+# Meta ja a fechou, e o texto livre tomaria 131047 em vez de ir pela reabertura. LEAST: a mensagem
+# nunca e depois da chegada (relogio torto do aparelho nao abre janela no futuro). Sem timestamp
+# (aviso antigo, evento de teste), vale a chegada, como antes. A mesma expressao serve
+# `campo.ultima_mensagem_de`, que e de onde o campo, os clientes do dia, a logo e a vaga medem.
+HORA_DA_MENSAGEM = """CASE WHEN corpo->'msg'->>'timestamp' ~ '^[0-9]{9,11}$'
+                           THEN LEAST(to_timestamp((corpo->'msg'->>'timestamp')::bigint), recebido_em)
+                           ELSE recebido_em END"""
+
+
 def janela_aberta(con, numero: str, agora: datetime) -> bool:
     """A pessoa mandou QUALQUER mensagem (texto, foto, toque, reacao) ao numero da empresa ha menos de
-    24 h. A fonte e `eventos_meta`, e nao `conversas`: o interno que so manda foto ao canal de campo
-    nao abre conversa nenhuma, e a janela dele esta aberta do mesmo jeito (o canal de campo mede
-    assim, `campo.ultima_mensagem_de`). A Meta manda o celular sem o 9; o cadastro o guarda com o 9:
-    procura-se pelas duas formas."""
+    24 h, contadas da hora da mensagem (#1237). A fonte e `eventos_meta`, e nao `conversas`: o interno
+    que so manda foto ao canal de campo nao abre conversa nenhuma, e a janela dele esta aberta do mesmo
+    jeito (o canal de campo mede assim, `campo.ultima_mensagem_de`). A Meta manda o celular sem o 9; o
+    cadastro o guarda com o 9: procura-se pelas duas formas."""
     from .saida import wa_id_do_whatsapp
     formas = list({com_nove(numero), wa_id_do_whatsapp(com_nove(numero))})
-    r = con.execute("""SELECT max(recebido_em) AS em FROM atendimento.eventos_meta
+    r = con.execute("SELECT max(" + HORA_DA_MENSAGEM + """) AS em FROM atendimento.eventos_meta
                         WHERE tipo = 'mensagem' AND corpo->'msg'->>'from' = ANY(%s)""", (formas,)).fetchone()
     return r is not None and r["em"] is not None and agora - r["em"] < JANELA
 
