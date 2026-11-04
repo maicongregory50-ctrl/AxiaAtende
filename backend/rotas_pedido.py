@@ -172,6 +172,41 @@ def rotas(cfg) -> APIRouter:
                      FROM atendimento.envio_destinatarios""", {"d": desde, "a": ate}).fetchone()
         return dict(r1)
 
+    # #1172 (D1 da spec do #1114, Marketing): o estado da Meta por mensagem, para o que o publicador manda
+    # pelo numero do atendimento (as artes de Status ao dono). O recepcionista guarda TODO aviso de status
+    # em eventos_meta e so aplica os dos wamids que ele mesmo mandou; os do Marketing ficavam sem leitor.
+    # So leitura, atras da chave do pedido, ate 50 wamids por chamada. O estado e o mais alto na ordem
+    # sent < delivered < read; "failed" vence com o codigo do erro da Meta; wamid sem aviso = null.
+    ORDEM_STATUS = {"sent": 1, "delivered": 2, "read": 3}
+
+    @r.get("/pedido/mensagens")
+    def mensagens(wamid: str = "", x_axiaatende_chave: str | None = Header(default=None)):
+        conferir(x_axiaatende_chave)
+        pedidos = [w.strip() for w in wamid.split(",") if w.strip()]
+        if not pedidos:
+            raise HTTPException(status_code=422, detail="wamid vazio: ?wamid=<a>,<b>,... (ate 50)")
+        if len(pedidos) > 50:
+            raise HTTPException(status_code=422, detail="ate 50 wamids por chamada")
+        estados: dict[str, dict | None] = {w: None for w in pedidos}
+        with conexao(cfg) as con:
+            for st in con.execute("""SELECT corpo FROM atendimento.eventos_meta
+                                      WHERE tipo = 'status' AND corpo->>'id' = ANY(%s) ORDER BY id""", (pedidos,)).fetchall():
+                c = st["corpo"] or {}
+                w, s = c.get("id"), c.get("status")
+                quando = c.get("timestamp")
+                item = {"estado": s, "quando": quando, "codigo": None, "erro": None}
+                if s == "failed":
+                    e = (c.get("errors") or [{}])[0]
+                    item.update(codigo=e.get("code"), erro=e.get("title") or e.get("message"))
+                    estados[w] = item   # o fracasso e terminal: vence o que veio antes e o que vier depois
+                    continue
+                atual = estados.get(w)
+                if atual and atual["estado"] == "failed":
+                    continue
+                if atual is None or ORDEM_STATUS.get(s, 0) >= ORDEM_STATUS.get(atual["estado"], 0):
+                    estados[w] = item
+        return {"mensagens": estados}
+
     class Aviso(BaseModel):
         tipo: Literal["plano_sem_registro", "status_do_dia"]
         partes: list[str] = Field(default_factory=list, max_length=3)

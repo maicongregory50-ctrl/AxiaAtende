@@ -55,6 +55,29 @@ def destinatarios(cfg):
         return {d["erp_codigo"]: d for d in con.execute("SELECT * FROM atendimento.envio_destinatarios ORDER BY posicao")}
 
 
+def test_1172_o_estado_da_meta_por_wamid_para_o_marketing(ligado):
+    """#1172: o publicador do Marketing pergunta o estado das mensagens que mandou pelo numero do atendimento.
+    Um wamid com os tres avisos (read vence), um so sent, um failed com o codigo, um sem aviso nenhum."""
+    import json
+    with conexao(ligado) as con:
+        for i, (w, s, extra) in enumerate([("wamid.a", "sent", {}), ("wamid.a", "delivered", {}), ("wamid.a", "read", {}),
+                                           ("wamid.b", "sent", {}),
+                                           ("wamid.c", "sent", {}),
+                                           ("wamid.c", "failed", {"errors": [{"code": 131049, "title": "This message was not delivered"}]})]):
+            corpo = {"id": w, "status": s, "timestamp": str(1793700000 + i), "recipient_id": "554991505565", **extra}
+            con.execute("INSERT INTO atendimento.eventos_meta (chave_meta, tipo, corpo, processado_em) VALUES (%s, 'status', %s, now())",
+                        ("%s:%s:%d" % (w, s, i), json.dumps(corpo)))
+    with TestClient(criar_app(ligado)) as c:
+        assert c.get("/pedido/mensagens", params={"wamid": "wamid.a"}).status_code == 403            # sem a chave
+        assert c.get("/pedido/mensagens", headers=CHAVE).status_code == 422                            # sem wamid
+        assert c.get("/pedido/mensagens", params={"wamid": ",".join("w%d" % i for i in range(51))}, headers=CHAVE).status_code == 422
+        m = c.get("/pedido/mensagens", params={"wamid": "wamid.a,wamid.b,wamid.c,wamid.x"}, headers=CHAVE).json()["mensagens"]
+    assert m["wamid.a"]["estado"] == "read" and m["wamid.a"]["quando"] == "1793700002"
+    assert m["wamid.b"]["estado"] == "sent"
+    assert m["wamid.c"]["estado"] == "failed" and m["wamid.c"]["codigo"] == 131049 and "not delivered" in m["wamid.c"]["erro"]
+    assert m["wamid.x"] is None
+
+
 def test_pedido_sem_a_chave_e_recusado(ligado, imagens):
     assert pedir(ligado, pedido(imagens, [cliente(1, 10)]), cabecalho={}).status_code == 403
     assert pedir(ligado, pedido(imagens, [cliente(1, 10)]), cabecalho={"X-Axiaatende-Chave": "outra"}).status_code == 403

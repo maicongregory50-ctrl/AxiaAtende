@@ -14,6 +14,7 @@ envio que o AxiaMarketing pede. Ele não decide campanha, peça nem lista: isso 
 | **O recepcionista do WhatsApp** do número 49 3664 0121: menu por botão, link de quem atende, a IA que propõe o motivo | serviço `axiaatende-recepcionista` (`127.0.0.1:8008`, publicado pelo Funnel em `:443`) — **a partir da Fase H do plano** |
 | **O envio à carteira**: o convite, as imagens na janela, o aceite e a recusa, o aviso ao responsável | API local `127.0.0.1:8009/envios`, só no próprio servidor — **a partir da Fase E do plano** |
 | O resumo para o KR2 (quem aceitou e quem respondeu, por período) | API local `127.0.0.1:8009` — **a partir da Fase E do plano** |
+| **O estado da Meta por mensagem** (#1172): o publicador do Marketing pergunta por wamid (até 50) se o que mandou pelo número do atendimento foi enviado, entregue, lido ou falhou (com o código da Meta) | `GET 127.0.0.1:8009/pedido/mensagens?wamid=a,b`, com a chave do pedido; só leitura |
 | **O registro do uso de IA dos vizinhos** (#1223): o AxiaMarketing empurra o uso real de cada chamada ao Gemini, e a tela Custos soma as três APIs pagas da casa (Meta, Claude, Gemini) | `POST 127.0.0.1:8009/pedido/uso-ia`, com a chave do pedido |
 
 ## Exijo
