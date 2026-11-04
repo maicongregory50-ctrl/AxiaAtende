@@ -189,10 +189,17 @@ def proximo(con, saida, c: dict, para: str, agora: datetime) -> bool:
     if not fila:
         _texto(con, saida, para, SEM_FILA)
         return False
+    # #1247 (04/11/2026): o cliente aberto ONTEM e gravado HOJE voltava como o proximo da fila -- "feitos"
+    # so olhava os registros criados hoje, e a fila local (copia da lista do ERP) ainda nao sabia do
+    # contato. Agora o que foi confirmado, gravado ou recusado nas ultimas 24 h tambem nao se oferece,
+    # seja de quando for o registro. O "depois" continua voltando no dia seguinte (teste de 23/10).
     feitos = {r["codigo"] for r in con.execute(
         """SELECT codigo FROM atendimento.clientes_registros
-            WHERE wa_id = %s AND estado <> 'descartado' AND (criado_em AT TIME ZONE 'America/Sao_Paulo')::date = %s""",
-        (c["wa_id"], hoje)).fetchall()}
+            WHERE wa_id = %s AND estado <> 'descartado'
+              AND ((criado_em AT TIME ZONE 'America/Sao_Paulo')::date = %s
+                   OR (estado IN ('confirmado', 'gravado', 'recusado')
+                       AND coalesce(gravado_em, confirmado_em, criado_em) > %s))""",
+        (c["wa_id"], hoje, agora - VIVO)).fetchall()}
     if aberto:
         reg = aberto
     else:

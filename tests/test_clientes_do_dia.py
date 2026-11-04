@@ -163,6 +163,26 @@ def test_recusa_pede_o_motivo_da_lista(piloto):
     assert "motivo: Preço" in s.ultima[2] and "ofereceu *Inverno*: sim" in s.ultima[2]
 
 
+def test_o_cliente_aberto_ontem_e_gravado_hoje_nao_volta_como_o_proximo(piloto):
+    """#1247 (04/11/2026, 08:17): a TRIFEL, aberta ontem e confirmada hoje, foi oferecida de novo logo
+    depois de "Gravado no sistema", porque `feitos` so contava os registros criados hoje."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.visita = dict(LEITURA)
+    _abrir(piloto, s)                                                     # COOPERPASSO, ontem
+    t = AGORA + timedelta(minutes=2)
+    passo(piloto, s, texto("w3", "liguei pro Márcio, vão querer +Palha", numero=EQUIPE), agora=t)
+    _rodar(piloto, s, ia, t + timedelta(seconds=31))                     # o cartao
+    rid = _registros(piloto)[0]["id"]
+    amanha = AGORA + timedelta(days=1)                                   # o Confere so no dia seguinte
+    passo(piloto, s, toque("w4", "cli:confere:%d" % rid, numero=EQUIPE), agora=amanha)
+    clientes_erp.enviar_registros(piloto, gravar=lambda cfg, corpo: {"id": 777})
+    _rodar(piloto, s, ia, amanha + timedelta(minutes=1))                 # "Gravado" + o proximo
+    textos = [e[2] for e in s.enviadas[-3:]]
+    assert textos[0].startswith(K.GRAVADO)
+    assert "PLANTAGRO" in textos[1] and "COOPERPASSO" not in textos[1]  # o proximo e OUTRO cliente
+    assert [r["codigo"] for r in _registros(piloto)] == [4461, 4655]
+
+
 def test_depois_manda_o_proximo_e_o_cliente_volta_amanha(piloto):
     s = SaidaFalsa()
     _abrir(piloto, s)
