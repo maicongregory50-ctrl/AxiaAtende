@@ -221,7 +221,12 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
     if saida is None and cfg.meta_token:
         from .saida import SaidaMeta
         from .texto_enviado import guardar_no_banco   # #1205: o texto exato de cada envio
-        saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg))
+        import httpx
+        # #1248: o upload de imagem para a Meta estourou o tempo padrao (08:01 de 04/11, 3 imagens do
+        # Status do dia). 90 s por leitura, 15 s para conectar: uma imagem de Stories sobe em segundos,
+        # e o laco do trabalhador nao fica preso mais que isso numa chamada.
+        saida = SaidaMeta(cfg.meta_phone_id, cfg.meta_token, guardar=guardar_no_banco(cfg),
+                          sessao=httpx.Client(timeout=httpx.Timeout(90.0, connect=15.0)))
     if ia is None and cfg.anthropic_chave:
         from .ia import IA
         from .uso_ia import guardar_no_banco as uso_no_banco   # #1223: o custo de cada chamada

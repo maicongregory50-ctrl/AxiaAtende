@@ -151,6 +151,62 @@ def test_fora_da_janela_uma_reabertura_e_o_ver_solta_as_imagens(ligado, artes):
     assert s.legendas[-1] == LEGENDA
 
 
+class SaidaQueCai(SaidaComLegenda):
+    """A Meta aceita a 1a imagem e estoura o tempo na 2a, uma vez (#1248: o Status do dia de 04/11)."""
+
+    def __init__(self, cai_na=2, vezes=1):
+        super().__init__()
+        self.cai_na, self.vezes, self.n = cai_na, vezes, 0
+
+    def imagem(self, para, arquivo, legenda=""):
+        self.n += 1
+        if (self.cai_na is None or self.n == self.cai_na) and self.vezes > 0:   # cai_na=None: cai em toda imagem
+            self.vezes -= 1
+            import httpx
+            raise httpx.ReadTimeout("The read operation timed out")
+        return super().imagem(para, arquivo, legenda)
+
+
+def test_falha_de_rede_tenta_de_novo_sem_repetir_a_imagem_que_ja_foi(ligado, artes):
+    """#1248 (04/11/2026, 08:01): o upload estourou o tempo e o aviso ficou com erro, fora da fila para
+    sempre. Agora conta uma tentativa, volta 5 min depois e manda so o que falta."""
+    aviso_id = pedir(ligado, artes).json()["aviso_id"]
+    falou(ligado, AGORA - timedelta(hours=3), numero=sem_o_nove(dono(ligado)["whatsapp"]))
+    s = SaidaQueCai(cai_na=2)
+    volta(ligado, s)
+    a = [x for x in avisos(ligado) if x["id"] == aviso_id][0]
+    assert a["erro"] == "" and a["tentativas"] == 1 and a["enviado_em"] is None   # na fila, nao morto
+    assert [e[0] for e in s.enviadas] == ["imagem"]                                 # a 1a foi
+    volta(ligado, s, agora=AGORA + timedelta(minutes=1))                           # cedo demais: espera
+    assert [e[0] for e in s.enviadas] == ["imagem"]
+    volta(ligado, s, agora=AGORA + timedelta(minutes=6))
+    assert [e[0] for e in s.enviadas] == ["imagem"] * 4                             # 3 que faltavam, nao 4
+    a = [x for x in avisos(ligado) if x["id"] == aviso_id][0]
+    assert a["enviado_em"] is not None and a["erro"] == ""
+    assert s.legendas[-1] == LEGENDA
+
+
+def test_a_terceira_falha_de_rede_vira_erro_e_a_falha_que_nao_e_de_rede_vira_na_hora(ligado, artes):
+    aviso_id = pedir(ligado, artes).json()["aviso_id"]
+    falou(ligado, AGORA - timedelta(hours=3), numero=sem_o_nove(dono(ligado)["whatsapp"]))
+    s = SaidaQueCai(cai_na=None, vezes=3)
+    for k in range(3):
+        volta(ligado, s, agora=AGORA + timedelta(minutes=6 * k))
+    a = [x for x in avisos(ligado) if x["id"] == aviso_id][0]
+    assert a["tentativas"] == 3 and "timed out" in a["erro"] and "(tentativa 3)" in a["erro"]
+
+    outro = pedir(ligado, artes).json()["aviso_id"]
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.avisos SET imagens = ARRAY['/nao/existe.jpeg'] WHERE id = %s", (outro,))
+
+    class SaidaQueRecusa(SaidaComLegenda):
+        def imagem(self, para, arquivo, legenda=""):
+            raise RuntimeError("(#131026) Message undeliverable")
+    volta(ligado, SaidaQueRecusa(), agora=AGORA + timedelta(minutes=30))
+    b = [x for x in avisos(ligado) if x["id"] == outro][0]
+    assert "undeliverable" in b["erro"] and b["tentativas"] == 1
+
+
 def test_sem_porteiro_e_janela_fechada_fica_o_erro_e_nada_sai(ligado, artes):
     desligado = replace(ligado, porteiro=False)
     aviso_id = pedir(desligado, artes).json()["aviso_id"]

@@ -59,6 +59,9 @@ JANELA_INICIO = time(9, 30)
 JANELA_FIM = time(17, 0)
 DIAS_DA_JANELA = (0, 1, 2, 3, 4)   # weekday(): segunda a sexta
 JANELA = timedelta(hours=24)
+# #1248: a falha de rede ao mandar um aviso conta uma tentativa; volta a fila depois da espera, ate o teto
+TENTATIVAS = 3
+ESPERA_TENTATIVA = timedelta(minutes=5)
 NAO_E_WHATSAPP = {"131026"}   # codigo da Meta: mensagem nao entregavel (numero sem WhatsApp)
 CELULAR = re.compile(r"^55[1-9][0-9]9[0-9]{8}$")
 
@@ -580,8 +583,8 @@ class Envio:
         # Chave desligada: um modelo por aviso, como sempre. O guardado de quando ela estava ligada sai
         # aqui tambem (o ROLLBACK da spec); o nao visto, nao: "nao reenvia o que ficou nao visto".
         for a in con.execute("""SELECT * FROM atendimento.avisos WHERE enviado_em IS NULL AND erro = ''
-                                   AND nao_visto_em IS NULL
-                                 ORDER BY id LIMIT 20""").fetchall():
+                                   AND nao_visto_em IS NULL AND (tentativa_em IS NULL OR tentativa_em < %s)
+                                 ORDER BY id LIMIT 20""", (agora - ESPERA_TENTATIVA,)).fetchall():
             if a["tipo"] == "status_do_dia":
                 # #1207: o status do dia nao tem modelo (a Meta poria texto fixo em cada imagem): sem o
                 # porteiro, so sai dentro da janela; fora dela, o erro diz por que
@@ -592,7 +595,7 @@ class Envio:
                                                "não tem modelo, só sai como imagem dentro da janela")
                         self._status_como_imagens(con, saida, a, agora)
                 except Exception as falha:  # noqa: BLE001
-                    con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+                    self._falhou(con, a, falha, agora)
                 continue
             m = modelo_do_uso(con, "aviso_" + a["tipo"])
             try:
@@ -602,7 +605,7 @@ class Envio:
                 con.execute("UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'modelo' WHERE id = %s",
                             (agora, w, a["id"]))
             except Exception as falha:  # noqa: BLE001
-                con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+                self._falhou(con, a, falha, agora)
 
     def _porteiro_dos_avisos(self, con, saida, agora):
         # 1. os guardados: 7 dias sem toque viram nao visto; com a janela aberta (a pessoa escreveu,
@@ -621,17 +624,46 @@ class Envio:
                 con.execute("""UPDATE atendimento.avisos SET nao_visto_em = %s
                                 WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
                                   AND guardado_em IS NOT NULL AND nao_visto_em IS NULL""", (agora, numero))
-        # 2. os novos
+        # 2. os novos (o que caiu por rede volta 5 min depois da ultima tentativa, #1248)
         for a in con.execute("""SELECT * FROM atendimento.avisos
                                  WHERE enviado_em IS NULL AND erro = '' AND guardado_em IS NULL
-                                   AND nao_visto_em IS NULL
-                                 ORDER BY id LIMIT 20""").fetchall():
+                                   AND nao_visto_em IS NULL AND (tentativa_em IS NULL OR tentativa_em < %s)
+                                 ORDER BY id LIMIT 20""", (agora - ESPERA_TENTATIVA,)).fetchall():
             try:
+                if a["tipo"] == "status_do_dia" and janela_aberta(con, a["para_whatsapp"], agora):
+                    # #1248: FORA do ponto de retorno, de proposito -- cada imagem que a Meta aceitou fica
+                    # registrada em `enviadas` mesmo que a seguinte caia; a tentativa seguinte manda so o
+                    # que falta. Dentro dele, a queda da 3a imagem apagava o registro da 1a e da 2a, e a
+                    # pessoa as receberia de novo.
+                    self._status_como_imagens(con, saida, a, agora)
+                    continue
                 # um ponto de retorno por aviso: o erro de banco de um nao derruba a volta dos outros
                 with con.transaction():
                     self._porteiro_de_um(con, saida, a, agora)
             except Exception as falha:  # noqa: BLE001 -- o proximo aviso segue; a linha diz o erro
-                con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+                self._falhou(con, a, falha, agora)
+
+    @staticmethod
+    def _e_de_rede(falha: BaseException) -> bool:
+        """Timeout e conexao recusada/caida: vale tentar de novo. O resto (modelo sem cadastro, janela
+        fechada, a Meta recusando a mensagem) nao muda sozinho, e vira `erro` na hora."""
+        nome, texto = type(falha).__name__.lower(), str(falha).lower()
+        return (isinstance(falha, (TimeoutError, ConnectionError)) or "timeout" in nome or "timed out" in texto
+                or "connect" in nome or "connection" in texto)
+
+    def _falhou(self, con, a, falha: BaseException, agora) -> None:
+        """#1248: a falha de REDE conta uma tentativa e o aviso continua na fila (ate TENTATIVAS); a
+        terceira, ou qualquer outra falha, vira `erro` -- e aviso com `erro` nao sai mais, como antes."""
+        tentativas = int(a.get("tentativas") or 0) + 1
+        if self._e_de_rede(falha) and tentativas < TENTATIVAS:
+            con.execute("UPDATE atendimento.avisos SET tentativas = %s, tentativa_em = %s WHERE id = %s",
+                        (tentativas, agora, a["id"]))
+            print("avisos: aviso %d (%s) caiu por rede (tentativa %d/%d): %s"
+                  % (a["id"], a["tipo"], tentativas, TENTATIVAS, str(falha)[:120]), flush=True)
+            return
+        con.execute("UPDATE atendimento.avisos SET erro = %s, tentativas = %s, tentativa_em = %s WHERE id = %s",
+                    (("%s (tentativa %d)" % (str(falha)[:280], tentativas)) if tentativas > 1 else str(falha)[:300],
+                     tentativas, agora, a["id"]))
 
     def _porteiro_de_um(self, con, saida, a, agora):
         numero = a["para_whatsapp"]
@@ -667,13 +699,22 @@ class Envio:
         w = None
         for i, arquivo in enumerate(imagens, start=1):
             ultima = i == len(imagens)
+            resumo = "status do dia %d/%d (aviso %d)" % (i, len(imagens), a["id"])
+            # #1248: a imagem que a Meta ja aceitou numa tentativa anterior nao vai de novo
+            ja = con.execute("SELECT wamid FROM atendimento.enviadas WHERE resumo = %s AND para = %s LIMIT 1",
+                             (resumo, para)).fetchone()
+            if ja:
+                w = ja["wamid"]
+                continue
             w = saida.imagem(para, arquivo, legenda if ultima and cabe else "")
             con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'imagem', %s)",
-                        (w, para, "status do dia %d/%d" % (i, len(imagens))))
+                        (w, para, resumo))
         if legenda and not cabe:
-            w = saida.texto(para, legenda)
-            con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', %s)",
-                        (w, para, "status do dia, a legenda"))
+            resumo = "status do dia, a legenda (aviso %d)" % a["id"]
+            if not con.execute("SELECT 1 FROM atendimento.enviadas WHERE resumo = %s AND para = %s", (resumo, para)).fetchone():
+                w = saida.texto(para, legenda)
+                con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', %s)",
+                            (w, para, resumo))
         con.execute("""UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'texto' WHERE id = %s""",
                     (agora, w, a["id"]))
 
