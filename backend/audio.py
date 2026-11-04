@@ -80,13 +80,30 @@ class Whisper:
 
     def __call__(self, caminho: Path, maximo: int):
         """(texto, duracao_s); texto None quando o audio passa de `maximo` segundos (nada e transcrito)."""
-        segmentos, info = self._m.transcribe(str(caminho), language="pt", vad_filter=True)
+        segmentos, info = self._m.transcribe(decodificar(caminho), language="pt", vad_filter=True)
         if info.duration > maximo:
             return None, info.duration
         return " ".join(s.text.strip() for s in segmentos).strip(), info.duration
 
 
 # ── 1. a chegada (o motor) ───────────────────────────────────────────────────────────────────────────
+
+def decodificar(caminho: Path):
+    """O audio em 16 kHz mono float32, decodificado aqui e nao pelo `decode_audio` do faster-whisper:
+    o 1.2.1 passa `metadata_errors` ao `av.open`, e o av 15+ nao aceita mais (TypeError no 1o audio
+    real, 04/11/2026, #1238)."""
+    import av
+    import numpy as np
+    pedacos = []
+    reamostra = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=16000)
+    with av.open(str(caminho), mode="r") as c:
+        for quadro in c.decode(audio=0):
+            pedacos.extend(q.to_ndarray() for q in reamostra.resample(quadro))
+        pedacos.extend(q.to_ndarray() for q in reamostra.resample(None))
+    if not pedacos:
+        return np.zeros(0, dtype=np.float32)
+    return np.concatenate(pedacos, axis=1).reshape(-1).astype(np.float32) / 32768.0
+
 
 def _nome_seguro(texto: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", texto or "")[:120] or "sem_nome"

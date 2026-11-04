@@ -143,3 +143,26 @@ def test_achar_modelo_na_copia_do_cache(tmp_path):
     (snap / "model.bin").write_bytes(b"x")
     assert audio.achar_modelo(tmp_path) == snap
     assert audio.achar_modelo(tmp_path / "nao_existe") is None
+
+
+def test_decodifica_o_ogg_opus_do_whatsapp_em_16k_mono(tmp_path):
+    """O 1o audio real (04/11) caiu no `decode_audio` do faster-whisper com o av 15+: decodificar e nosso."""
+    av = pytest.importorskip("av")
+    np = pytest.importorskip("numpy")
+    arq = tmp_path / "voz.ogg"
+    with av.open(str(arq), "w", format="ogg") as sai:
+        st = sai.add_stream("libopus", rate=48000)
+        st.layout = "mono"
+        for i in range(100):   # 2 s de 440 Hz em quadros de 960 amostras
+            t = (np.arange(960) + i * 960) / 48000
+            q = av.AudioFrame.from_ndarray((np.sin(2 * np.pi * 440 * t) * 8000).astype("int16")[None, :],
+                                           format="s16", layout="mono")
+            q.sample_rate, q.pts = 48000, i * 960
+            for p in st.encode(q):
+                sai.mux(p)
+        for p in st.encode(None):
+            sai.mux(p)
+    arr = audio.decodificar(arq)
+    assert arr.dtype == np.float32 and arr.ndim == 1
+    assert 1.8 < len(arr) / 16000 < 2.2
+    assert 0.1 < float(np.abs(arr).max()) <= 1.0
