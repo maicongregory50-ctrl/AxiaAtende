@@ -4,6 +4,8 @@ uvicorn==0.51.0
 psycopg[binary]==3.2.10
 pywa==4.5.0          # MIT, conferida no LICENSE e no PyPI em 09/10/2026; versao fixada de proposito
 anthropic==1.13.0     # a IA da triagem (D3); MIT; o SDK oficial
+# o transcritor local de audio (#1238): instalado no venv em 03/11/2026; as demais (ctranslate2, onnxruntime, av, huggingface_hub, tokenizers) vem por dependencia
+faster-whisper==1.2.1
 # so para os testes
 pytest==9.1.1
 httpx==0.28.1
