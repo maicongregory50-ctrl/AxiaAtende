@@ -136,6 +136,12 @@ def mandar(con, saida, agora: datetime | None = None) -> int:
             w = saida.documento(p["para_whatsapp"], dados, "ficha-%s.pdf" % p["frete_numero"], legenda=p["texto"])
             con.execute("UPDATE atendimento.pedidos_cte SET enviado_em = %s, wamid = %s WHERE id = %s",
                         (agora, w or "", p["id"]))
+            # a conversa da Recepcao parte de `enviadas` (o texto exato so se junta a ela pelo wamid):
+            # sem esta linha a ficha sai, a Meta entrega, e o historico com o Benedito nao a mostra
+            if w:
+                con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
+                               VALUES (%s, %s, 'documento', %s) ON CONFLICT (wamid) DO NOTHING""",
+                            (w, p["para_whatsapp"], "logistica: ficha %s" % p["frete_numero"]))
             saiu += 1
         except Exception as falha:  # noqa: BLE001 -- um pedido nao segura o outro
             motivo = str(falha) if str(falha) == FRASE_JANELA else "Não saiu: %s" % (str(falha)[:250] or type(falha).__name__)

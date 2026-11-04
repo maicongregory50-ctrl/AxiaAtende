@@ -82,6 +82,9 @@ def test_janela_aberta_o_pdf_sai_e_o_estado_volta(ligado):
     tipo, para, legenda, _ = saida.enviadas[0]
     assert (tipo, para) == ("documento", BENEDITO) and legenda == PENDENTE["texto"]
     assert saida.documentos[0][1] == b"%PDF-1.4 ficha" and saida.documentos[0][2] == "ficha-FRT-2026-0003.pdf"
+    with conexao(ligado) as con:      # e aparece na conversa com o Benedito (a Recepcao le `enviadas`)
+        h = con.execute("SELECT para, tipo, resumo FROM atendimento.enviadas WHERE wamid = 'wamid.saida.1'").fetchone()
+    assert (h["para"], h["tipo"], h["resumo"]) == (BENEDITO, "documento", "logistica: ficha FRT-2026-0003")
     e.pendentes = [PENDENTE]          # o ERP ainda lista ate receber o estado: nao duplica
     _volta(ligado, e)
     assert e.estados == [(7, "ENVIADO", "", "wamid.saida.1")]
