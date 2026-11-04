@@ -158,15 +158,16 @@ def _contatos(con, desde, conversas) -> list[dict]:
 
     def c(chave):
         return contatos.setdefault(chave, {"recebida": None, "enviada": None, "recebidas": 0, "enviadas": 0,
-                                           "perfil": None, "wa_id": None, "conversa": None})
+                                           "uteis": 0, "perfil": None, "wa_id": None, "conversa": None})
 
     for e in con.execute("""SELECT corpo->'msg'->>'from' AS de, max(recebido_em) AS em, count(*) AS n,
+                                   count(*) FILTER (WHERE coalesce(corpo->'msg'->>'type', '') NOT IN ('unsupported', 'reaction')) AS uteis,
                                    max(corpo->'contacts'->0->'profile'->>'name') AS perfil
                               FROM atendimento.eventos_meta
                              WHERE tipo = 'mensagem' AND recebido_em >= %s AND corpo->'msg'->>'from' IS NOT NULL
                              GROUP BY 1""", (desde,)).fetchall():
         x = c(_sem_nove(e["de"]))
-        x.update(recebida=e["em"], recebidas=e["n"], perfil=e["perfil"] or x["perfil"], wa_id=e["de"])
+        x.update(recebida=e["em"], recebidas=e["n"], uteis=e["uteis"], perfil=e["perfil"] or x["perfil"], wa_id=e["de"])
     for s in con.execute("""SELECT para, max(enviada_em) AS em, count(*) AS n FROM atendimento.enviadas
                              WHERE enviada_em >= %s AND para ~ '^[0-9]+$' GROUP BY 1""", (desde,)).fetchall():
         x = c(_sem_nove(s["para"]))
@@ -180,6 +181,10 @@ def _contatos(con, desde, conversas) -> list[dict]:
     linhas = []
     for chave, x in contatos.items():
         l = x["conversa"]
+        # dono, 04/11/2026: "vamos remover o robo, se for a unica movimentacao". O numero de quem so mandou
+        # mensagem sem tipo (ou reacao) e nao teve atendimento nao e contato: e maquina batendo na porta.
+        if l is None and x["recebidas"] and x["uteis"] == 0:
+            continue
         quando = max(q for q in (x["recebida"], x["enviada"], l["ultimo_toque_em"] if l else None,
                                  l["iniciada_em"] if l else None) if q is not None)
         quem = agenda.reconhecer(con, chave) or {"erp_cadastros": None}

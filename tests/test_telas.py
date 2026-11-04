@@ -114,6 +114,12 @@ def test_um_contato_por_numero_com_a_ultima_mensagem_em_qualquer_sentido(ligado,
     assert j["pessoa"]["nome"] == "DJ AGRO" and j["pessoa"]["codigo"] == 4445 and len(j["itens"]) >= 2
     fora = tela.get("/api/recepcao/pessoa/5549999990000").json()                              # de fora: tambem abre
     assert fora["pessoa"]["codigo"] is None and len(fora["itens"]) >= 4
+    # dono, 04/11: o robo (so mensagem sem tipo, sem atendimento) nao e contato
+    robo = {"from": "5511933157031", "id": "wamid.r1", "type": "unsupported", "errors": [{"code": 131051}]}
+    R.gravar(ligado, aviso([robo], numero="5511933157031", bsuid="BR.robo"))
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.eventos_meta SET processado_em = now() WHERE processado_em IS NULL")
+    assert "5511933157031" not in [l["pessoa"] for l in tela.get("/api/recepcao", params={"dias": 7}).json()["linhas"]]
 
 
 def test_envios_lista_detalhe_e_religar(ligado, tela, tmp_path):
