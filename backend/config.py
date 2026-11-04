@@ -37,7 +37,9 @@ RAIZ = Path(__file__).resolve().parent.parent
 META_VERSAO = "v23.0"
 META_URL = "https://graph.facebook.com"
 # O numero 49 3664 0121 e a conta do WhatsApp (medidos no A1 do plano, 09/10/2026). Nao sao segredo.
-META_PHONE_ID = "725888737278277"
+# #1242 (04/11/2026): o numero foi removido da conta em 03/11 (o Opa Suite ainda tinha acesso) e
+# readicionado pelo dono; o phone_number_id MUDOU. O antigo era 725888737278277.
+META_PHONE_ID = "1324521000755687"
 META_CONTA_WA = "1442233593867052"
 ANTHROPIC_URL = "https://api.anthropic.com"
 
