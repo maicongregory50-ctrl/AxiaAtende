@@ -105,6 +105,72 @@ class Triagem(BaseModel):
     ligada: bool
 
 
+# #1238 (dono, 04/11/2026: "o DJ enviou conteudo valido, precisa listar a linha; a linha do Benedito
+# precisa subir"). Quem e da casa manda foto, logo, audio e resposta de chamado SEM abrir conversa (#970),
+# e a Recepcao so listava conversas: o dia inteiro da equipe era invisivel na tela. Agora cada pessoa da
+# equipe que falou com a empresa no periodo ganha UMA linha por dia, com o que mandou e o que ficou
+# pendente com ela. So leitura: nenhuma conversa nasce, nenhum fio muda.
+def _linhas_da_equipe(con, desde) -> list[dict]:
+    from .envio import com_nove
+    dias = con.execute(
+        """WITH internos AS (SELECT DISTINCT ON (numero) numero, CASE WHEN length(numero) = 13 THEN substr(numero, 1, 4) || substr(numero, 6) ELSE numero END AS sem9,
+                                   codigo, nome, papeis
+                              FROM atendimento.agenda
+                             WHERE papeis && ARRAY['equipe', 'representante'] ORDER BY numero, codigo)
+           SELECT i.numero, i.codigo, i.nome, i.papeis,
+                  (e.recebido_em AT TIME ZONE 'America/Sao_Paulo')::date AS dia,
+                  max(e.recebido_em) AS ultima,
+                  count(*) FILTER (WHERE e.corpo->'msg'->>'type' IN ('image', 'video')) AS midias,
+                  count(*) FILTER (WHERE e.corpo->'msg'->>'type' = 'document') AS documentos,
+                  count(*) FILTER (WHERE e.corpo->'msg'->>'type' = 'audio') AS audios,
+                  count(*) FILTER (WHERE e.corpo->'msg'->>'type' = 'text') AS textos,
+                  count(*) FILTER (WHERE e.corpo->'msg'->>'type' IN ('interactive', 'button')) AS toques,
+                  max(e.corpo->'msg'->>'from') AS wa_id,
+                  max(e.corpo->'contacts'->0->'profile'->>'name') AS perfil
+             FROM atendimento.eventos_meta e
+             JOIN internos i ON e.corpo->'msg'->>'from' IN (i.numero, i.sem9)
+            WHERE e.tipo = 'mensagem' AND e.recebido_em >= %s
+            GROUP BY 1, 2, 3, 4, 5""", (desde,)).fetchall()
+    linhas = []
+    for d in dias:
+        n = com_nove(d["numero"])
+        partes = []
+        if d["midias"]:
+            partes.append("%d foto%s/vídeo%s" % (d["midias"], "s" if d["midias"] > 1 else "", "s" if d["midias"] > 1 else ""))
+        if d["documentos"]:
+            partes.append("%d documento%s" % (d["documentos"], "s" if d["documentos"] > 1 else ""))
+        if d["audios"]:
+            partes.append("%d áudio%s" % (d["audios"], "s" if d["audios"] > 1 else ""))
+        if d["textos"]:
+            partes.append("%d texto%s" % (d["textos"], "s" if d["textos"] > 1 else ""))
+        if d["toques"]:
+            partes.append("%d toque%s" % (d["toques"], "s" if d["toques"] > 1 else ""))
+        pend = []
+        if con.execute("""SELECT 1 FROM atendimento.material_de_campo WHERE wa_id IN (%s, %s)
+                           AND pergunta_pendente IS NOT NULL AND recebido_em > now() - interval '1 day' LIMIT 1""",
+                       (d["wa_id"], n)).fetchone():
+            pend.append("foto sem legenda")
+        if con.execute("""SELECT 1 FROM atendimento.logos_de_cliente WHERE wa_id IN (%s, %s)
+                           AND pergunta_pendente IS NOT NULL LIMIT 1""", (d["wa_id"], n)).fetchone():
+            pend.append("logo sem cliente")
+        if con.execute("SELECT 1 FROM atendimento.pendencias WHERE para_whatsapp = %s AND espera IS NOT NULL LIMIT 1",
+                       (n,)).fetchone():
+            pend.append("chamado esperando resposta")
+        if con.execute("""SELECT 1 FROM atendimento.clientes_registros WHERE wa_id IN (%s, %s)
+                           AND estado IN ('aberto', 'conferir') AND criado_em > now() - interval '1 day' LIMIT 1""",
+                       (d["wa_id"], n)).fetchone():
+            pend.append("cliente aberto em Meus clientes")
+        papeis = list(d["papeis"] or [])
+        linhas.append({"id": None, "pessoa": d["wa_id"], "quando": d["ultima"].isoformat(),
+                       "cadastro": {"codigo": d["codigo"], "nome": d["nome"], "papeis": papeis,
+                                    "contato_setor": None, "contato_nome": None},
+                       "cadastros": 1, "numero": mascarar(d["wa_id"]), "conversar": link_conversa(d["wa_id"]),
+                       "perfil": d["perfil"], "caminho": ["Equipe"] + partes, "destino": None, "estado": "equipe",
+                       "pendente": " · ".join(pend), "pergunta_em": None, "aviso_nao_em": None,
+                       "satisfacao": None, "ia": None})
+    return linhas
+
+
 def rotas(cfg, usuario) -> APIRouter:
     r = APIRouter(dependencies=[Depends(usuario)])
 
@@ -132,6 +198,7 @@ def rotas(cfg, usuario) -> APIRouter:
             campo = con.execute("""SELECT count(*) AS n, count(*) FILTER (WHERE catalogado_em IS NOT NULL) AS c
                                      FROM atendimento.material_de_campo WHERE recebido_em > now() - %s * interval '1 day'""",
                                 (dias,)).fetchone()
+            equipe = _linhas_da_equipe(con, desde)
         if motivo:
             linhas = [l for l in linhas if l["motivo"] == motivo]
         # #969: so do cadastro / so fora dele (quem nao foi conferido -- agenda vazia -- fica nos dois de fora)
@@ -139,7 +206,11 @@ def rotas(cfg, usuario) -> APIRouter:
             linhas = [l for l in linhas if l["erp_cadastros"] == 1]
         elif quem == "fora":
             linhas = [l for l in linhas if l["erp_cadastros"] != 1]
+            equipe = []            # a equipe e do cadastro por definicao
+        if motivo or (situacao and situacao != "equipe"):
+            equipe = []            # a linha da equipe nao tem motivo do menu nem situacao de atendimento
         cartoes = {
+            "equipe": len(equipe),
             "campo": campo["n"], "campo_catalogadas": campo["c"],
             "chegaram": len(linhas),
             "do_cadastro": sum(1 for l in linhas if l["erp_cadastros"] == 1),
@@ -150,8 +221,10 @@ def rotas(cfg, usuario) -> APIRouter:
             "ia_acertou": sum(1 for l in linhas if l["ia_confirmou"] is True),
             "ia_errou": sum(1 for l in linhas if l["ia_confirmou"] is False),
         }
-        saida = []
+        saida = list(equipe)
         for l in linhas:
+            if situacao == "equipe":
+                break
             if l["link_em"]:
                 # #969: uma pergunta por dia; as outras conversas do dia ficam cobertas por ela
                 estado = ("sim" if l["recebeu"] is True else "nao" if l["recebeu"] is False
@@ -178,7 +251,26 @@ def rotas(cfg, usuario) -> APIRouter:
                           "pergunta_em": l["pergunta_em"].isoformat() if l["pergunta_em"] else None,
                           "aviso_nao_em": l["aviso_nao_em"].isoformat() if l["aviso_nao_em"] else None,
                           "satisfacao": l["satisfacao"], "ia": l["ia_confirmou"]})
+        saida.sort(key=lambda x: x["quando"], reverse=True)
         return {"cartoes": cartoes, "motivos": motivos, "linhas": saida, "leitura": leitura}
+
+    @r.get("/recepcao/pessoa/{numero}")
+    def ler_pessoa(numero: str, u: dict = Depends(usuario)):
+        """#1238: a janela da linha da EQUIPE -- a pessoa inteira pelo numero, sem conversa nenhuma por
+        tras (quem e da casa manda foto, logo, audio e chamado sem abrir atendimento). So le; registrada
+        como a leitura de conversa."""
+        numero = "".join(ch for ch in numero if ch.isdigit())
+        with conexao(cfg) as con:
+            quem = agenda.reconhecer(con, numero)
+            if not quem or quem.get("erp_cadastros") != 1:
+                raise HTTPException(status_code=404, detail="número não é de alguém da casa")
+            _, _, lista = leitura.itens(con, numero)
+        itens = [{"quando": i["quando"].isoformat(), "lado": i["lado"], "tipo": i["tipo"], "texto": i["texto"],
+                  "opcoes": i["opcoes"], "estado": i["estado"], "erro": i["erro"], "resumo": i["resumo"],
+                  "destaque": False} for i in lista]
+        _registrar_leitura(cfg, u, 0, len(itens))
+        return {"pessoa": {"nome": quem["erp_nome"] or "sem nome", "codigo": quem["erp_codigo"],
+                           "numero": mascarar(numero)}, "itens": itens}
 
     @r.get("/recepcao/conversa/{conversa_id}")
     def ler_conversa(conversa_id: int, u: dict = Depends(usuario)):

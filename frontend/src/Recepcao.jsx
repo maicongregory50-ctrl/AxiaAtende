@@ -60,6 +60,7 @@ const ESTADO = {
   sem_pergunta: ['não perguntado (mais de 24h sem mensagem)', ''],
   curriculo: ['currículo recebido', 'v'], sem_curriculo: ['sem currículo', ''],   // #1098, o Trabalhe conosco
   imagem: ['imagem recebida', 'v'], logo: ['logo recebida', 'v'],                  // #1097, a equipe pelo Foto do campo
+  equipe: ['equipe', ''],                                                          // #1238, quem e da casa falou hoje
 }
 
 // a nota da pesquisa, em tres botoes (#969, 11/10/2026): o Ruim tambem avisa o gestor
@@ -74,7 +75,9 @@ function Janela({ id, fechar }) {
   const destaque = useRef(null)
 
   useEffect(() => {
-    pegar('/recepcao/conversa/' + id).then(setC).catch((e) => setErro(e.message))
+    // #1238: a linha da equipe nao tem conversa; a janela le a pessoa pelo numero
+    const rota = String(id).startsWith('pessoa:') ? '/recepcao/pessoa/' + String(id).slice(7) : '/recepcao/conversa/' + id
+    pegar(rota).then(setC).catch((e) => setErro(e.message))
     const tecla = (e) => { if (e.key === 'Escape') fechar() }
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
@@ -157,6 +160,7 @@ export default function Recepcao() {
           <option value="curriculo">Currículo recebido</option><option value="sem_curriculo">Sem currículo</option>
           <option value="imagem">Imagem recebida</option><option value="logo">Logo recebida</option>
           <option value="nao">Disse que não foi atendido</option><option value="sim">Disse que foi atendido</option>
+          <option value="equipe">Só a equipe</option>
         </select>
         <select value={quem} onChange={(e) => setQuem(e.target.value)}>
           <option value="">Todos (cadastro e fora dele)</option><option value="cadastro">Só quem está no cadastro</option>
@@ -169,6 +173,7 @@ export default function Recepcao() {
           <div className="grupo">No período escolhido</div>
           <div className="cartoes">
             <div className="cartao"><span>Chegaram</span><b>{d.cartoes.chegaram}</b></div>
+            {d.cartoes.equipe > 0 && <div className="cartao"><span>Da equipe (pessoas × dias)</span><b>{d.cartoes.equipe}</b></div>}
             <div className="cartao"><span>Do nosso cadastro</span><b>{d.cartoes.do_cadastro}</b></div>
             <div className="cartao"><span>Receberam o link</span><b>{d.cartoes.receberam_link}</b></div>
             <div className="cartao alerta"><span>Pararam no meio</span><b>{d.cartoes.pararam_no_meio}</b></div>
@@ -183,7 +188,7 @@ export default function Recepcao() {
             <tbody>
               {d.linhas.length === 0 && <tr><td colSpan={5} className="vazio">Ninguém chamou neste período.</td></tr>}
               {d.linhas.map((l, i) => (
-                <tr key={i} className="abre" onClick={() => setAberta(l.id)} title="Ler a conversa">
+                <tr key={i} className="abre" onClick={() => setAberta(l.id || 'pessoa:' + l.pessoa)} title="Ler a conversa">
                   <td>{quando(l.quando)}</td>
                   {/* a coluna QUEM continua sendo o link do WhatsApp Web: o clique nela nao abre a janela */}
                   <td onClick={(e) => e.stopPropagation()} className="sem-janela"><Quem l={l} /></td>
@@ -192,6 +197,9 @@ export default function Recepcao() {
                   <td><span className={'selo ' + ESTADO[l.estado][1]}>
                     {ESTADO[l.estado][0]}{l.estado === 'pergunta_marcada' ? ' ' + hora(l.pergunta_em) : ''}
                     {l.estado === 'nao' && l.aviso_nao_em ? ' ' + hora(l.aviso_nao_em) : ''}</span>
+                    {l.estado === 'equipe' && (l.pendente
+                      ? <> <span className="selo a">{l.pendente}</span></>
+                      : <> <span className="selo v">nada pendente</span></>)}
                     {NOTA[l.satisfacao] && <> <span className={'selo ' + NOTA[l.satisfacao][1]}>{NOTA[l.satisfacao][0]}</span></>}</td>
                 </tr>
               ))}

@@ -76,6 +76,34 @@ def test_recepcao_conta_e_lista(ligado, tela):
     assert [m["chave"] for m in d["motivos"]][:2] == ["comercial", "fretes"]
 
 
+def test_a_equipe_que_falou_hoje_tem_linha_na_recepcao(ligado, tela):
+    """#1238 (dono, 04/11): o DJ mandou logo e foto e nao aparecia; o Benedito escreveu e a linha dele
+    nao subia. Quem e da casa nao abre conversa; a Recepcao passa a listar a pessoa e o que ficou
+    pendente com ela, e a janela abre pelo numero."""
+    with conexao(ligado) as con:
+        con.execute("""INSERT INTO atendimento.agenda (numero, codigo, nome, papeis, contato_setor, contato_nome)
+                       VALUES ('5549999570001', 4445, 'DJ AGRO', ARRAY['representante','cliente'], '', '')""")
+        con.execute("INSERT INTO atendimento.agenda_leitura (linhas) VALUES (1)")
+        con.execute("""INSERT INTO atendimento.logos_de_cliente (bsuid, wa_id, wamid, nome_arquivo, pergunta_pendente)
+                       VALUES ('BR.dj', '554999570001', 'wamid.logo', 'logo.pdf', 'erp_codigo')""")
+    foto = {"from": "554999570001", "id": "wamid.f1", "type": "image", "image": {"id": "m1"}}
+    doc = {"from": "554999570001", "id": "wamid.d1", "type": "document",
+           "document": {"id": "m2", "mime_type": "application/pdf", "filename": "logo.pdf"}}
+    R.gravar(ligado, aviso([foto, doc], numero="554999570001", bsuid="BR.dj"))
+    with conexao(ligado) as con:   # a Meta falsa nao processa; a linha e lida de eventos_meta
+        con.execute("UPDATE atendimento.eventos_meta SET processado_em = now()")
+    d = tela.get("/api/recepcao", params={"dias": 7}).json()
+    dj = next(l for l in d["linhas"] if l["estado"] == "equipe")
+    assert dj["cadastro"]["nome"] == "DJ AGRO" and dj["caminho"] == ["Equipe", "1 foto/vídeo", "1 documento"]
+    assert dj["pendente"] == "logo sem cliente" and dj["id"] is None and dj["pessoa"] == "554999570001"
+    assert d["cartoes"]["equipe"] == 1
+    assert [l["estado"] for l in tela.get("/api/recepcao", params={"situacao": "equipe"}).json()["linhas"]] == ["equipe"]
+    assert tela.get("/api/recepcao", params={"quem": "fora"}).json()["cartoes"]["equipe"] == 0
+    j = tela.get("/api/recepcao/pessoa/554999570001").json()
+    assert j["pessoa"]["nome"] == "DJ AGRO" and j["pessoa"]["codigo"] == 4445 and len(j["itens"]) >= 2
+    assert tela.get("/api/recepcao/pessoa/5549988887777").status_code == 404   # quem nao e da casa: nao
+
+
 def test_envios_lista_detalhe_e_religar(ligado, tela, tmp_path):
     pasta = tmp_path / "mk"
     pasta.mkdir()
