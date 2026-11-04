@@ -10,7 +10,7 @@ from backend import seguranca
 from backend.banco import conexao
 from backend.envio import Envio
 from backend.main import CABECALHO_DA_TELA, criar_app
-from backend.rotas_telas import link_conversa, mascarar
+from backend.rotas_telas import _sem_nove, link_conversa, mascarar
 from tests.avisos_meta import aviso, texto, toque
 from tests.saida_falsa import SaidaFalsa
 from tests.test_1192_janela import dia_util_10h
@@ -76,10 +76,11 @@ def test_recepcao_conta_e_lista(ligado, tela):
     assert [m["chave"] for m in d["motivos"]][:2] == ["comercial", "fretes"]
 
 
-def test_a_equipe_que_falou_hoje_tem_linha_na_recepcao(ligado, tela):
-    """#1238 (dono, 04/11): o DJ mandou logo e foto e nao aparecia; o Benedito escreveu e a linha dele
-    nao subia. Quem e da casa nao abre conversa; a Recepcao passa a listar a pessoa e o que ficou
-    pendente com ela, e a janela abre pelo numero."""
+def test_um_contato_por_numero_com_a_ultima_mensagem_em_qualquer_sentido(ligado, tela):
+    """#1249 (dono, 04/11): "cada numero que entra gera UMA linha, atualizada com a data e hora da ultima
+    mensagem, recebida ou enviada; fica tudo num historico so". O DJ (logo + foto, sem conversa) e o
+    Benedito ("Bom dia" + chamados) aparecem; quem chamou pelo menu continua aparecendo, uma linha por
+    numero mesmo com dois atendimentos; a janela abre pelo numero, de dentro ou de fora da casa."""
     with conexao(ligado) as con:
         con.execute("""INSERT INTO atendimento.agenda (numero, codigo, nome, papeis, contato_setor, contato_nome)
                        VALUES ('5549999570001', 4445, 'DJ AGRO', ARRAY['representante','cliente'], '', '')""")
@@ -90,18 +91,29 @@ def test_a_equipe_que_falou_hoje_tem_linha_na_recepcao(ligado, tela):
     doc = {"from": "554999570001", "id": "wamid.d1", "type": "document",
            "document": {"id": "m2", "mime_type": "application/pdf", "filename": "logo.pdf"}}
     R.gravar(ligado, aviso([foto, doc], numero="554999570001", bsuid="BR.dj"))
-    with conexao(ligado) as con:   # a Meta falsa nao processa; a linha e lida de eventos_meta
-        con.execute("UPDATE atendimento.eventos_meta SET processado_em = now()")
+    s = SaidaFalsa()
+    R.gravar(ligado, aviso([toque("w1", "menu:fretes", lista=True)]))                       # 5549999990000, 1o atendimento
+    R.processar_pendentes(ligado, s, None, agora=AGORA - timedelta(hours=2))
+    R.gravar(ligado, aviso([toque("w2", "menu:comercial", lista=True)]))                   # o mesmo numero, 2o atendimento
+    R.processar_pendentes(ligado, s, None, agora=AGORA - timedelta(hours=1))
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.eventos_meta SET processado_em = now() WHERE processado_em IS NULL")
     d = tela.get("/api/recepcao", params={"dias": 7}).json()
-    dj = next(l for l in d["linhas"] if l["estado"] == "equipe")
-    assert dj["cadastro"]["nome"] == "DJ AGRO" and dj["caminho"] == ["Equipe", "1 foto/vídeo", "1 documento"]
-    assert dj["pendente"] == "logo sem cliente" and dj["id"] is None and dj["pessoa"] == "554999570001"
-    assert d["cartoes"]["equipe"] == 1
-    assert [l["estado"] for l in tela.get("/api/recepcao", params={"situacao": "equipe"}).json()["linhas"]] == ["equipe"]
+    chaves = [_sem_nove(l["pessoa"]) for l in d["linhas"]]   # o numero de teste vem com o 9
+    assert chaves.count("554999570001") == 1 and chaves.count("554999990000") == 1       # uma linha por numero
+    dj = next(l for l in d["linhas"] if l["pessoa"] == "554999570001")
+    assert dj["cadastro"]["nome"] == "DJ AGRO" and dj["estado"] == "equipe" and dj["interno"] is True
+    assert dj["pendente"] == "logo sem cliente" and dj["recebidas"] == 2   # a pergunta da logo saiu: enviadas >= 1
+    menu = next(l for l in d["linhas"] if _sem_nove(l["pessoa"]) == "554999990000")
+    assert menu["caminho"] == ["🛒 Comercial"] and menu["recebidas"] == 2 and menu["enviadas"] >= 2   # o ultimo atendimento
+    assert menu["quando"] >= menu["enviada_em"] and menu["quando"] >= menu["recebida_em"]
+    assert d["cartoes"]["contatos"] == 2 and d["cartoes"]["equipe"] == 1 and d["cartoes"]["chegaram"] == 2
+    assert [l["pessoa"] for l in tela.get("/api/recepcao", params={"situacao": "equipe"}).json()["linhas"]] == ["554999570001"]
     assert tela.get("/api/recepcao", params={"quem": "fora"}).json()["cartoes"]["equipe"] == 0
     j = tela.get("/api/recepcao/pessoa/554999570001").json()
     assert j["pessoa"]["nome"] == "DJ AGRO" and j["pessoa"]["codigo"] == 4445 and len(j["itens"]) >= 2
-    assert tela.get("/api/recepcao/pessoa/5549988887777").status_code == 404   # quem nao e da casa: nao
+    fora = tela.get("/api/recepcao/pessoa/5549999990000").json()                              # de fora: tambem abre
+    assert fora["pessoa"]["codigo"] is None and len(fora["itens"]) >= 4
 
 
 def test_envios_lista_detalhe_e_religar(ligado, tela, tmp_path):

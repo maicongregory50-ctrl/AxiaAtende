@@ -60,7 +60,8 @@ const ESTADO = {
   sem_pergunta: ['não perguntado (mais de 24h sem mensagem)', ''],
   curriculo: ['currículo recebido', 'v'], sem_curriculo: ['sem currículo', ''],   // #1098, o Trabalhe conosco
   imagem: ['imagem recebida', 'v'], logo: ['logo recebida', 'v'],                  // #1097, a equipe pelo Foto do campo
-  equipe: ['equipe', ''],                                                          // #1238, quem e da casa falou hoje
+  equipe: ['equipe', ''],                                                          // #1249, quem e da casa falou
+  contato: ['só mensagem, sem atendimento', ''],                                   // #1249, numero sem atendimento no periodo
 }
 
 // a nota da pesquisa, em tres botoes (#969, 11/10/2026): o Ruim tambem avisa o gestor
@@ -77,14 +78,17 @@ function Janela({ id, fechar }) {
   useEffect(() => {
     // #1238: a linha da equipe nao tem conversa; a janela le a pessoa pelo numero
     const rota = String(id).startsWith('pessoa:') ? '/recepcao/pessoa/' + String(id).slice(7) : '/recepcao/conversa/' + id
-    pegar(rota).then(setC).catch((e) => setErro(e.message))
+    const ler = () => pegar(rota).then(setC).catch((e) => setErro(e.message))
+    ler()
+    const relogio = setInterval(ler, 10000)   // #1104: a conversa em tempo real, enquanto a janela esta aberta
     const tecla = (e) => { if (e.key === 'Escape') fechar() }
     window.addEventListener('keydown', tecla)
-    return () => window.removeEventListener('keydown', tecla)
+    return () => { clearInterval(relogio); window.removeEventListener('keydown', tecla) }
   }, [id])
 
-  useEffect(() => {   // abre ja no atendimento clicado
-    if (destaque.current) destaque.current.scrollIntoView({ block: 'start' })
+  const rolou = useRef(false)
+  useEffect(() => {   // abre ja no atendimento clicado (uma vez; a releitura de 10 s nao puxa a rolagem)
+    if (destaque.current && !rolou.current) { destaque.current.scrollIntoView({ block: 'start' }); rolou.current = true }
   }, [c])
 
   let primeiro = true
@@ -144,8 +148,9 @@ export default function Recepcao() {
   return (
     <section className="atende">
       <h1>Recepção</h1>
-      <p className="sub">Quem chamou no 49 3664 0121, o que escolheu e para quem foi mandado. A OlivIA atende e manda o
-        link; a conversa continua no WhatsApp de quem recebeu o link.</p>
+      <p className="sub">Um contato por número: quem falou com o 49 3664 0121 ou recebeu mensagem dele, pela última
+        mensagem em qualquer sentido, com o último atendimento e o que ficou pendente. O clique abre o histórico
+        inteiro da pessoa, atualizando sozinho enquanto a janela está aberta.</p>
       <div className="filtros">
         <select value={dias} onChange={(e) => setDias(Number(e.target.value))}>
           <option value={1}>Hoje e ontem</option><option value={7}>Últimos 7 dias</option>
@@ -172,8 +177,8 @@ export default function Recepcao() {
         <>
           <div className="grupo">No período escolhido</div>
           <div className="cartoes">
-            <div className="cartao"><span>Chegaram</span><b>{d.cartoes.chegaram}</b></div>
-            {d.cartoes.equipe > 0 && <div className="cartao"><span>Da equipe (pessoas × dias)</span><b>{d.cartoes.equipe}</b></div>}
+            <div className="cartao"><span>Contatos</span><b>{d.cartoes.contatos}{d.cartoes.equipe ? ` · ${d.cartoes.equipe} da equipe` : ''}</b></div>
+            <div className="cartao"><span>Atendimentos</span><b>{d.cartoes.chegaram}</b></div>
             <div className="cartao"><span>Do nosso cadastro</span><b>{d.cartoes.do_cadastro}</b></div>
             <div className="cartao"><span>Receberam o link</span><b>{d.cartoes.receberam_link}</b></div>
             <div className="cartao alerta"><span>Pararam no meio</span><b>{d.cartoes.pararam_no_meio}</b></div>
@@ -184,22 +189,23 @@ export default function Recepcao() {
           </div>
           <Leitura leitura={d.leitura} />
           <table className="tabela">
-            <thead><tr><th>Quando</th><th>Quem</th><th>Caminho</th><th>Mandado para</th><th>Recebeu o atendimento?</th></tr></thead>
+            <thead><tr><th>Última mensagem</th><th>Quem</th><th>Último atendimento</th><th>Mandado para</th><th>Situação</th></tr></thead>
             <tbody>
-              {d.linhas.length === 0 && <tr><td colSpan={5} className="vazio">Ninguém chamou neste período.</td></tr>}
+              {d.linhas.length === 0 && <tr><td colSpan={5} className="vazio">Nenhum contato neste período.</td></tr>}
               {d.linhas.map((l, i) => (
-                <tr key={i} className="abre" onClick={() => setAberta(l.id || 'pessoa:' + l.pessoa)} title="Ler a conversa">
-                  <td>{quando(l.quando)}</td>
+                <tr key={i} className="abre" onClick={() => setAberta('pessoa:' + l.pessoa)} title="Ler o histórico inteiro">
+                  <td>{quando(l.quando)}<br /><span className="leve">
+                    {l.recebidas ? `${l.recebidas} recebida${l.recebidas > 1 ? 's' : ''}` : ''}
+                    {l.recebidas && l.enviadas ? ' · ' : ''}
+                    {l.enviadas ? `${l.enviadas} enviada${l.enviadas > 1 ? 's' : ''}` : ''}</span></td>
                   {/* a coluna QUEM continua sendo o link do WhatsApp Web: o clique nela nao abre a janela */}
                   <td onClick={(e) => e.stopPropagation()} className="sem-janela"><Quem l={l} /></td>
-                  <td>{l.caminho.join(' › ') || <span className="leve">— só chegou</span>}{l.ia === true && <span className="leve"> · IA acertou</span>}</td>
+                  <td>{l.caminho.join(' › ') || <span className="leve">{l.id ? '— só chegou' : '—'}</span>}{l.ia === true && <span className="leve"> · IA acertou</span>}</td>
                   <td>{l.destino || <span className="leve">—</span>}</td>
                   <td><span className={'selo ' + ESTADO[l.estado][1]}>
                     {ESTADO[l.estado][0]}{l.estado === 'pergunta_marcada' ? ' ' + hora(l.pergunta_em) : ''}
                     {l.estado === 'nao' && l.aviso_nao_em ? ' ' + hora(l.aviso_nao_em) : ''}</span>
-                    {l.estado === 'equipe' && (l.pendente
-                      ? <> <span className="selo a">{l.pendente}</span></>
-                      : <> <span className="selo v">nada pendente</span></>)}
+                    {l.pendente && <> <span className="selo a">{l.pendente}</span></>}
                     {NOTA[l.satisfacao] && <> <span className={'selo ' + NOTA[l.satisfacao][1]}>{NOTA[l.satisfacao][0]}</span></>}</td>
                 </tr>
               ))}
