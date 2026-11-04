@@ -48,7 +48,7 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 2. A OlivIA responde **"Recebi."** Ela lê a sua frase e, um ou dois minutos depois, pergunta **só o
    que faltou**, uma coisa por vez, em conversa: o que a foto mostra, de que produto é (o nome como
    está na embalagem), em que fase está a lavoura, e — **só se você não disse a data na frase** —
-   **"É de hoje?"** (toque **Sim**, ou **Outra
+   **"É de hoje?"** (toque **Sim**, ou escreva "sim" / "não" / "não sei"; ou **Outra
    data** e diga o dia, *09/10*; se não souber o dia, escreva a **safra**, *safra 2025*: a safra vai
    de 1º de julho a 30 de junho, e a foto entra sem dia, com a safra). Responda escrevendo, com as suas palavras; ela encaixa.
 
@@ -93,7 +93,7 @@ mostrar: a colheita, a vistoria, o beneficiamento, a entrega.
 | **"De que produto é?"** | a foto é de campo ou de colheita e faltou o produto: escreva o nome da embalagem |
 | **"Em que fase está a lavoura?"** | só para foto de campo de sementes: recém-nascida, verde, florindo, madura ou já em semente, com as suas palavras |
 | **"É do mesmo assunto da anterior (…)?"** | você mandou fotos sem frase logo depois de outro lote que já fechou: **Sim** repete o título e a data do anterior, **Outra coisa** abre as perguntas (#1099) |
-| **"É de hoje?"** | a data da foto; sem resposta, vale o dia do envio. "safra 2025" vale como resposta: a foto entra sem dia, com a safra (1º de julho a 30 de junho) |
+| **"É de hoje?"** | a data da foto. Toque **Sim**, ou escreva "sim" ou "não" (desde #1097 o escrito vale como o botão, e não vai para a legenda). "não sei" deixa a foto **sem dia**, e o marketing preenche se souber; sem resposta nenhuma, vale o dia do envio. "safra 2025" vale como resposta: a foto entra sem dia, com a safra (1º de julho a 30 de junho) |
 | **"Ainda sobre a foto de há pouco: ..."** | a lembrança, duas horas depois; é a última vez que ela pergunta |
 | **"Anotado. Obrigado!"** | fechou |
 | **"Recebi."** duas vezes seguidas | são dois lotes |

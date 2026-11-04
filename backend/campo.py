@@ -75,7 +75,8 @@ SEMENTE_BASTIDORES = [
      "descricao": "carregamento, caminhão, revenda, cliente", "institucional": True},
 ]
 FASES = {"inicial": "Inicial (recém-nascida)", "vegetativo": "Vegetativo (verde)", "flor": "Flor / espigando",
-         "pre-colheita": "Pré-colheita (madura)", "semente": "Semente (grão de perto)"}
+         "pre-colheita": "Pré-colheita (madura)", "semente": "Semente (grão de perto)",
+         "palhada": "Palhada (dessecada)"}   # #1097: a cobertura depois da dessecacao nao e pre-colheita
 COM_PRODUTO = ("campo-de-sementes", "colheita")
 
 RECEBI = "Recebi."
@@ -90,7 +91,14 @@ PERGUNTA_QUAL_DIA = "Qual dia? (ex.: 09/10)"
 PERGUNTA_MESMO = "É do mesmo assunto da anterior (%s)?"
 RETOMANDO = "Ainda sobre a foto de há pouco: "
 ANOTADO = "Anotado. Obrigado!"
-NAO_ENTENDI_DATA = "Não entendi a data; vale o dia do envio."
+NAO_ENTENDI_DATA = "Não entendi a data; a foto fica sem dia."   # #1097: nada de presumir o dia do envio
+SEM_DIA = "Anotado: a foto fica sem dia."
+# #1097: "sim" e "nao" ESCRITOS a "E de hoje?" valem como os botoes (o Willian digitou "Nao" e o "Nao"
+# foi colado na legenda); "nao sei" deixa a foto sem dia.
+RESPOSTAS_SIM = ("sim", "s", "e", "isso", "e sim", "sim e", "hoje", "e de hoje", "de hoje")
+RESPOSTAS_NAO = ("nao", "n", "nao e", "nao e de hoje", "nao, outra", "outra", "outro dia")
+RESPOSTAS_SEM_DIA = ("nao sei", "nao sei dizer", "nao lembro", "nao me lembro", "sei la", "nao tenho certeza",
+                     "nao faco ideia", "sem data", "nao sei o dia", "nao sei a data")
 NAO_ACHEI_PRODUTO = "Não achei esse produto na lista; deixo para o marketing conferir."
 AVISO_CATALOGO = "Sua foto entrou no catálogo da Renascer. Obrigado!"
 AVISO_AR = "A sua foto virou o Stories do dia."
@@ -557,8 +565,8 @@ class Campo:
         # o dia so e presumido quando nao ha dia dito NEM safra dita (#982: com a safra, a foto entra sem dia)
         con.execute("""UPDATE atendimento.material_de_campo
                           SET classe_bastidor = %s, classe_produto = %s, classe_fase = %s,
-                              data_presumida = CASE WHEN data_dita IS NULL AND safra_dita IS NULL THEN true ELSE data_presumida END,
-                              data_dita = CASE WHEN data_dita IS NULL AND safra_dita IS NULL THEN %s ELSE data_dita END,
+                              data_presumida = CASE WHEN data_dita IS NULL AND safra_dita IS NULL AND NOT sem_dia THEN true ELSE data_presumida END,
+                              data_dita = CASE WHEN data_dita IS NULL AND safra_dita IS NULL AND NOT sem_dia THEN %s ELSE data_dita END,
                               fechado_em = %s, pergunta_pendente = NULL, retomar_em = NULL
                         WHERE id = ANY(%s)""",
                     (r["classe_bastidor"], r["classe_produto"], r["classe_fase"], _dia(r["recebido_em"]), agora, ids))
@@ -761,13 +769,20 @@ class Campo:
                 return True
             return toque.startswith("campo:")
         if q == "data":
-            if toque == "campo:hoje:sim":
+            # #1097: o que foi ESCRITO vale como o botao; "nao sei" deixa a foto sem dia
+            resp = _sem_acento(texto).strip(" !.,") if texto else ""
+            if toque == "campo:hoje:sim" or resp in RESPOSTAS_SIM:
                 r = self._gravar(con, r, data_dita=_dia(r["recebido_em"]), data_presumida=False)
                 self._texto(con, saida, e.pessoa.para, ANOTADO)
                 self._perguntar_proxima(con, saida, r, agora)
                 return True
-            if toque == "campo:hoje:outra":
+            if toque == "campo:hoje:outra" or resp in RESPOSTAS_NAO:
                 self._perguntar(con, saida, r, agora, "qual_dia")
+                return True
+            if resp in RESPOSTAS_SEM_DIA:
+                r = self._gravar(con, r, sem_dia=True, data_dita=None, data_presumida=False)
+                self._texto(con, saida, e.pessoa.para, SEM_DIA)
+                self._perguntar_proxima(con, saida, r, agora)
                 return True
             dia = ler_data(texto, agora) if texto else None
             if dia:
@@ -796,8 +811,10 @@ class Campo:
                 r = self._gravar(con, r, data_dita=dia, data_presumida=False)
                 self._texto(con, saida, e.pessoa.para, ANOTADO)
             else:
-                r = self._gravar(con, r, data_dita=_dia(r["recebido_em"]), data_presumida=True)
-                self._texto(con, saida, e.pessoa.para, NAO_ENTENDI_DATA)
+                # #1097: "nao sei", ou o dia que nao se entende, deixa a foto SEM dia (antes presumia o do envio)
+                r = self._gravar(con, r, sem_dia=True, data_dita=None, data_presumida=False)
+                self._texto(con, saida, e.pessoa.para, SEM_DIA if _sem_acento(texto or "").strip(" !.,") in RESPOSTAS_SEM_DIA
+                            else NAO_ENTENDI_DATA)
             self._perguntar_proxima(con, saida, r, agora)
             return True
         return False
@@ -976,7 +993,8 @@ def classe_aplicada(con, item_id: int, agora: datetime) -> dict | None:
 def descrever(r) -> dict:
     # #982: com a safra dita e sem dia, a data vai VAZIA (o marketing nao presume o dia)
     com_safra = r["safra_dita"] is not None and r["data_dita"] is None
-    data = None if com_safra else (r["data_dita"] or _dia(r["recebido_em"]))
+    sem_dia = bool(r.get("sem_dia")) and r["data_dita"] is None   # #1097: a pessoa nao soube o dia
+    data = None if (com_safra or sem_dia) else (r["data_dita"] or _dia(r["recebido_em"]))
     falta = []
     if not (r["legenda"] or "").strip():
         falta.append("legenda")
@@ -992,7 +1010,7 @@ def descrever(r) -> dict:
             "classe": classe, "fechado": r["fechado_em"] is not None, "desistiu": r["desistiu_em"] is not None,
             "perguntado": r["perguntas_em"] is not None, "safra": r["safra_dita"],
             "data": data.isoformat() if data else None,
-            "data_presumida": (r["data_dita"] is None or r["data_presumida"]) and not com_safra,
+            "data_presumida": (r["data_dita"] is None or r["data_presumida"]) and not com_safra and not sem_dia,
             "recebido_em": r["recebido_em"].isoformat(), "falta": falta,
             "lote": r["lote"], "atv": r["atv"], "buscado_em": r["buscado_em"].isoformat() if r["buscado_em"] else None}
 

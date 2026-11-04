@@ -160,6 +160,42 @@ def test_sem_frase_pergunta_o_que_falta_em_texto_e_a_ia_encaixa(canal):
     assert sorted(m["perguntas_feitas"]) == ["data", "fase", "legenda", "produto", "qual_dia"]
 
 
+def test_1097_sim_e_nao_escritos_valem_como_os_botoes_e_nao_sei_deixa_sem_dia(canal):
+    """A ficha do Willian (21/10): "Nao" digitado a "E de hoje?" foi colado na legenda e o dia foi
+    presumido. Agora "nao" escrito pergunta o dia, "sim" escrito e o dia do envio, e "nao sei" deixa a
+    foto sem dia, inclusive no fechamento e no que vai ao marketing."""
+    ligar(canal)
+    s = SaidaFalsa()
+    # 1. "nao" escrito -> "Qual dia?"; "nao sei" -> sem dia
+    passo(canal, s, foto("wamid.f1", "Dessecada, apenas palhada do AVR +PALHA MULTI"),
+          ia=IAFalsa(campo={"bastidor": "campo-de-sementes", "produto": "AVR +PALHA MULTI", "fase": "palhada"}))
+    minuto(canal, s, AGORA + 3 * MIN)
+    assert s.ultima[2] == campo.PERGUNTA_DATA
+    passo(canal, s, texto("wamid.t1", "Não", numero=EQUIPE), agora=AGORA + 4 * MIN)
+    assert s.ultima[2] == campo.PERGUNTA_QUAL_DIA
+    passo(canal, s, texto("wamid.t2", "não sei", numero=EQUIPE), agora=AGORA + 5 * MIN)
+    assert campo.SEM_DIA in textos(s)
+    m = material(canal)[0]
+    assert m["legenda"] == "Dessecada, apenas palhada do AVR +PALHA MULTI"        # nada colado na legenda
+    assert (m["classe_fase"], m["sem_dia"], m["data_dita"], m["data_presumida"]) == ("palhada", True, None, False)
+    minuto(canal, s, AGORA + 40 * MIN)                                              # o grupo fecha
+    m = material(canal)[0]
+    assert m["fechado_em"] is not None and m["data_dita"] is None and m["data_presumida"] is False
+    with conexao(canal) as con:
+        p = campo.pendentes(con, AGORA + 41 * MIN)[0]
+    assert p["data"] is None and p["data_presumida"] is False and p["classe"]["fase"] == "palhada"
+    # 2. "sim" escrito e o dia do envio
+    s2 = SaidaFalsa()
+    passo(canal, s2, foto("wamid.f2", "Centeio IPR 89 florindo"), agora=AGORA + 2 * H,
+          ia=IAFalsa(campo={"bastidor": "campo-de-sementes", "produto": "CENTEIO IPR 89", "fase": "flor"}))
+    minuto(canal, s2, AGORA + 2 * H + 3 * MIN)
+    assert s2.ultima[2] == campo.PERGUNTA_DATA
+    passo(canal, s2, texto("wamid.t3", "sim", numero=EQUIPE), agora=AGORA + 2 * H + 4 * MIN)
+    m2 = [x for x in material(canal) if x["wamid"] == "wamid.f2"][0]
+    assert m2["data_dita"] is not None and m2["data_presumida"] is False and m2["sem_dia"] is False
+    assert "sim" not in m2["legenda"]
+
+
 def test_o_limite_de_tres_perguntas_deixa_o_resto_a_classificar(canal):
     """A resposta que a IA nao encaixa fica na legenda e a pergunta nao se repete; no limite de tres,
     so a data sai e o grupo fecha com o que tem."""
