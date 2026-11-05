@@ -255,6 +255,8 @@ def _nao_e_whatsapp(con, numero):
 
 NAO_VISTO = timedelta(days=7)
 LEGENDA_DA_IMAGEM = 1024   # o limite da Meta para a legenda de uma imagem (#1207)
+#: #1267: a linha que abre o material mandado na janela aberta, no lugar do convite
+TEXTO_NA_JANELA = "Mais material da Renascer com a marca da sua loja:"
 
 
 # #1237 (03/11/2026): a janela de 24 h conta da HORA DA MENSAGEM (`msg.timestamp`, que e como a Meta
@@ -269,17 +271,24 @@ HORA_DA_MENSAGEM = """CASE WHEN corpo->'msg'->>'timestamp' ~ '^[0-9]{9,11}$'
                            ELSE recebido_em END"""
 
 
-def janela_aberta(con, numero: str, agora: datetime) -> bool:
-    """A pessoa mandou QUALQUER mensagem (texto, foto, toque, reacao) ao numero da empresa ha menos de
-    24 h, contadas da hora da mensagem (#1237). A fonte e `eventos_meta`, e nao `conversas`: o interno
-    que so manda foto ao canal de campo nao abre conversa nenhuma, e a janela dele esta aberta do mesmo
-    jeito (o canal de campo mede assim, `campo.ultima_mensagem_de`). A Meta manda o celular sem o 9; o
-    cadastro o guarda com o 9: procura-se pelas duas formas."""
+def inicio_da_janela(con, numero: str) -> datetime | None:
+    """A hora da ULTIMA mensagem da pessoa ao numero da empresa (qualquer uma: texto, foto, toque,
+    reacao), contada da hora da mensagem (#1237): e dela que a Meta conta as 24 h. None se nunca
+    escreveu. A fonte e `eventos_meta`, e nao `conversas`: o interno que so manda foto ao canal de campo
+    nao abre conversa nenhuma, e a janela dele esta aberta do mesmo jeito (o canal de campo mede assim,
+    `campo.ultima_mensagem_de`). A Meta manda o celular sem o 9; o cadastro o guarda com o 9:
+    procura-se pelas duas formas."""
     from .saida import wa_id_do_whatsapp
     formas = list({com_nove(numero), wa_id_do_whatsapp(com_nove(numero))})
     r = con.execute("SELECT max(" + HORA_DA_MENSAGEM + """) AS em FROM atendimento.eventos_meta
                         WHERE tipo = 'mensagem' AND corpo->'msg'->>'from' = ANY(%s)""", (formas,)).fetchone()
-    return r is not None and r["em"] is not None and agora - r["em"] < JANELA
+    return r["em"] if r is not None else None
+
+
+def janela_aberta(con, numero: str, agora: datetime) -> bool:
+    """A pessoa mandou qualquer mensagem ha menos de 24 h (`inicio_da_janela`)."""
+    em = inicio_da_janela(con, numero)
+    return em is not None and agora - em < JANELA
 
 
 def texto_do_modelo(m, corpo: list[str]) -> str:
@@ -385,7 +394,9 @@ class Envio:
                     con.execute("UPDATE atendimento.envio_destinatarios SET situacao = 'teto_do_mes' WHERE id = %s",
                                 (d["id"],))
                     continue
-                self._mandar_um(con, saida, e, m, d, lote, agora)
+                # #1267: o material a quem ja aceitou e esta com a janela aberta vai sem o convite pago
+                if not (e["tipo"] == "material" and self._na_janela(con, saida, e, d, lote, agora)):
+                    self._mandar_um(con, saida, e, m, d, lote, agora)
                 saiu.append(d)
                 mandados += 1
             self._resumo_ao_representante(con, e, saiu)
@@ -417,6 +428,33 @@ class Envio:
                if m["botao"] in ("falar_responsavel", "parar_e_falar") else None)
         capa = (d["capa"] or e["capa"]) if m["cabecalho_imagem"] else None
         return parametros(m, fontes), capa, botoes, url, len(imagens)
+
+    def _na_janela(self, con, saida, e, d, lote, agora) -> bool:
+        """#1267 (dono, 05/11/2026): o MATERIAL na janela aberta. Quem ja aceitou (ultimo consentimento
+        `aceite`, ou o aceite do cadastro) e mandou qualquer mensagem ha menos de 24 h recebe uma linha
+        de texto e as imagens, mensagens livres que a Meta nao cobra dentro da janela, no lugar do
+        convite pago. A `resposta_em` e a hora da ultima mensagem DELE (o comeco da janela que a Meta
+        conta), para as imagens pararem quando a janela fechar; a `resposta` fica nula, porque ninguem
+        tocou. Devolve False -- e vai o convite de sempre -- se nao cabe, ou se o texto falhou (a Meta
+        diz que a janela fechou, por exemplo)."""
+        if not (d["aceite_cadastro"] or _ultimo_consentimento(con, d["whatsapp"]) == "aceite"):
+            return False
+        inicio = inicio_da_janela(con, d["whatsapp"])
+        if inicio is None or agora - inicio >= JANELA:
+            return False
+        imagens = d["imagens"] if d["imagens"] is not None else e["imagens"]
+        try:
+            w = saida.texto(d["whatsapp"], TEXTO_NA_JANELA)
+        except Exception:   # noqa: BLE001 -- a recusa da Meta nao perde o envio: vai o convite
+            return False
+        con.execute("""UPDATE atendimento.envio_destinatarios
+                          SET situacao = 'convidado', lote = %s, convite_wamid = %s, convite_em = %s,
+                              imagens_total = %s, resposta_em = %s, sem_convite = true
+                        WHERE id = %s""", (lote, w, agora, len(imagens), inicio, d["id"]))
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
+                       VALUES (%s, %s, 'texto', %s)""", (w, d["whatsapp"], "material sem convite %s" % e["peca"]))
+        self._mandar_imagens(con, saida, d["id"], agora)
+        return True
 
     def _mandar_um(self, con, saida, e, m, d, lote, agora):
         corpo, capa, botoes, url, n = self._mensagem(e, m, d, d["nome"], d["responsavel_whatsapp"])
@@ -572,7 +610,7 @@ class Envio:
 
     def mandar_imagens_pendentes(self, con, saida, agora):
         for d in con.execute("""SELECT id FROM atendimento.envio_destinatarios
-                                 WHERE resposta = 'quero' AND imagens_enviadas < imagens_total
+                                 WHERE (resposta = 'quero' OR sem_convite) AND imagens_enviadas < imagens_total
                                    AND resposta_em > %s""", (agora - JANELA,)).fetchall():
             self._mandar_imagens(con, saida, d["id"], agora)
 
