@@ -101,7 +101,7 @@ chegam vários pedidos de uma vez.
 ## Escopo desta etapa
 
 **DENTRO:**
-- migração 057: `envios.suspenso_por` (text) e `envios.suspenso_em` (timestamptz); a chave
+- migração 058: `envios.suspenso_por` (text) e `envios.suspenso_em` (timestamptz); a chave
   `envio.segurar` em `ajustes`, desligada;
 - `envio.mandar_lotes` e `envio.receber_pedido` respeitando a chave;
 - rotas das telas: `POST /envios/{id}/suspender`, `POST /envios/{id}/religar` (passa a aceitar
@@ -132,7 +132,7 @@ chegam vários pedidos de uma vez.
 1. Desligar o "segurar tudo" na tela (ou `UPDATE atendimento.ajustes SET valor = '{"ligado": false}'
    WHERE chave = 'envio.segurar'`). É o rollback operacional: tudo volta ao de hoje.
 2. Reverter os commits do plano (código primeiro), build do frontend, restart dos dois serviços.
-3. `057_segurar_envio_VOLTA.sql`: as duas colunas e a chave saem. Envio que ficou `suspenso` continua
+3. `058_segurar_envio_VOLTA.sql`: as duas colunas e a chave saem. Envio que ficou `suspenso` continua
    `suspenso` (o estado já existia), e o script de 28/10 continua religando.
 
 ## Manual de uso

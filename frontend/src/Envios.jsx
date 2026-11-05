@@ -85,6 +85,17 @@ export default function Envios() {
     try { await mandar('POST', `/envios/${escolhido}/religar`); carregar(); setD(null); setEscolhido(escolhido) }
     catch (e) { setErro(e.message) }
   }
+  // #1169: suspender este envio; e o "segurar tudo", que para os convites de todos
+  async function suspender() {
+    if (!window.confirm('Suspender este envio? Quem ainda não recebeu o convite fica na fila, sem perder a posição.')) return
+    try { await mandar('POST', `/envios/${escolhido}/suspender`); carregar(); setD(null); setEscolhido(escolhido) }
+    catch (e) { setErro(e.message) }
+  }
+  async function segurarTudo(ligado) {
+    if (ligado && !window.confirm('Segurar TODO o envio à carteira? Nenhum convite sai, de envio nenhum, e todo pedido novo do marketing entra suspenso.')) return
+    try { await mandar('PUT', '/ajustes/segurar-envio', { ligado }); carregar(); setD(null); setEscolhido(escolhido) }
+    catch (e) { setErro(e.message) }
+  }
 
   const c = d && d.cartoes
   const linhasVisiveis = !d ? [] : (() => {
@@ -102,12 +113,16 @@ export default function Envios() {
       <p className="sub">O Marketing pede o envio e você aprova lá, em Publicações. Aqui o envio é acompanhado: quem
         recebeu, quem leu, quem quis e quem não quis. Sai em lotes de até 20 por dia, só com a nota do número em verde.</p>
       {erro && <p className="aviso erro">{erro}</p>}
+      {lista && lista.segurado && lista.segurado.ligado && (
+        <p className="aviso erro"><b>Envio à carteira SEGURADO</b>
+          {lista.segurado.em ? ` desde ${quando(lista.segurado.em)}` : ''}{lista.segurado.por ? ` por ${lista.segurado.por}` : ''}.
+          {' '}Nenhum convite sai, e todo pedido novo entra suspenso.</p>)}
       {lista && lista.envios.length === 0 && <p className="vazio">Nenhum envio ainda. Ele nasce em Publicações, no AxiaMarketing.</p>}
       {lista && lista.envios.length > 0 && (
         <div className="filtros">
           <select value={escolhido || ''} onChange={(e) => { setEscolhido(Number(e.target.value)); setD(null); setSituacao("") }}>
             {lista.envios.map((e) => (
-              <option key={e.id} value={e.id}>{TIPO[e.tipo]} · {e.campanha || e.peca} · {quando(e.aprovado_em)}</option>))}
+              <option key={e.id} value={e.id}>{TIPO[e.tipo]} · {e.campanha || e.peca} · {quando(e.aprovado_em)}{e.situacao === 'suspenso' ? ' · suspenso' : ''}</option>))}
           </select>
           <select value={responsavel} onChange={(e) => setResponsavel(e.target.value)}>
             <option value="">Todos os responsáveis</option>
@@ -124,13 +139,21 @@ export default function Envios() {
             <option value="nao_quero">Não quero</option><option value="texto">Escreveu</option><option value="falar">Tocou em falar</option>
           </select>
           {lista.nota && <span className="leve">Nota do número: <b>{NOTA[lista.nota.nota]}</b></span>}
+          {lista.segurado && (lista.segurado.ligado
+            ? <button className="secundario" onClick={() => segurarTudo(false)}>Soltar o envio</button>
+            : <button className="secundario" onClick={() => segurarTudo(true)}>Segurar tudo</button>)}
         </div>
       )}
       {d && (
         <>
           <div className="grupo">{TIPO[d.envio.tipo]} · {d.envio.peca} · aprovado por {d.envio.aprovado_por} em {quando(d.envio.aprovado_em)}
             {' · '}<b>{ESTADO[d.envio.situacao]}</b>
-            {d.envio.situacao === 'parado_nota' && <button className="secundario religar" onClick={religar}>Religar o envio</button>}</div>
+            {(d.envio.situacao === 'parado_nota' || d.envio.situacao === 'suspenso') && <button className="secundario religar" onClick={religar}>Religar o envio</button>}
+            {(d.envio.situacao === 'ativo' || d.envio.situacao === 'parado_nota') && <button className="secundario religar" onClick={suspender}>Suspender</button>}
+            {(() => { const x = lista && lista.envios.find((e) => e.id === d.envio.id)
+              return x && x.suspenso_por && <span className="leve"> · {x.situacao === 'suspenso' ? 'suspenso' : 'religado'} por {
+                x.suspenso_por === 'segurar tudo' ? 'Segurar tudo' : x.suspenso_por === 'chegou no segurar tudo' ? 'chegou durante o Segurar tudo' : x.suspenso_por}
+                {x.suspenso_em ? ` em ${quando(x.suspenso_em)}` : ''}</span> })()}</div>
           <div className="cartoes">
             <div className="cartao"><span>{d.envio.tipo === 'direta' ? 'Enviados' : 'Convidados'}</span><b>{c.convidados}</b></div>
             <div className="cartao"><span>Entregues</span><b>{c.entregues}</b></div>
@@ -162,8 +185,10 @@ export default function Envios() {
                       {l.aviso_recusa_em ? ' · responsável avisado' : ''}</span>}
                     {l.resposta === 'falar' && <span className="selo v">tocou em falar · {hora(l.resposta_em)}</span>}
                     {l.resposta === 'texto' && <><span className="selo v">escreveu · {hora(l.resposta_em)}</span> “{l.resposta_texto}”</>}
-                    {!l.resposta && <span className="leve">—</span>}</td>
-                  <td>{l.resposta === 'quero' ? l.imagens : <span className="leve">—</span>}</td>
+                    {!l.resposta && (l.sem_convite
+                      ? <span className="selo v" title="Já tinha aceitado e escreveu nas últimas 24 h: foi sem o convite pago">sem convite (janela aberta)</span>
+                      : <span className="leve">—</span>)}</td>
+                  <td>{l.resposta === 'quero' || l.sem_convite ? l.imagens : <span className="leve">—</span>}</td>
                 </tr>
               ))}
             </tbody>

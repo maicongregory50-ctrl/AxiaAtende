@@ -15,7 +15,7 @@ a chave geral e o registro de quem e quando. Plano e execução nesta mesma sess
 
 ## Passos
 
-1. **Migração 057** — `backend/migracoes/057_segurar_envio.sql` + `_VOLTA.sql`: `envios.suspenso_por`
+1. **Migração 058** — `backend/migracoes/058_segurar_envio.sql` + `_VOLTA.sql`: `envios.suspenso_por`
    (text) e `envios.suspenso_em` (timestamptz); chave `envio.segurar` em `ajustes` com valor
    `{"ligado": false}` (`ON CONFLICT DO NOTHING`, como a 052). — verificação: `test_migracoes` ida e
    volta — reversão: `_VOLTA`.
@@ -59,8 +59,8 @@ a chave geral e o registro de quem e quando. Plano e execução nesta mesma sess
    com `--basetemp` próprio e a 5437 de pé. — verificação: tudo verde. — reversão: n/a.
 
 9. **Subida** — commits com `#1169`, push; build já feito; restart do `axiaatende-recepcionista`
-   (a 057 aplica) e do `axiaatende-backend` pela Porta-Ação **pelo dono** (o classificador barra a
-   sessão). — verificação: `/saude` das telas lista a 057; `/saude` do recepcionista traz
+   (a 058 aplica) e do `axiaatende-backend` pela Porta-Ação **pelo dono** (o classificador barra a
+   sessão). — verificação: `/saude` das telas lista a 058; `/saude` do recepcionista traz
    `envio_segurado.ligado=false`; a tela mostra o envio suspenso de 28/10 com o botão Religar. —
    reversão: ROLLBACK_PLAN da spec.
 
@@ -78,7 +78,7 @@ a chave geral e o registro de quem e quando. Plano e execução nesta mesma sess
 
 ## Riscos de execução identificados
 
-- **057 sem o código:** colunas nulas e chave desligada; nada muda. Seguro.
+- **058 sem o código:** colunas nulas e chave desligada; nada muda. Seguro.
 - **Código no ar com a chave desligada:** o comportamento é o de hoje. Seguro em qualquer ponto.
 - **Recepcionista reiniciado antes das telas:** a tela antiga não mostra a chave, mas ninguém a liga sem
   a tela nova. Seguro.

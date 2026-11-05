@@ -141,6 +141,31 @@ def test_envios_lista_detalhe_e_religar(ligado, tela, tmp_path):
     assert tela.get("/api/envios/99").status_code == 404
 
 
+def test_1169_suspender_religar_e_segurar_tudo_pela_tela(ligado, tela, tmp_path):
+    pasta = tmp_path / "mk1169"
+    pasta.mkdir()
+    imgs = []
+    for n in ("capa.jpg", "t1.jpg"):
+        (pasta / n).write_bytes(bytes([0xFF, 0xD8, 0xFF]))
+        imgs.append(str(pasta / n))
+    pedir(ligado, pedido(imgs, [cliente(1, 10)]))
+    assert tela.post("/api/envios/1/suspender").status_code == 200
+    e = tela.get("/api/envios").json()["envios"][0]
+    assert e["situacao"] == "suspenso" and e["suspenso_por"] and e["suspenso_em"]
+    assert tela.post("/api/envios/1/suspender").status_code == 422                 # ja esta suspenso
+    r = tela.put("/api/ajustes/segurar-envio", json={"ligado": True}).json()
+    assert r["ligado"] is True and r["por"] and r["em"]
+    assert tela.get("/api/envios").json()["segurado"]["ligado"] is True
+    assert "SEGURADO" in tela.post("/api/envios/1/religar").json()["detail"]      # com a trava, nao religa
+    assert tela.put("/api/ajustes/segurar-envio", json={"ligado": False}).json()["ligado"] is False
+    assert tela.post("/api/envios/1/religar").status_code == 200
+    assert tela.get("/api/envios").json()["envios"][0]["situacao"] == "ativo"
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.envios SET situacao = 'concluido'")
+    assert tela.post("/api/envios/1/suspender").status_code == 422                 # concluido nao se suspende
+    assert tela.post("/api/envios/1/religar").status_code == 422
+
+
 def test_destinos_trocar_numero_ligar_opcao_e_horario(ligado, tela):
     d = tela.get("/api/destinos").json()
     cascavel = next(o for o in d["opcoes"] if o["chave"] == "comercial.produtor.pr.cascavel")

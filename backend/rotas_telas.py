@@ -333,7 +333,8 @@ def rotas(cfg, usuario) -> APIRouter:
         with conexao(cfg) as con:
             lista = con.execute(
                 """SELECT e.id, e.tipo, e.campanha, e.peca, e.assunto, e.modelo, e.aprovado_por, e.aprovado_em,
-                          e.situacao, count(d.*) FILTER (WHERE d.convite_em IS NOT NULL) AS convidados
+                          e.situacao, e.suspenso_por, e.suspenso_em,
+                          count(d.*) FILTER (WHERE d.convite_em IS NOT NULL) AS convidados
                      FROM atendimento.envios e LEFT JOIN atendimento.envio_destinatarios d ON d.envio_id = e.id
                     GROUP BY e.id ORDER BY e.id DESC LIMIT 100""").fetchall()
             nota = con.execute("SELECT nota, lida_em FROM atendimento.nota_qualidade ORDER BY lida_em DESC LIMIT 1").fetchone()
@@ -348,7 +349,11 @@ def rotas(cfg, usuario) -> APIRouter:
                                         JOIN atendimento.pendencias p ON p.id = m.pendencia_id
                                        WHERE m.criado_em > now() - interval '30 days'
                                        ORDER BY m.id DESC LIMIT 200""").fetchall()
-        return {"envios": [{**dict(e), "aprovado_em": e["aprovado_em"].isoformat()} for e in lista],
+            from . import segurar
+            segurado = segurar.estado(con)   # #1169
+        return {"segurado": segurado,
+                "envios": [{**dict(e), "aprovado_em": e["aprovado_em"].isoformat(),
+                            "suspenso_em": e["suspenso_em"].isoformat() if e["suspenso_em"] else None} for e in lista],
                 "nota": dict(nota, lida_em=nota["lida_em"].isoformat()) if nota else None,
                 "avisos": [estado_do_aviso(a) for a in avisos],
                 "chamados": [{**{k: c[k] for k in ("id", "sentido", "classe", "estado", "resultado", "erro", "texto",
@@ -383,6 +388,7 @@ def rotas(cfg, usuario) -> APIRouter:
             linhas.append({"codigo": d["erp_codigo"], "nome": d["nome"], "cidade": d["cidade"], "uf": d["uf"],
                            "responsavel": d["responsavel_nome"], "sugestao": d["sugestao_vendedor"],
                            "situacao": d["situacao"], "lote": d["lote"],
+                           "sem_convite": bool(d.get("sem_convite")),   # #1267: saiu na janela aberta
                            "convite_em": d["convite_em"].isoformat() if d["convite_em"] else None,
                            "entregue_em": d["entregue_em"].isoformat() if d["entregue_em"] else None,
                            "lido_em": d["lido_em"].isoformat() if d["lido_em"] else None,
@@ -397,14 +403,39 @@ def rotas(cfg, usuario) -> APIRouter:
                 "cartoes": cartoes, "responsaveis": resp, "linhas": linhas}
 
     @r.post("/envios/{envio_id}/religar")
-    def religar(envio_id: int):
-        """O envio que parou pela nota amarela ou vermelha volta a andar. Decisao do dono, na tela."""
+    def religar(envio_id: int, u: dict = Depends(usuario)):
+        """O envio parado pela nota ou suspenso volta a andar, com quem e quando (#1169)."""
+        from . import segurar
         with conexao(cfg) as con:
-            n = con.execute("""UPDATE atendimento.envios SET situacao = 'ativo'
-                                WHERE id = %s AND situacao = 'parado_nota'""", (envio_id,)).rowcount
-        if not n:
-            raise HTTPException(status_code=422, detail="este envio não está parado pela nota")
+            try:
+                segurar.religar(con, envio_id, u.get("login") or "?", datetime.now(timezone.utc))
+            except segurar.Recusa as e:
+                raise HTTPException(status_code=422, detail=str(e)) from None
         return {"religado": envio_id}
+
+    @r.post("/envios/{envio_id}/suspender")
+    def suspender(envio_id: int, u: dict = Depends(usuario)):
+        """#1169: o envio para; quem ainda nao recebeu o convite fica na fila, sem perder a posicao."""
+        from . import segurar
+        with conexao(cfg) as con:
+            try:
+                segurar.suspender(con, envio_id, u.get("login") or "?", datetime.now(timezone.utc))
+            except segurar.Recusa as e:
+                raise HTTPException(status_code=422, detail=str(e)) from None
+        return {"suspenso": envio_id}
+
+    class Segurar(BaseModel):
+        ligado: bool
+
+    @r.put("/ajustes/segurar-envio")
+    def segurar_envio(dados: Segurar, u: dict = Depends(usuario)):
+        """#1169: o "segurar tudo". Ligado, nenhum convite sai e todo pedido novo nasce suspenso."""
+        from . import segurar
+        agora = datetime.now(timezone.utc)
+        with conexao(cfg) as con:
+            n = (segurar.ligar if dados.ligado else segurar.desligar)(con, u.get("login") or "?", agora)
+            est = segurar.estado(con)
+        return {**est, "envios": n}
 
     # ── Destinos ─────────────────────────────────────────────────────────────
 

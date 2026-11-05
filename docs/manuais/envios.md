@@ -12,7 +12,12 @@ abertura do canal, usa o mesmo convite do material, mas vai a outra lista):
 
 - **Material para cliente** — a peça da esteira, com a versão de cada revenda. Vai um **convite** com
   a capa e os botões "Quero receber" / "Não quero receber"; quem toca "Quero receber" recebe as
-  imagens na conversa, sem custo, e o aceite fica gravado.
+  imagens na conversa, sem custo, e o aceite fica gravado. **Na janela aberta** (desde 05/11/2026,
+  #1267): quem já aceitou e mandou qualquer mensagem nas últimas 24 h recebe o material seguinte
+  **sem o convite pago** — a linha "Mais material da Renascer com a marca da sua loja:" e as imagens,
+  mensagens que a Meta não cobra dentro da janela. A janela conta da última mensagem dele; quem não
+  escreveu nas últimas 24 h recebe o convite de sempre. Vale só para o material, não para a
+  comunicação direta.
 - **Comunicação direta** — uma arte com o texto e o botão "Falar com meu atendimento": um toque e
   o cliente já está no WhatsApp do responsável dele, e o toque fica anotado. **Só vai a quem já
   aceitou.**
@@ -30,14 +35,22 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 ## 3. O caminho comum
 
 1. Escolha o envio (tipo · campanha · data).
-2. Leia a barra no alto (o que é, quem aprovou e se está **enviando**, **concluído** ou **PARADO**) e os
-   cartões.
+2. Leia a barra no alto (o que é, quem aprovou e se está **enviando**, **concluído**, **suspenso** ou
+   **PARADO**) e os cartões.
 3. Filtre por responsável, por **situação** (na fila, enviado, sem responsável, responsável sem WhatsApp, recusou
    antes… — cada uma com quantos são) ou por resposta. Clique no título de uma coluna para ordenar por ela;
    um segundo clique inverte, e o terceiro volta à ordem do ranking (#1199).
 4. Na lista, veja quem escreveu alguma coisa: o texto aparece ao lado.
 5. Se a barra disser **PARADO pela nota do número**, leia o porquê abaixo antes de clicar **Religar o
    envio**.
+6. **Para segurar um envio** (desde 05/11/2026, #1169): clique **Suspender** no envio aberto. Quem ainda não
+   recebeu o convite fica na fila, sem perder a posição. Para voltar, **Religar o envio**. A barra diz
+   quem suspendeu ou religou, e quando.
+7. **Para segurar tudo:** clique **Segurar tudo** na linha dos filtros. Nenhum convite sai, de envio
+   nenhum, e todo pedido novo que o marketing mandar entra **suspenso**. Para soltar, **Soltar o envio**:
+   volta a andar o que estava enviando. O que chegou durante a trava continua suspenso: abra cada um e
+   clique **Religar o envio** quando quiser que saia. Enquanto a trava estiver ligada, ninguém religa
+   envio nenhum.
 
 ## 4. O que significa cada sinal
 
@@ -60,9 +73,12 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **"recusou antes" / "já recebeu esta peça"** | não recebe de novo |
 | **"fora: teto do mês (já recebeu duas)"** (#1163) | o **comprador** já recebeu duas mensagens nossas neste mês. Conta **um por envio recebido** (o convite do material ou a mensagem da direta, de qualquer envio); as imagens depois do "Quero receber" são parte do mesmo envio e não contam de novo. Ele não recebe esta, e volta a receber no mês seguinte. O mês é o do calendário, em Brasília, e a conta é feita na hora em que o lote sai. O técnico e o contato sem papel não entram no teto |
 | **Imagens "3 de 3"** | todas as imagens chegaram a quem quis |
+| **"sem convite (janela aberta)"** (#1267) | ele já tinha aceitado e escreveu nas últimas 24 h: o material foi direto, sem o convite pago. A resposta fica em branco porque ninguém tocou; se ele escrever depois, aparece "escreveu" |
 | **"—"** | ainda não aconteceu (não é zero) |
 | **Nota do número: verde / amarela / vermelha** | a nota de qualidade que a Meta dá ao número da empresa. Só sai lote com verde |
 | **PARADO pela nota do número** | a nota caiu para amarela ou vermelha: os envios param sozinhos para proteger o número. **Religar o envio** volta a mandar (só com a nota de volta ao verde) |
+| **suspenso** (#1169) | alguém clicou **Suspender** (a barra diz quem e quando), ou o envio chegou durante o **Segurar tudo** ("chegou durante o Segurar tudo"), ou parou porque a trava foi ligada ("por Segurar tudo", e volta sozinho quando ela é solta). Nada sai dele até ser religado |
+| **Faixa vermelha "Envio à carteira SEGURADO"** (#1169) | o **Segurar tudo** está ligado, com quem ligou e quando. Enquanto ela estiver lá, nenhum convite sai e todo pedido novo entra suspenso |
 
 **Os lotes:** saem até 20 clientes por dia, na ordem do ranking de faturamento (Top 20, depois o 21º
 ao 40º…), e só com a nota verde.
@@ -187,6 +203,11 @@ representante, e reclamação).
   reiniciar.
 
 ## 5. O que a tela NÃO faz
+
+- **Suspender e Segurar tudo não seguram as imagens** de quem já tocou "Quero receber": quem pediu recebe.
+  Também não seguram os avisos à equipe, os chamados no WhatsApp nem o Status do dia (#1169).
+- **Não recusa nem apaga pedido do marketing:** com o Segurar tudo ligado, o pedido entra e fica suspenso.
+- **Não desliga o envio do lado do marketing:** lá existe outra chave, e as duas valem juntas.
 
 - **Não cria nem aprova envio:** o envio nasce e é aprovado em Publicações, no AxiaMarketing.
 - **Não reenvia imagem depois de 24 horas** do "Quero receber": a Meta só deixa mensagem grátis

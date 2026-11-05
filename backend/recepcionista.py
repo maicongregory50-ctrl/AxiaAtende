@@ -285,6 +285,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 from . import audio, roteador   # #1238: as duas chaves e a fila da transcricao
                 rot = {"ligado": roteador.ligado(con)}
                 aud = audio.saude(cfg, con)
+                from . import segurar   # #1169: o "segurar tudo" do envio a carteira
+                seg = segurar.estado(con)
         except Exception as erro:  # noqa: BLE001
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
@@ -297,7 +299,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 # cala nao ser ela mesma um fracasso silencioso. Zero nao quer dizer desligada: quer
                 # dizer que ninguem esbarrou nela, ou que o servico acabou de subir.
                 "calados": dict(motor.calados),
-                "roteador": rot, "audio": aud,
+                "roteador": rot, "audio": aud, "envio_segurado": seg,
                 # o nome publico la fora (vigia.py): None = ainda nao conferido
                 "endereco": endereco and {"situacao": endereco["situacao"], "desde": endereco["desde"].isoformat(),
                                           "conferido_em": endereco["conferido_em"].isoformat()}}

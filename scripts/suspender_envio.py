@@ -8,7 +8,9 @@ com --religar (volta a `ativo`). Sem `--gravar`, SO MOSTRA. Em producao, janela 
     C:\\AxiaAtende\\.venv\\Scripts\\python.exe C:\\AxiaAtende\\scripts\\suspender_envio.py --envio 6 --gravar
 """
 import argparse
+import getpass
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -41,7 +43,8 @@ def main():
         if not args.gravar:
             print("\nso mostrei. Para passar a %s, repita com --gravar" % novo)
             return
-        con.execute("UPDATE atendimento.envios SET situacao = %s WHERE id = %s", (novo, e["id"]))
+        con.execute("UPDATE atendimento.envios SET situacao = %s, suspenso_por = %s, suspenso_em = %s WHERE id = %s",
+                    (novo, "script:%s" % getpass.getuser(), datetime.now().astimezone(), e["id"]))   # #1169: quem e quando
         print("\ngravado: envio %s agora %s" % (e["id"], novo))
 
 

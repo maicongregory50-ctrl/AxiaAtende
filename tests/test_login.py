@@ -48,30 +48,8 @@ def test_saude_diz_que_nao_responde_ninguem(cfg):
     with TestClient(criar_app(cfg)) as c:
         s = c.get("/saude").json()
     assert s["de_pe"] is True and s["responde"] is False
-    assert s["mudancas"] == ["001_casa_e_atendimento.sql", "002_menu_da_olivia.sql",
-                            "003_modelos_e_comunicacao_direta.sql",
-                            "004_modelo_nao_comeca_por_variavel.sql", "005_direta_por_toque.sql",
-                            "006_agenda_do_cadastro.sql", "007_uma_pergunta_por_dia.sql",
-                            "008_nota_em_tres_botoes.sql", "009_vigia_do_endereco.sql",
-                            "010_canal_de_campo.sql", "011_frase_do_campo.sql", "012_palpite_fase.sql",
-                            "013_atendente_de_campo.sql", "014_perguntas_feitas.sql",
-                            "015_grupo_da_conversa.sql", "016_retomada.sql", "017_safra_dita.sql",
-                            "018_menu_interno.sql", "019_direcao_do_pedido.sql",
-                            "020_pelo_nome_e_a_logo.sql",
-                            "021_ele_sabe_que_e_da_equipe.sql", "022_bastidores_em_cadastro.sql",
-                                "023_logos_puxadas.sql", "024_aviso_do_plano.sql",
-                                "025_trabalhe_conosco.sql", "026_imagem_e_logo_recebida.sql",
-                                "027_grato_a_quem_manda_assim_mesmo.sql", "028_lote_pelo_envio.sql",
-                                "029_vaga_sem_autoavaliacao.sql", "030_hora_de_envio_das_fotos_antigas.sql",
-                                "032_clientes_do_dia.sql",
-                              "033_fila_por_numero_e_resumo.sql", "034_teto_do_comprador.sql",
-                              "035_peca_a_mais.sql", "036_modelo_abertura_do_canal.sql",
-                              "037_texto_da_abertura_do_canal.sql",
-                              "038_abertura_do_canal_volta_ao_texto_aprovado.sql",
-                              "039_porteiro_dos_avisos.sql", "040_portao_do_cliente_da_carteira.sql",
-                              "041_consentimento_retomada.sql", "042_pedido_de_cte.sql",
-                              "043_informativo_ao_comprador.sql", "044_informativo_sem_link.sql",
-                              "045_informativo_so_ola.sql", "046_origem_da_conversa.sql",
-                              "047_texto_do_envio.sql", "048_status_do_dia.sql",
-                              "049_aviso_auditoria_estoque.sql", "050_custos.sql", "051_precos_oficiais.sql",
-                              "052_pendencias.sql", "053_logo_pelo_nome.sql", "054_roteador_e_audio.sql"]
+    # todas as mudancas da pasta, na ordem, e nenhuma a mais (#1169, 05/11: a lista escrita a mao ficava
+    # para tras a cada migracao nova -- parou na 054 com a 055 e a 056 ja no ar)
+    from backend import migracoes
+    nomes = [a.name for a in migracoes.listar()]
+    assert s["mudancas"] == nomes and nomes[0] == "001_casa_e_atendimento.sql" and len(nomes) >= 54

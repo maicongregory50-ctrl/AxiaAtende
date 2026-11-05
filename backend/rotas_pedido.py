@@ -111,10 +111,15 @@ def rotas(cfg) -> APIRouter:
         dados = pedido.model_dump()
         dados.update(capa=capa, imagens=imagens, clientes=clientes)
         with conexao(cfg) as con:
+            novo = con.execute("SELECT 1 FROM atendimento.envios WHERE pedido_ref = %s",
+                               (pedido.pedido_ref,)).fetchone() is None
             try:
                 envio_id = E.receber_pedido(con, dados)
             except E.PedidoInvalido as erro:
                 raise HTTPException(status_code=422, detail=str(erro)) from None
+            # #1169: com o "segurar tudo" ligado o pedido entra e nasce suspenso (decisao 1 do dono)
+            from . import segurar
+            segurar.no_pedido(con, envio_id, novo, datetime.now().astimezone())
             contagem = {x["situacao"]: x["n"] for x in con.execute(
                 """SELECT situacao, count(*) AS n FROM atendimento.envio_destinatarios
                     WHERE envio_id = %s GROUP BY situacao""", (envio_id,))}
