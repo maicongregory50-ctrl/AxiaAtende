@@ -37,3 +37,6 @@
 [2026-11-04][ATENDE-END] #1172 fechado (52611d3, restart das telas 16:20); #1018 recusado pelo dono. Abertos: #1097 (entrega 2 da ficha) e #1169 (interruptor do envio)
 [2026-11-04][ATENDE-END] #1128 ficha do frete nao aparecia na conversa com a Logistica: logistica_erp.mandar era o unico envio sem linha em atendimento.enviadas (5bb9b4c). Envio estava ok (FRT-2026-0003 entregue e lida 15:59). Linha da FRT-0003 inserida a mao pelo dono (fica 'aceita', os status da Meta chegaram antes); recepcionista reiniciado 16:22.
 [2026-11-05][ATENDE-END] #1097 fechado: entrega 2 (Marketing d255183/054, Atende dc40f25/056) no ar e provada 13:37 (foto de palhada com "nao sei a data" -> palhada, sem dia). Fila do Atende: so o #1169. Pendente miudo: manual recepcao.md (lista por contato)
+[2026-11-05][ATENDE-END] #1267 (material na janela aberta, sem convite pago): 057, testes e spec comitados; codigo na arvore junto com o #1169 em execucao; restart pelo dono depois do #1169
+[2026-11-05][ATENDE-END] #1267 no ar (restart do dono 14:30, 057 aplicada); envio.py comitado (0003672); fecha no primeiro envio sem convite
+[2026-11-05][ATENDE-END] #1169 fechado: Suspender/Religar por envio e Segurar tudo na tela Envios (058, b5adfa0); trava pelo estado do envio, envio.py intocado (#1267 na mesma arvore, migracao renumerada 057->058); restart 14:54. Fila do Atende vazia
