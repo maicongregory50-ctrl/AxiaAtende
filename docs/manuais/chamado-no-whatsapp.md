@@ -10,9 +10,11 @@ que você responde no celular entra no chamado, como se você tivesse escrito no
 
 ## 2. Quem usa e quando
 
-Quem abre chamado no sistema: Benedito, Fran, Alisson e o resto da equipe. Toda vez que o chamado anda:
-quando ele vira decisão, quando o trabalho começa, quando fica pronto, ou quando precisamos perguntar
-alguma coisa a você.
+Quem abre chamado no sistema: Benedito, Fran, Alisson e o resto da equipe. **Só quando o chamado pede
+alguma coisa de você ou termina** (dono, 05/11/2026, #1269): quando precisamos de uma resposta sua (a
+pergunta que o dono decidiu fazer), quando alguém da equipe escreve direto a você, e no fim — a entrega,
+que diz como usar e pede o teste, ou a recusa. O andamento (virou decisão, o trabalho começou, o plano
+foi gravado) fica no chamado, no sistema, e não vem ao celular.
 
 ## 3. O caminho comum
 
@@ -58,6 +60,8 @@ quê (por exemplo, o número não é o de quem abriu o chamado).
 - Não lê foto ou arquivo como resposta de chamado: só texto, os botões e, para a equipe, o **áudio**
   transcrito na máquina (#1238, quando a transcrição estiver ligada).
 - Não manda aviso fora de hora por conta própria: o que é só aviso espera você escrever para a empresa.
+- Não avisa cada etapa do chamado, nem manda a pergunta do agente de suporte sem o dono (#1269): isso
+  fica no chamado, no sistema.
 - Não manda o detalhe técnico: só a parte do comentário escrita para quem pediu.
 
 ## 6. Pré-requisito de cadastro
