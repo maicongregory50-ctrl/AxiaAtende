@@ -313,6 +313,28 @@ def texto_do_aviso(con, a) -> str:
     return texto_do_modelo(m, _partes_do_aviso(m, a))
 
 
+#: #1271 (dono, 05/11/2026: "o representante recebe se tiver janela de 24h aberta, se nao, fica na
+#: fila ate abrir"): o resumo do lote nao paga reabertura e nao vira "nao visto" -- espera calado o
+#: representante escrever, e os guardados saem juntos. A chave em `atendimento.ajustes` (059);
+#: ausente conta como ligada. Desligada, o resumo volta ao porteiro do #1188.
+RESUMO = "lote_do_representante"
+
+
+def resumo_espera_calado(con) -> bool:
+    r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = 'resumo.espera_calado'").fetchone()
+    return r is None or r["valor"] is not False
+
+
+def texto_dos_resumos(resumos: list) -> str:
+    """Os resumos guardados de um representante numa mensagem so (#1271): em 03/11 a DJ AGRO recebeu
+    cinco seguidos, todos do mesmo Boletim. `sobre` = "nome|quantos|assunto", o mesmo do modelo."""
+    partes = [(r["sobre"].split("|") + ["", "", ""])[:3] for r in resumos]
+    linhas = ["• %s: %s" % (q, assunto) for _, q, assunto in partes]
+    return ("Olá, %s. Nestes dias saíram mensagens nossas aos seus clientes:\n%s\n"
+            "O que cada um respondeu aparece no Relacionamento, no sistema."
+            % (partes[0][0] or "tudo bem", "\n".join(linhas)))
+
+
 # ── a rotina (lado do RECEPCIONISTA) ────────────────────────────────────────
 
 class Envio:
@@ -471,8 +493,9 @@ class Envio:
                             WHERE id = %s""", (lote, str(falha)[:300], d["id"]))
 
     #: o canal de quem RECEBE o resumo do lote. O dono e o flutuante ficam de fora: a copia por
-    #: cliente ia ao dono (o marketing o poe como responsavel de toda revenda) e foi assim que as
-    #: artes da Agro Real e da Agro Simil chegaram ao WhatsApp dele em 23/10. E o CORRETOR tambem
+    #: cliente ia ao dono, e foi assim que as artes da Agro Real e da Agro Simil chegaram ao WhatsApp
+    #: dele em 23/10. Desde o #1271 a revenda vem com o responsavel do ERP; a revenda cujo
+    #: representante e o proprio dono vem com o canal `dono`, e nao gera resumo. E o CORRETOR tambem
     #: (#1197, dono 29/10/2026): "corretor nao e representante; corretor nao recebe aviso nosso".
     CANAIS_DO_RESUMO = ("representante",)
 
@@ -646,6 +669,13 @@ class Envio:
                 self._falhou(con, a, falha, agora)
 
     def _porteiro_dos_avisos(self, con, saida, agora):
+        calado = resumo_espera_calado(con)
+        if not calado:
+            # #1271, o ROLLBACK: o resumo guardado calado (sem reabertura) volta a ser aviso novo, e o
+            # porteiro do #1188 manda a reabertura dele na volta de baixo
+            con.execute("""UPDATE atendimento.avisos SET guardado_em = NULL
+                            WHERE tipo = %s AND reabertura_id IS NULL AND guardado_em IS NOT NULL
+                              AND enviado_em IS NULL AND erro = '' AND nao_visto_em IS NULL""", (RESUMO,))
         # 1. os guardados: 7 dias sem toque viram nao visto; com a janela aberta (a pessoa escreveu,
         #    mesmo sem tocar Ver), saem como texto. Uma linha por numero: os guardados nao entram no
         #    lote de 20 de baixo, senao vinte guardados parariam a fila inteira.
@@ -659,9 +689,11 @@ class Envio:
             if janela_aberta(con, numero, agora):
                 self.soltar_guardados(con, saida, numero, agora)
             elif agora - g["reaberto_em"] >= NAO_VISTO:
+                # #1271: o resumo calado nao tem toque a esperar, e nao vira "nao visto"
                 con.execute("""UPDATE atendimento.avisos SET nao_visto_em = %s
                                 WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
-                                  AND guardado_em IS NOT NULL AND nao_visto_em IS NULL""", (agora, numero))
+                                  AND guardado_em IS NOT NULL AND nao_visto_em IS NULL
+                                  AND reabertura_id IS NOT NULL""", (agora, numero))
         # 2. os novos (o que caiu por rede volta 5 min depois da ultima tentativa, #1248)
         for a in con.execute("""SELECT * FROM atendimento.avisos
                                  WHERE enviado_em IS NULL AND erro = '' AND guardado_em IS NULL
@@ -677,7 +709,7 @@ class Envio:
                     continue
                 # um ponto de retorno por aviso: o erro de banco de um nao derruba a volta dos outros
                 with con.transaction():
-                    self._porteiro_de_um(con, saida, a, agora)
+                    self._porteiro_de_um(con, saida, a, agora, calado)
             except Exception as falha:  # noqa: BLE001 -- o proximo aviso segue; a linha diz o erro
                 self._falhou(con, a, falha, agora)
 
@@ -703,14 +735,19 @@ class Envio:
                     (("%s (tentativa %d)" % (str(falha)[:280], tentativas)) if tentativas > 1 else str(falha)[:300],
                      tentativas, agora, a["id"]))
 
-    def _porteiro_de_um(self, con, saida, a, agora):
+    def _porteiro_de_um(self, con, saida, a, agora, calado=True):
         numero = a["para_whatsapp"]
         if janela_aberta(con, numero, agora):
             self._aviso_como_texto(con, saida, a, agora)
             return
+        if calado and a["tipo"] == RESUMO:   # #1271: guarda sem reabertura, ate ele escrever
+            con.execute("UPDATE atendimento.avisos SET guardado_em = %s WHERE id = %s", (agora, a["id"]))
+            return
+        # so a reabertura que EXISTE (o resumo calado e guardado sem ela, #1271)
         pendente = con.execute("""SELECT reabertura_id FROM atendimento.avisos
                                    WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
                                      AND guardado_em IS NOT NULL AND nao_visto_em IS NULL
+                                     AND reabertura_id IS NOT NULL
                                    LIMIT 1""", (numero,)).fetchone()
         if pendente:   # ja ha reabertura sem toque: so se soma ao guardado
             con.execute("UPDATE atendimento.avisos SET guardado_em = %s, reabertura_id = %s WHERE id = %s",
@@ -778,17 +815,36 @@ class Envio:
     def soltar_guardados(self, con, saida, numero: str, agora: datetime) -> int:
         """Os guardados do numero saem como texto, na ordem em que nasceram. O nao visto fica como esta."""
         feitos = 0
-        for a in con.execute("""SELECT * FROM atendimento.avisos
-                                 WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
-                                   AND guardado_em IS NOT NULL AND nao_visto_em IS NULL
-                                 ORDER BY criado_em, id""", (numero,)).fetchall():
+        guardados = con.execute("""SELECT * FROM atendimento.avisos
+                                    WHERE para_whatsapp = %s AND enviado_em IS NULL AND erro = ''
+                                      AND guardado_em IS NOT NULL AND nao_visto_em IS NULL
+                                    ORDER BY criado_em, id""", (numero,)).fetchall()
+        # #1271: dois ou mais resumos do lote saem numa mensagem so, no lugar do primeiro deles
+        resumos = [a for a in guardados if a["tipo"] == RESUMO]
+        juntos = len(resumos) > 1
+        for a in guardados:
+            if juntos and a["tipo"] == RESUMO and a["id"] != resumos[0]["id"]:
+                continue
+            em_grupo = juntos and a["tipo"] == RESUMO
             try:
                 with con.transaction():
-                    self._aviso_como_texto(con, saida, a, agora)
-                feitos += 1
+                    if em_grupo:
+                        self._resumos_juntos(con, saida, resumos, agora)
+                    else:
+                        self._aviso_como_texto(con, saida, a, agora)
+                feitos += len(resumos) if em_grupo else 1
             except Exception as falha:  # noqa: BLE001
-                con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = %s", (str(falha)[:300], a["id"]))
+                alvo = [r["id"] for r in resumos] if em_grupo else [a["id"]]
+                con.execute("UPDATE atendimento.avisos SET erro = %s WHERE id = ANY(%s)", (str(falha)[:300], alvo))
         return feitos
+
+    def _resumos_juntos(self, con, saida, resumos, agora):
+        numero = resumos[0]["para_whatsapp"]
+        w = saida.texto(numero, texto_dos_resumos(resumos))
+        con.execute("""UPDATE atendimento.avisos SET enviado_em = %s, wamid = %s, como = 'texto'
+                        WHERE id = ANY(%s)""", (agora, w, [r["id"] for r in resumos]))
+        con.execute("INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo) VALUES (%s, %s, 'texto', %s)",
+                    (w, numero, "aviso %s (%d juntos)" % (RESUMO, len(resumos))))
 
     def tratar_reabrir(self, con, saida, entrada, agora: datetime) -> None:
         """O toque em Ver da reabertura (`reabrir:<numero>`). So vale do proprio numero da carga: um

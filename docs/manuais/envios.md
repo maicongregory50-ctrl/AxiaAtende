@@ -106,13 +106,20 @@ o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP 
 
 - **Uma por lote, não uma por cliente.** Cinco clientes num lote são uma mensagem, não cinco.
 - **Nunca vai ao dono nem ao flutuante.** Até 23/10/2026 saía uma **cópia de cada convite** ao
-  responsável, e no material às revendas o responsável é o dono — foi assim que as artes da Agro
-  Real e da Agro Símil chegaram ao WhatsApp dele. A cópia acabou.
-- **Se o resumo não chegar:** quem **falou com o número da empresa no último dia** recebe o resumo
-  direto, como texto, e para isso não precisa de modelo nenhum. Quem não falou depende de dois
-  modelos aprovados na Meta: o `reabrir_avisos` (o "Você tem N aviso(s)… Ver", da seção abaixo) e,
-  com o porteiro desligado, o `aviso_lote_do_representante`, na categoria **Utilidade**. Sem o modelo,
-  o aviso aparece com **Erro** na tabela de avisos, com o motivo escrito, e **ninguém recebe**.
+  responsável — foi assim que as artes da Agro Real e da Agro Símil chegaram ao WhatsApp do dono. A
+  cópia acabou.
+- **A revenda tem o responsável do ERP** (desde 06/11/2026, #1271). No material às revendas, quem
+  aparece no "Quem cuida de você…", no aviso de recusa e no resumo é **quem o cadastro da revenda no
+  ERP diz que atende**. Antes era sempre o dono, e a Campos Gerais, da DJ AGRO, leu "é Maicon". Quando
+  o representante no ERP é o próprio dono, a revenda fica com ele e **não sai resumo**. Revenda sem
+  canal no ERP, ou com representante sem WhatsApp, aparece como **sem responsável** e não recebe, como
+  o comprador. Vale para os envios criados daí em diante: o que já saiu guarda o nome do dia.
+- **O resumo espera o representante escrever** (desde 06/11/2026, #1271). Se ele **falou com o número
+  da empresa no último dia**, recebe o resumo na hora, como texto, de graça. Se não falou, o resumo
+  fica **Guardado**, sem mensagem paga e sem o "Você tem N aviso(s)", até ele escrever qualquer coisa
+  ao número da empresa. Aí saem **todos os resumos guardados juntos, numa mensagem só**, uma linha por
+  envio. Não vira "Não visto": se o representante não escrever, o resumo não chega, e a tabela de
+  avisos mostra há quanto tempo está guardado.
 
 ## 4.1 Os avisos à equipe (desde 28/10/2026, #1188)
 
@@ -133,6 +140,10 @@ nas últimas 24 horas; fora disso, cada mensagem é um modelo pago. Então o avi
   ordem em que nasceram. Enquanto ela não toca, aviso novo **só se soma** aos guardados: não sai outra
   mensagem dessas. Se ela escrever para o número da empresa em vez de tocar Ver, os guardados saem
   igual, logo depois.
+- **O resumo do lote é a exceção** (desde 06/11/2026, #1271): fora da janela ele **não pede o toque**.
+  Fica guardado calado até o representante escrever, e os resumos guardados saem juntos numa mensagem.
+  A chave dele é `resumo.espera_calado`, nos ajustes do atendimento (ligada). Desligada, o resumo volta
+  a pedir o toque como os outros avisos.
 
 **O que significa cada sinal:**
 
@@ -140,8 +151,8 @@ nas últimas 24 horas; fora disso, cada mensagem é um modelo pago. Então o avi
 |---|---|
 | **Enviado (texto)** | saiu de graça: a pessoa tinha falado com o número da empresa no último dia |
 | **Enviado (modelo)** | saiu como modelo pago (o caminho de antes, com o porteiro desligado) |
-| **Guardado** | esperando o toque em **Ver** da mensagem "Você tem N aviso(s)" |
-| **Não visto** | **7 dias sem o toque.** O aviso não sai mais e **não some**: a pessoa não está lendo, e vale um telefonema |
+| **Guardado** | esperando o toque em **Ver** da mensagem "Você tem N aviso(s)". No **resumo do lote** (#1271), esperando o representante escrever ao número da empresa: não houve mensagem de "Ver" |
+| **Não visto** | **7 dias sem o toque.** O aviso não sai mais e **não some**: a pessoa não está lendo, e vale um telefonema. O resumo do lote nunca fica assim (#1271) |
 | **Erro** | a Meta recusou (o motivo está escrito ao lado). Em geral é modelo que ainda não foi aprovado |
 | **na fila** | ainda vai sair, na próxima volta (a cada minuto) |
 | **"—" em Quando** | ainda não aconteceu (não é zero) |
@@ -216,7 +227,8 @@ representante, e reclamação).
   diz quantos receberam, sem dizer quem respondeu o quê. *(Até 26/10/2026 o código mandava uma cópia
   de cada convite ao responsável, contra o que esta linha já dizia; o #1142 fez o código cumprir o
   manual.)*
-- **Não manda nada ao dono nem ao corretor:** o resumo é só do representante (o corretor deixou de receber em 29/10/2026, #1197). O **cliente de corretor** tem o dono como responsável desde 29/10/2026: o "fale direto" e o portão levam a ele, não ao corretor (vale para os envios criados daí em diante).
+- **Não manda nada ao dono nem ao corretor:** o resumo é só do representante (o corretor deixou de receber em 29/10/2026, #1197), e não vai ao dono nem quando ele é o representante da revenda no ERP (#1271).
+- **Não paga mensagem para entregar o resumo do lote:** se o representante nunca escrever ao número da empresa, o resumo fica guardado (#1271). O **cliente de corretor** tem o dono como responsável desde 29/10/2026: o "fale direto" e o portão levam a ele, não ao corretor (vale para os envios criados daí em diante).
 - **Não manda comunicação direta a quem nunca aceitou.**
 - **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão).
 - **Não tira ninguém do teto do mês por aqui:** o comprador no teto volta a receber no mês seguinte.
