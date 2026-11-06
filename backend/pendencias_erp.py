@@ -147,3 +147,78 @@ def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=
     except erp.ErpIndisponivel as e:
         print("pendencias: estado: %s" % e, flush=True)
     return {"novas": novas, "entregues": entregues, "fechadas": fechadas}
+
+
+# ── #1276: o aviso de aprovação ──────────────────────────────────────────────────────────────────
+# Outra fila do mesmo molde, com a regra própria: o ERP não manda eventos, manda o ESTADO (os pedidos
+# que esperam aprovação agora). Cada pedido × etapa × número vira uma pendência `aprovacao` com UMA
+# mensagem informativa; o RECEPCIONISTA manda (só na janela, juntando os pedidos da mesma pessoa).
+# O pedido que some da lista foi decidido: a mensagem que ainda não saiu é descartada, e a pendência
+# ganha o sufixo `~id` na referência -- libera a chave para um ciclo novo (o pedido recusado,
+# corrigido e mandado de novo é aviso novo, não o mesmo).
+
+def _filial_curta(nome) -> str:
+    return (nome or "").split(" — ")[0].replace("FILIAL ", "").strip().title()
+
+
+def texto_da_aprovacao(li: dict) -> str:
+    valor = "R$ " + ("%.2f" % float(li.get("valor_total") or 0)).replace(".", ",")
+    inteiro, cent = valor[3:].split(",")
+    valor = "R$ " + "{:,}".format(int(inteiro)).replace(",", ".") + "," + cent
+    partes = ["%s %s" % ("Venda" if li["tipo"] == "venda" else "Compra", li["numero"]), li.get("contraparte") or "",
+              valor, li.get("condicao") or "", _filial_curta(li.get("filial"))]
+    etapa = " (financeira)" if li.get("etapa") == "financeira" else ""
+    return " · ".join(x for x in partes if x) + etapa
+
+
+def receber_aprovacoes(con, linhas: list[dict], agora: datetime) -> int:
+    """Grava o aviso dos pedidos que entraram na lista. Idempotente pela referência viva."""
+    novas = 0
+    for li in linhas:
+        p = con.execute(
+            """INSERT INTO atendimento.pendencias (tipo, referencia, titulo, para_whatsapp, ultima_em)
+               VALUES ('aprovacao', %s, %s, %s, %s)
+               ON CONFLICT (tipo, referencia, para_whatsapp) DO NOTHING RETURNING id""",
+            (li["referencia"], (li.get("numero") or "")[:120], li["numero_whatsapp"], agora)).fetchone()
+        if p is None:
+            continue   # já avisado (ou esperando a janela) neste ciclo
+        con.execute("""INSERT INTO atendimento.pendencias_mensagens (pendencia_id, sentido, classe, texto, estado, criado_em)
+                       VALUES (%s, 'saiu', 'informativo', %s, 'esperando', %s)""",
+                    (p["id"], texto_da_aprovacao(li)[:4000], agora))
+        novas += 1
+    return novas
+
+
+def conferir_aprovacoes(con, linhas: list[dict], agora: datetime) -> int:
+    """Encerra o ciclo do pedido que saiu da lista. Devolve quantos."""
+    vivas = {(li["referencia"], li["numero_whatsapp"]) for li in linhas}
+    feitas = 0
+    for p in con.execute("""SELECT id, referencia, para_whatsapp FROM atendimento.pendencias
+                             WHERE tipo = 'aprovacao' AND referencia NOT LIKE '%%~%%'""").fetchall():
+        if (p["referencia"], p["para_whatsapp"]) in vivas:
+            continue
+        con.execute("""UPDATE atendimento.pendencias_mensagens SET estado = 'descartada', erro = 'decidido antes de sair'
+                        WHERE pendencia_id = %s AND sentido = 'saiu' AND estado IN ('esperando', 'guardada')""", (p["id"],))
+        con.execute("UPDATE atendimento.pendencias SET referencia = referencia || '~' || id, ultima_em = %s WHERE id = %s",
+                    (agora, p["id"]))
+        feitas += 1
+    return feitas
+
+
+def volta_aprovacoes(cfg, trazer=erp.aprovacoes, agora: datetime | None = None) -> dict:
+    agora = agora or datetime.now(timezone.utc)
+    if not cfg.erp_segredo:
+        return {"erro": "a ligação com o ERP não está ligada"}
+    with conexao(cfg) as con:
+        if _ajuste(con, "pendencias.aprovacao.ligado", False) is not True:
+            return {"desligado": True}
+    try:
+        linhas = trazer(cfg)
+    except erp.ErpIndisponivel as e:
+        return {"erro": str(e)}
+    with conexao(cfg) as con:
+        with con.transaction():
+            fechadas = conferir_aprovacoes(con, linhas, agora)
+            novas = receber_aprovacoes(con, linhas, agora)
+    return {"novas": novas, "fechadas": fechadas}
+

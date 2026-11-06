@@ -268,6 +268,22 @@ def _whatsapp(url: str, corpo: dict | None, token: str) -> dict:
         raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
 
 
+# ── #1276: as aprovações no WhatsApp (a rota /pedidos/whatsapp/aprovacoes do ERP, atividade APR.WPP) ──
+
+def aprovacoes(cfg) -> list[dict]:
+    """Os pedidos que esperam aprovação, uma linha por pedido × etapa × quem recebe o aviso. A lista É o
+    estado: o pedido que some dela foi decidido (ou cancelado), e o aviso que ainda não saiu cai."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    try:
+        token = _token(cfg)
+    except urllib.error.HTTPError:
+        raise ErpIndisponivel("o ERP recusou o agente (segredo)") from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    return _whatsapp(cfg.erp_url.rstrip("/") + "/pedidos/whatsapp/aprovacoes", None, token)["linhas"]
+
+
 def chamados_saida(cfg, depois: int | None) -> dict:
     """O que chegou aos autores depois do evento `depois`, num token so. Sem `depois`, so o cursor."""
     if not cfg.erp_agente or not cfg.erp_segredo:

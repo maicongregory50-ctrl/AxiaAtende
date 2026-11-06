@@ -121,6 +121,9 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
                 r = pendencias_erp.volta(cfg)
                 if "erro" in r:
                     print("pendencias: %s" % r["erro"], flush=True)
+                a = pendencias_erp.volta_aprovacoes(cfg)   # #1276: o aviso de aprovação, chave propria
+                if "erro" in a:
+                    print("aprovacoes: %s" % a["erro"], flush=True)
             except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
                 print("pendencias: %s: %s" % (type(falha).__name__, falha), flush=True)
             if parar.wait(pendencias_erp.INTERVALO_SEGUNDOS):

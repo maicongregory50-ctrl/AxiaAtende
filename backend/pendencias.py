@@ -32,17 +32,23 @@ NAO_VISTO = timedelta(days=7)
 LIMITE_TEXTO = 3800        # a Meta aceita 4096 no texto; a margem e do rotulo e do rodape
 SEPARADOR = "\n\n— — —\n\n"
 
-TIPOS = {"chamado": {"rotulo": "Chamado"}}
+TIPOS = {"chamado": {"rotulo": "Chamado"},
+         # #1276: o pedido que espera aprovação; sempre informativo, os da mesma pessoa saem num bloco so
+         "aprovacao": {"rotulo": "Aprovação esperando você"}}
+CHAMADA_APROVACAO = "Abra *Aprovações* no app do celular."
 
 RODAPE = {"pergunta": "_Para responder, deslize esta mensagem para o lado._",
           "informativo": "_Só aviso, não precisa responder._",
           "entrega": ""}
 SO_AVISO = ("Anotado. Esta mensagem é só um aviso; se precisar falar do chamado, responda no sistema "
             "ou na próxima pergunta.")
+SO_AVISO_APROVACAO = "Anotado. Este aviso não aprova nada; para decidir, abra Aprovações no app do celular."
 QUAL_FALHOU = "O que não ficou bom? Escreva em uma linha."
 
 
 def rotulo(p) -> str:
+    if p["tipo"] == "aprovacao":
+        return TIPOS["aprovacao"]["rotulo"]
     base = "%s %s" % (TIPOS[p["tipo"]]["rotulo"], p["referencia"])
     return ("%s · %s" % (base, p["titulo"])) if p["titulo"] else base
 
@@ -81,6 +87,8 @@ def _blocos(con, numero: str) -> list[tuple[dict, list[dict]]]:
 
 
 def _texto_do_bloco(p, msgs) -> str:
+    if p.get("_texto"):
+        return "*%s*\n%s\n\n%s" % (rotulo(p), p["_texto"], RODAPE["informativo"])
     classes = {m["classe"] for m in msgs}
     rodape = RODAPE["pergunta"] if "pergunta" in classes else (
         "" if "entrega" in classes else RODAPE["informativo"])
@@ -93,6 +101,13 @@ def _mandar_numero(con, saida, numero: str, agora: datetime) -> int:
     blocos = _blocos(con, numero)
     if not blocos:
         return 0
+    # #1276: os avisos de aprovação da pessoa viram UM bloco, uma linha por pedido
+    aprov = [(p, msgs) for p, msgs in blocos if p["tipo"] == "aprovacao"]
+    if aprov:
+        msgs = [m for _p, ms in aprov for m in ms]
+        corpo = "\n".join(m["texto"] for m in msgs) + "\n\n" + CHAMADA_APROVACAO
+        blocos = [(p, ms) for p, ms in blocos if p["tipo"] != "aprovacao"] + [
+            (dict(aprov[0][0], _texto=corpo), [dict(m, texto=corpo if i == 0 else "") for i, m in enumerate(msgs)])]
     # os blocos viram mensagens de ate LIMITE_TEXTO; um bloco maior que isso vai sozinho, cortado
     lotes, atual = [], []
     for p, msgs in blocos:
@@ -320,7 +335,8 @@ def tratar(con, saida, e, agora: datetime):
         _entrou(con, p["id"], "resposta", e.texto, estado="descartada")
         if not p["avisou_informativo"]:
             con.execute("UPDATE atendimento.pendencias SET avisou_informativo = true WHERE id = %s", (p["id"],))
-            _responder(con, saida, e.pessoa.para, SO_AVISO, "pendencia %d: so aviso" % p["id"])
+            _responder(con, saida, e.pessoa.para, SO_AVISO_APROVACAO if p["tipo"] == "aprovacao" else SO_AVISO,
+                       "pendencia %d: so aviso" % p["id"])
     return True
 
 
