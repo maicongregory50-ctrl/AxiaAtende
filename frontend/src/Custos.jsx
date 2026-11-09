@@ -13,7 +13,7 @@ const FUNCAO = {
   aviso_avaliacao_ruim: 'Aviso: avaliação ruim', aviso_endereco_fora: 'Aviso: endereço fora do ar',
   aviso_endereco_voltou: 'Aviso: endereço voltou', aviso_plano_sem_registro: 'Aviso: plano sem registro',
   aviso_lote_do_representante: 'Aviso: resumo do lote', aviso_status_do_dia: 'Aviso: status do dia',
-  aviso_auditoria_estoque: 'Aviso: auditoria de estoque',
+  aviso_auditoria_estoque: 'Aviso: auditoria de estoque', aviso_integracao_recusada: 'Aviso: API externa recusando',
   triagem: 'OlivIA · triagem do motivo', campo: 'OlivIA · material de campo', visita: 'OlivIA · registro de visita',
   pendencia: 'OlivIA · de qual chamado é a resposta',
   roteador: 'OlivIA · assunto da mensagem da equipe', audio: 'Transcrição de áudio da equipe',

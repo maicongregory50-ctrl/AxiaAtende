@@ -67,6 +67,8 @@ EXEMPLOS_AVISO = {
     # #1142: o resumo do lote ao representante -- {{2}} e contado na hora ("1 cliente seu")
     "aviso_lote_do_representante": ["Djeison", "3 clientes seus", "o plantio do Trigo Mourisco"],
     "aviso_auditoria_estoque": ["Matriz", "13/10/2026"],     # #350, a auditoria de estoque
+    # #1337: o texto vem pronto do ERP (#1280); so vai a Meta se o porteiro for desligado
+    "aviso_integracao_recusada": ["a SEFAZ (NF-e) recusou 3 vezes seguidas. Chamado #1400."],
 }
 
 

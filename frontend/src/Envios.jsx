@@ -23,7 +23,7 @@ const ESTADO_AVISO = {
 const TIPO_AVISO = {
   recusa: 'Cliente pediu para parar', sem_atendimento: 'Cliente sem atendimento', avaliacao_ruim: 'Avaliação ruim',
   endereco_fora: 'Endereço fora do ar', endereco_voltou: 'Endereço voltou', plano_sem_registro: 'Plano sem registro',
-  lote_do_representante: 'Resumo do lote', status_do_dia: 'Status do dia', auditoria_estoque: 'Auditoria de estoque',
+  lote_do_representante: 'Resumo do lote', status_do_dia: 'Status do dia', auditoria_estoque: 'Auditoria de estoque', integracao_recusada: 'API externa recusando',
 }
 
 // #1222: o chamado no WhatsApp. O que sai (informativo, pergunta, entrega) e o que volta (resposta, validacao).

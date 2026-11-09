@@ -18,9 +18,9 @@ class ErpIndisponivel(RuntimeError):
     pass
 
 
-def _pedir(url: str, corpo: dict | None = None, token: str = "") -> dict:
+def _pedir(url: str, corpo: dict | None = None, token: str = "", metodo: str | None = None) -> dict:
     dados = json.dumps(corpo).encode() if corpo is not None else None
-    pedido = urllib.request.Request(url, data=dados, method="POST" if corpo is not None else "GET")
+    pedido = urllib.request.Request(url, data=dados, method=metodo or ("POST" if corpo is not None else "GET"))
     pedido.add_header("Accept", "application/json")
     if dados is not None:
         pedido.add_header("Content-Type", "application/json")
@@ -238,6 +238,48 @@ def estado_do_aviso_auditoria(cfg, token: str, aviso_id: int, estado: str, motiv
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return
+        raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+
+
+
+# ── #1337: o aviso de API externa recusando (#1280 no ERP), na mesma atividade AUD.AVISO ─────────
+
+def integracoes_pendentes(cfg) -> dict:
+    """Os avisos de API externa recusando que o ERP deixou PENDENTE, num token so, no MESMO formato da
+    auditoria -- {"pendentes": [{"id", "partes": [texto]}], "token"} --, para o canal nao saber do ERP.
+    O texto vem pronto de la (fonte, motivo e o chamado que nasceu); aqui nao se remonta."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    base = cfg.erp_url.rstrip("/")
+    try:
+        token = _token(cfg)
+        r = _pedir(base + "/atendimento/integracoes-avisos", token=token)
+        return {"pendentes": [{"id": int(a["id"]), "partes": [str(a["texto"])]} for a in r["avisos"]],
+                "token": token}
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão AUD.AVISO",
+                  404: "o ERP ainda não tem o aviso de API externa (#1280)"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+def estado_do_aviso_integracao(cfg, token: str, aviso_id: int, estado: str, motivo: str = "", wamid: str = "") -> None:
+    """Devolve ao ERP ENVIADO ou FALHOU do aviso de integracao. 409 (e 404) = ja respondido: nao e erro,
+    e o mesmo papel do 404 da auditoria."""
+    corpo = {"estado": estado, "motivo": motivo[:500] or None, "ref_externa": wamid[:120] or None}
+    try:
+        _pedir(cfg.erp_url.rstrip("/") + "/atendimento/integracoes-avisos/%d" % int(aviso_id),
+               corpo, token=token, metodo="PATCH")
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 409):
+            return
+        if e.code == 403:
+            raise ErpIndisponivel("o agente está sem a permissão AUD.AVISO") from None
         raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ErpIndisponivel("o ERP não respondeu") from None

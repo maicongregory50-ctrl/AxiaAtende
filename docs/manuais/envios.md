@@ -125,7 +125,8 @@ o lembrete de que o que cada um respondeu aparece no **Relacionamento**, no ERP 
 
 Os avisos que o sistema manda **à equipe** pelo WhatsApp: o resumo do lote ao representante, o
 cliente que pediu para parar, o cliente que disse que não recebeu atendimento, a avaliação ruim, o
-endereço público fora do ar e o plano de marketing sem registro. Ficam numa tabela própria, **Avisos à
+endereço público fora do ar, o plano de marketing sem registro, a auditoria de estoque vencida e a
+API externa recusando (ver abaixo). Ficam numa tabela própria, **Avisos à
 equipe · últimos 30 dias**, no fim desta tela, com o nome de quem recebe, o número mascarado e o
 estado. **Cliente não entra aqui:** o convite dele já tem botão.
 
@@ -180,6 +181,40 @@ Publicações do Marketing:
 Quem recebe é o destino do ajuste `status_do_dia_para`, que nasceu igual ao do aviso do plano (o dono).
 O Status do dia **não tem modelo**: com a chave do porteiro desligada, ele só sai dentro das 24 h, e
 fora delas fica com **Erro** ("janela de 24 h fechada e porteiro desligado").
+
+### API externa recusando (desde 09/11/2026, #1337)
+
+**Para que serve.** Quando um serviço de fora (Receita, SEFAZ, bancos, Focus, Clicksign…) para de
+aceitar o que o AxiaGestão manda, você fica sabendo no WhatsApp em até 1h30, com o motivo e o número do
+chamado que já nasceu. A mensagem começa com *"Aviso do AxiaGestão:"*, e o resto é o texto que o ERP
+escreveu.
+
+**Quem usa e quando.** O dono, ao receber. Quem cuida do sistema, para conferir nesta tabela se o aviso
+saiu: ele aparece como **API externa recusando**.
+
+**O caminho comum.**
+1. O aviso chega como texto, se você falou com o número da empresa nas últimas 24 h. Se não falou,
+   chega *"Você tem N aviso(s)"*, e o texto vem quando você toca **Ver**.
+2. O chamado citado na mensagem já está na fila.
+3. O detalhe fica no AxiaGestão, em Contabilidade → Manual legal → Mudanças de lei a tratar.
+
+**O que significa cada sinal.**
+- **Enviado**: saiu para o seu número.
+- **Guardado**: espera o toque em Ver.
+- **Não visto**: passaram 7 dias sem toque. O aviso não sai mais, e o ERP fica sabendo que não chegou.
+- **Erro "Ninguém configurado para receber o aviso (ajuste integracoes_para)"**: a lista de quem recebe
+  está vazia, nos ajustes do atendimento.
+
+Quem recebe é o destino do ajuste `integracoes_para`, que nasceu só com o dono. O modelo
+`aviso_integracao` está cadastrado, mas **não foi à Meta**: com a chave do porteiro ligada, ele não
+precisa. Se um dia o porteiro for desligado, ele precisa ser aprovado antes. O comando é
+`python -m backend.modelos_meta --propor --so aviso_integracao`.
+
+**O que NÃO faz.**
+- Não manda a mais ninguém além dos destinos do ajuste.
+- Não repete: sai um aviso por episódio, e quem controla isso é o ERP.
+- Não avisa quando o serviço volta; isso fica no chamado, não no celular.
+- Não conserta nada.
 
 ## 4.2 Chamados no WhatsApp (desde novembro de 2026, #1222)
 
@@ -293,6 +328,7 @@ novo. Não tira o número antigo da tela **Destinos** nem da agenda da casa: a a
 - **Não manda nada ao dono nem ao corretor:** o resumo é só do representante (o corretor deixou de receber em 29/10/2026, #1197), e não vai ao dono nem quando ele é o representante da revenda no ERP (#1271).
 - **Não paga mensagem para entregar o resumo do lote:** se o representante nunca escrever ao número da empresa, o resumo fica guardado (#1271). O **cliente de corretor** tem o dono como responsável desde 29/10/2026: o "fale direto" e o portão levam a ele, não ao corretor (vale para os envios criados daí em diante).
 - **Não manda comunicação direta a quem nunca aceitou.**
+- **Não avisa a volta de uma API externa** que tinha recusado, nem repete o aviso dela: um aviso por episódio, só ao dono (#1337).
 - **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão). O que já está gravado nos envios segue o cadastro novo pelo procedimento da §4c (#1285); sem ele, cada envio continua com o responsável do dia em que nasceu.
 - **Não tira ninguém do teto do mês por aqui:** o comprador no teto volta a receber no mês seguinte.
   A única passagem é a **peça a mais**, marcada pelo dono no Marketing, ao aprovar a peça.

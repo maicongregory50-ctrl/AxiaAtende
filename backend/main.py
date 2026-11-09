@@ -103,12 +103,16 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
                 return
 
     def avisos_da_auditoria():
-        """#350: os avisos de auditoria de estoque vencida, do ERP para a fila dos avisos, e o estado de volta (1 min)."""
+        """#350 e #1337: os avisos que o ERP deixa (auditoria de estoque vencida, API externa recusando), do
+        ERP para a fila dos avisos, e o estado de volta (1 min). O log cita o canal."""
         while True:
             try:
                 r = auditoria_erp.volta(cfg)
                 if "erro" in r:
                     print("auditoria: %s" % r["erro"], flush=True)
+                for nome, c in (r.get("canais") or {}).items():
+                    if "erro" in c:
+                        print("%s: %s" % (nome, c["erro"]), flush=True)
             except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
                 print("auditoria: %s" % type(falha).__name__, flush=True)
             if parar.wait(auditoria_erp.INTERVALO_SEGUNDOS):
