@@ -25,7 +25,7 @@ ALTER TABLE atendimento.modelos ADD CONSTRAINT modelos_uso
 -- `python -m backend.modelos_meta --propor --so aviso_integracao`.
 INSERT INTO atendimento.modelos (nome, categoria, uso, cabecalho_imagem, variaveis, botao, texto) VALUES
     ('aviso_integracao', 'UTILITY', 'aviso_integracao_recusada', false, ARRAY['aviso1'], 'nenhum',
-     'Aviso do AxiaGestão: {{1}}');
+     'Aviso do AxiaGestão: {{1}} O detalhe está no AxiaGestão.');
 
 -- Quem recebe: so o dono (o mesmo destino que abre o aviso do "nao quero", e o primeiro da auditoria).
 INSERT INTO atendimento.ajustes (chave, valor)

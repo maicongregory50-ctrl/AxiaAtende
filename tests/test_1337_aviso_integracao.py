@@ -64,7 +64,7 @@ def test_a_migracao_poe_so_o_dono_e_o_modelo(cfg):
         m = con.execute("SELECT * FROM atendimento.modelos WHERE uso = 'aviso_integracao_recusada'").fetchone()
     assert nomes == ["Maicon Gregory"]
     assert m["nome"] == "aviso_integracao" and m["categoria"] == "UTILITY"
-    assert m["variaveis"] == ["aviso1"] and m["texto"] == "Aviso do AxiaGestão: {{1}}"
+    assert m["variaveis"] == ["aviso1"] and m["texto"] == "Aviso do AxiaGestão: {{1}} O detalhe está no AxiaGestão."
 
 
 def test_a_volta_da_060_desfaz_e_a_ida_refaz(ligado):
@@ -161,7 +161,7 @@ def test_dentro_da_janela_sai_o_texto(ligado):
         en._porteiro = True
         en.mandar_avisos(con, s, AGORA)
     assert s.modelos == []
-    assert [x[0] for x in s.enviadas] == ["texto"] and s.enviadas[0][2] == "Aviso do AxiaGestão: " + TEXTO
+    assert [x[0] for x in s.enviadas] == ["texto"] and s.enviadas[0][2] == "Aviso do AxiaGestão: " + TEXTO + " O detalhe está no AxiaGestão."
     assert _avisos(ligado)[0]["enviado_em"] == AGORA
 
 
