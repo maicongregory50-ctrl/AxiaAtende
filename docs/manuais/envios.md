@@ -213,6 +213,69 @@ representante, e reclamação).
 - **Para desligar** (voltar ao menu geral para todos): ajuste `portao.ligado` = `false`, sem
   reiniciar.
 
+## 4c. Quando o responsável muda no ERP (desde 09/11/2026, #1285)
+
+**Para que serve.** Quando um representante sai, ou um cliente muda de mão no ERP, os envios já
+criados continuam apontando para quem atendia antes: o botão "Falar com meu atendimento", o aviso de
+recusa, o resumo do lote e a frase "Quem cuida de você é…" que o cliente recebe ao escrever (§4b).
+Cada envio guarda o responsável do dia em que nasceu. Este procedimento faz o atendimento seguir o
+cadastro de hoje.
+
+**Quem usa e quando.** Quem cuida do sistema, no dia em que o cadastro do ERP foi trocado, numa
+janela elevada da máquina dos serviços. **Antes, o cadastro:** no ERP, Stakeholders → **Sem
+responsável** não pode listar os clientes trocados — quem aparecer ali fica como está aqui. De
+preferência fora das 9h30–17h de dia útil, para não cruzar com o lote do dia.
+
+**O caminho comum.**
+
+1. No AxiaMarketing, gerar a lista de hoje (a regra de quem é o responsável mora lá):
+
+   ```powershell
+   $env:AXIAMKT_AMBIENTE = 'producao'
+   C:\AxiaMarketing\.venv\Scripts\python.exe C:\AxiaMarketing\scripts\responsaveis_de_hoje.py C:\Temp\responsaveis.csv
+   ```
+
+2. No AxiaAtende, ver o que mudaria (não grava nada):
+
+   ```powershell
+   $env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
+   C:\AxiaAtende\.venv\Scripts\python.exe C:\AxiaAtende\scripts\reatribuir_responsavel.py C:\Temp\responsaveis.csv
+   ```
+
+3. Conferir a lista na tela: envio, cliente, de quem para quem.
+4. Gravar: o mesmo comando com `--antes` (um arquivo **novo**, que é o que permite desfazer) e
+   `--gravar`:
+
+   ```powershell
+   C:\AxiaAtende\.venv\Scripts\python.exe C:\AxiaAtende\scripts\reatribuir_responsavel.py C:\Temp\responsaveis.csv --antes C:\AxiaAtende\docs\medicoes\AAAA-MM-DD-antes.csv --gravar
+   ```
+
+5. Na tela Envios, filtrar pelo responsável novo: as linhas aparecem com ele. Vale a partir do minuto
+   seguinte, sem reiniciar nada.
+
+**Para desfazer:** `... reatribuir_responsavel.py --desfazer C:\AxiaAtende\docs\medicoes\AAAA-MM-DD-antes.csv --gravar`
+(sem `--gravar`, só conta o que devolveria).
+
+**O que significa cada sinal.**
+
+| Sinal | Quer dizer |
+|---|---|
+| `[muda]` | a linha será regravada com o responsável de hoje |
+| `[volta à fila]` | estava **sem responsável** e agora tem: sai no próximo lote do envio, com as travas de sempre |
+| `[fica fora: recusou antes / já recebeu esta peça / o número não é WhatsApp]` | ganhou responsável, mas não recebe, pelas travas de sempre |
+| linha que não aparece | já bate com o ERP, ou é de envio concluído com convite há mais de 30 dias (histórico de quem mandou), ou o cliente não tem responsável no ERP hoje |
+| `N resumo(s) guardado(s) do número antigo não saem mais` | os resumos do lote que esperavam o representante que saiu foram marcados como **não vistos**: não saem e não somem |
+| `"antes" não se sobrescreve` | o arquivo de `--antes` já existe: use outro nome |
+
+**Quais linhas entram.** A de envio que não está concluído (qualquer situação); a convidada nos
+últimos 30 dias (é a janela da frase "Quem cuida de você"); e a de **comunicação direta** convidada
+em qualquer data (o botão vive na mensagem).
+
+**O que NÃO faz.** Não muda o cadastro do ERP (é lá que se corrige). Não reenvia nada a ninguém e não
+cria envio. Não avisa o cliente de que trocou de atendente: a frase nova sai quando ele escrever de
+novo. Não tira o número antigo da tela **Destinos** nem da agenda da casa: a agenda relê o ERP às
+06:00, e a tela Destinos é à mão.
+
 ## 5. O que a tela NÃO faz
 
 - **Suspender e Segurar tudo não seguram as imagens** de quem já tocou "Quero receber": quem pediu recebe.
@@ -230,6 +293,6 @@ representante, e reclamação).
 - **Não manda nada ao dono nem ao corretor:** o resumo é só do representante (o corretor deixou de receber em 29/10/2026, #1197), e não vai ao dono nem quando ele é o representante da revenda no ERP (#1271).
 - **Não paga mensagem para entregar o resumo do lote:** se o representante nunca escrever ao número da empresa, o resumo fica guardado (#1271). O **cliente de corretor** tem o dono como responsável desde 29/10/2026: o "fale direto" e o portão levam a ele, não ao corretor (vale para os envios criados daí em diante).
 - **Não manda comunicação direta a quem nunca aceitou.**
-- **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão).
+- **Não preenche o responsável:** isso é no cadastro do cliente, no ERP (o mutirão). O que já está gravado nos envios segue o cadastro novo pelo procedimento da §4c (#1285); sem ele, cada envio continua com o responsável do dia em que nasceu.
 - **Não tira ninguém do teto do mês por aqui:** o comprador no teto volta a receber no mês seguinte.
   A única passagem é a **peça a mais**, marcada pelo dono no Marketing, ao aprovar a peça.
