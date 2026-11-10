@@ -41,3 +41,4 @@
 [2026-11-05][ATENDE-END] #1267 no ar (restart do dono 14:30, 057 aplicada); envio.py comitado (0003672); fecha no primeiro envio sem convite
 [2026-11-05][ATENDE-END] #1169 fechado: Suspender/Religar por envio e Segurar tudo na tela Envios (058, b5adfa0); trava pelo estado do envio, envio.py intocado (#1267 na mesma arvore, migracao renumerada 057->058); restart 14:54. Fila do Atende vazia
 [2026-11-09][ATENDE-END] #1285 scripts do responsavel que muda no ERP (marketing ed669cc, atende 5813719) + manual Envios 4c; producao (medir, CSV, ensaio, gravar) com o dono em janela elevada
+[2026-11-10][ATENDE-END] #1337 fechado: aviso de API externa recusando no WhatsApp do dono (auditoria_erp.py em canais, migracao 060, ad5205c+cb639e2); prova 10/11 08:40 ensaio id 3 ENVIADO com wamid; comentado no #1280 (modelo Meta so cadastro com porteiro ligado)
