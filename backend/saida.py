@@ -16,6 +16,8 @@ MAX_BOTOES = 3
 EMPRESA = "Sementes Renascer"
 MAX_LINHAS = 10
 LIMITE_LINK = 20   # #1090: o rotulo do botao de link (cta_url) na Meta
+PDF = "application/pdf"
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"   # #1381
 
 
 @dataclass(frozen=True)
@@ -60,9 +62,10 @@ class Saida:
         raise NotImplementedError
 
     def documento(self, para: str, dados: bytes, nome: str, legenda: str = "",
-                  opcoes: list[Opcao] | None = None) -> str:
+                  opcoes: list[Opcao] | None = None, mime_type: str = PDF) -> str:
         """#1098: um PDF, com a legenda e ate 3 botoes (mensagem interativa com o documento no
-        cabecalho). So dentro da janela de 24 h de quem recebe; fora dela, e modelo."""
+        cabecalho). So dentro da janela de 24 h de quem recebe; fora dela, e modelo. `mime_type`
+        (#1381): o Word que vai junto da resposta do chamado; o padrao e o PDF de sempre."""
         raise NotImplementedError
 
     def baixar(self, media_id: str, destino) -> str:
@@ -180,12 +183,12 @@ class SaidaMeta(Saida):
         self._wa.download_media(url=url, path=str(destino.parent), filename=destino.name)
         return str(destino)
 
-    def documento(self, para, dados, nome, legenda="", opcoes=None):
+    def documento(self, para, dados, nome, legenda="", opcoes=None, mime_type=PDF):
         from pywa.types import Button
         if opcoes:
             conferir_botoes(opcoes)
         w = self._wa.send_document(
-            to=para, document=dados, filename=nome, caption=legenda or None, mime_type="application/pdf",
+            to=para, document=dados, filename=nome, caption=legenda or None, mime_type=mime_type,
             buttons=[Button(title=o.titulo, callback_data=o.id) for o in opcoes] if opcoes else None).id
         return self._guardado(w, "documento", legenda=" — ".join(x for x in (legenda, nome) if x),
                               opcoes=[{"titulo": o.titulo} for o in opcoes] if opcoes else None)

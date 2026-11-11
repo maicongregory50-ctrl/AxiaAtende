@@ -348,6 +348,18 @@ def chamados_estado(cfg, token: str, ids: list[int]) -> list[dict]:
     return _whatsapp(url, None, token)["demandas"]
 
 
+def chamado_anexo(cfg, token: str, anexo_id: int) -> bytes:
+    """#1381: o arquivo que vai junto da resposta do chamado. So o ja ligado a um evento existe la."""
+    try:
+        return _baixar(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/anexos/%d" % int(anexo_id), token)
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 403, 404):   # recusa que nao muda tentando de novo
+            raise ErpRecusou("o anexo %d: o ERP recusou (%d)" % (int(anexo_id), e.code)) from None
+        raise ErpIndisponivel("o anexo %d: o ERP respondeu %d" % (int(anexo_id), e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu ao baixar o anexo") from None
+
+
 def chamado_resposta(cfg, token: str, demanda_id: int, numero: str, texto: str) -> None:
     _whatsapp(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/resposta" % int(demanda_id),
               {"numero": numero, "texto": texto}, token)

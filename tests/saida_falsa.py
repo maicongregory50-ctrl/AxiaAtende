@@ -59,11 +59,12 @@ class SaidaFalsa(Saida):
         self.enviadas.append(("link", para, texto, [(rotulo, url)]))
         return self._id()
 
-    def documento(self, para, dados, nome, legenda="", opcoes=None):
+    def documento(self, para, dados, nome, legenda="", opcoes=None, mime_type="application/pdf"):
         if opcoes:
             conferir_botoes(opcoes)
         self.enviadas.append(("documento", para, legenda, [(o.id, o.titulo) for o in opcoes or []]))
         self.documentos = getattr(self, "documentos", []) + [(para, dados, nome)]
+        self.mimes = getattr(self, "mimes", []) + [mime_type]
         return self._id()
 
     @property

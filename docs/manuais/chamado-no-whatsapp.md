@@ -46,6 +46,9 @@ foi gravado) fica no chamado, no sistema, e não vem ao celular.
 - **Vários chamados numa mensagem só**, separados por um traço: o sistema junta o que chega para você
   em poucos minutos, para não mandar uma mensagem atrás da outra.
 - **"Esta entrega já foi respondida. ✓"**: você (ou alguém pela caixa do sistema) já tinha respondido.
+- **Um documento (PDF ou Word) com a legenda "Chamado N"** logo depois da mensagem (#1381): é o arquivo
+  que a equipe mandou junto da pergunta ou da entrega, um roteiro ou um manual, por exemplo. Toque para
+  abrir. Fora das 24 horas, ele espera junto com a mensagem e chega quando você tocar em **Ver**.
 - **Sem o "Bom dia" de volta.** Se você escreve "Bom dia" e havia mensagem esperando, chegam só as
   mensagens, sem o menu da casa.
 
@@ -58,7 +61,9 @@ quê (por exemplo, o número não é o de quem abriu o chamado).
 
 - Não abre chamado novo pelo WhatsApp: para isso, continue usando o sistema.
 - Não lê foto ou arquivo como resposta de chamado: só texto, os botões e, para a equipe, o **áudio**
-  transcrito na máquina (#1238, quando a transcrição estiver ligada).
+  transcrito na máquina (#1238, quando a transcrição estiver ligada). O arquivo só vai **da equipe para
+  você** (#1381), e só junto de uma pergunta ou de uma entrega.
+- O documento que chega pelo WhatsApp não aparece na caixa do sistema: guarde-o no celular.
 - Não manda aviso fora de hora por conta própria: o que é só aviso espera você escrever para a empresa.
 - Não avisa cada etapa do chamado, nem manda a pergunta do agente de suporte sem o dono (#1269): isso
   fica no chamado, no sistema.
@@ -78,3 +83,10 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
   espera antes de ir ao ERP (manual `roteador.md`).
 - A volta das telas traz do ERP a cada minuto e leva as respostas; o recepcionista manda e lê.
 - Resposta que o ERP recusa fica com o erro na tela Envios; não é tentada de novo.
+- **O anexo (#1381).** Quem trata manda pela skill `demanda` (`comentar N --pergunta ... --anexo <arquivo>`
+  ou `entregar N --devolucao @f --anexo <arquivo>`): PDF ou Word, até 10 MB, um por resposta. A volta das
+  telas baixa o arquivo do ERP para `envios_pasta\chamados` (ERP fora: a volta para e tenta de novo, sem
+  andar o cursor; anexo recusado de vez pelo ERP: a mensagem sai só com o texto e o motivo vai ao log).
+  O recepcionista manda o documento logo depois do texto e antes do "ficou bom?". Se o documento falhar,
+  o texto já saiu: o erro fica na mensagem ("anexo: ...") e no log. A chave `pendencias.anexo_ligado`
+  desliga só o documento; o texto continua saindo.

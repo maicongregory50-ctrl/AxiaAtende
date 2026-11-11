@@ -16,7 +16,11 @@ Desligado (`pendencias.ligado`), nada: nem o cursor anda.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from psycopg.types.json import Jsonb
 
 from . import erp
 from .banco import conexao
@@ -56,9 +60,10 @@ def receber(con, linhas: list[dict], agora: datetime) -> int:
              li["evento_id"] if espera else None, agora)).fetchone()
         r = con.execute(
             """INSERT INTO atendimento.pendencias_mensagens (pendencia_id, sentido, classe, texto, origem_evento_id,
-                                                            estado, criado_em)
-               VALUES (%s, 'saiu', %s, %s, %s, 'esperando', %s) ON CONFLICT (origem_evento_id) DO NOTHING RETURNING id""",
-            (p["id"], li["classe"], li["texto"][:4000], li["evento_id"], agora)).fetchone()
+                                                            estado, criado_em, anexo)
+               VALUES (%s, 'saiu', %s, %s, %s, 'esperando', %s, %s) ON CONFLICT (origem_evento_id) DO NOTHING RETURNING id""",
+            (p["id"], li["classe"], li["texto"][:4000], li["evento_id"], agora,
+             Jsonb(li["_anexo"]) if li.get("_anexo") else None)).fetchone()
         novas += r is not None
     return novas
 
@@ -97,8 +102,36 @@ def conferir(con, demandas: list[dict], agora: datetime) -> int:
     return feitas
 
 
+def _nome_seguro(nome: str) -> str:
+    return re.sub(r"[^\w.\- ]", "_", Path(nome or "documento").name)[:120] or "documento"
+
+
+def baixar_anexos(cfg, token: str, linhas: list[dict], baixar=erp.chamado_anexo) -> None:
+    """#1381: baixa o arquivo de cada linha que tem `anexo` para envios_pasta\\chamados e poe em
+    `_anexo` o que o recepcionista precisa. Uma falha levanta `ErpIndisponivel`: a volta para antes de
+    gravar, o cursor nao anda, e a linha vem de novo na volta seguinte (o molde da ficha do frete)."""
+    pasta = Path(cfg.envios_pasta) / "chamados"
+    for li in linhas:
+        a = li.get("anexo")
+        if not a:
+            continue
+        pasta.mkdir(parents=True, exist_ok=True)
+        destino = pasta / ("%d-%s" % (int(li["evento_id"]), _nome_seguro(a.get("nome"))))
+        try:
+            destino.write_bytes(baixar(cfg, token, int(a["id"])))
+        except erp.ErpRecusou as e:
+            # recusa definitiva: segurar a volta trancaria a ida de todos os chamados por um arquivo
+            print("pendencias: %s -- a mensagem do evento %s sai so com o texto" % (e, li["evento_id"]),
+                  flush=True)
+            continue
+        except OSError as e:
+            raise erp.ErpIndisponivel("o anexo %s não pôde ser gravado: %s" % (a.get("id"), e)) from None
+        li["_anexo"] = {"arquivo": str(destino), "nome": a.get("nome") or destino.name,
+                        "media_type": a.get("media_type") or "application/pdf"}
+
+
 def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=erp.chamado_resposta,
-          validar=erp.chamado_validar, agora: datetime | None = None) -> dict:
+          validar=erp.chamado_validar, agora: datetime | None = None, baixar=erp.chamado_anexo) -> dict:
     agora = agora or datetime.now(timezone.utc)
     if not cfg.erp_segredo:
         return {"erro": "a ligação com o ERP não está ligada"}
@@ -111,6 +144,11 @@ def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=
     except erp.ErpIndisponivel as e:
         return {"erro": str(e)}
     token = r["token"]
+    if isinstance(cursor, int):
+        try:
+            baixar_anexos(cfg, token, r["linhas"], baixar)
+        except erp.ErpIndisponivel as e:
+            return {"erro": str(e)}   # nada gravado, cursor parado: a linha volta na proxima
     with conexao(cfg) as con:
         with con.transaction():   # o cursor so anda junto com o que foi gravado
             novas = receber(con, r["linhas"], agora) if isinstance(cursor, int) else 0

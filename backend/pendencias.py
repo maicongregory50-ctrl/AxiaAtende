@@ -24,6 +24,7 @@ O que volta fica `a_entregar`, e as TELAS levam ao ERP.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from .envio import com_nove, janela_aberta, modelo_do_uso, parametros
 from .saida import Opcao
@@ -96,6 +97,32 @@ def _texto_do_bloco(p, msgs) -> str:
     return "*%s*\n%s%s" % (rotulo(p), corpo, ("\n\n" + rodape) if rodape else "")
 
 
+def _mandar_anexos(con, saida, numero: str, lote) -> int:
+    """#1381: o arquivo de cada mensagem do lote, logo depois do texto (e antes do "ficou bom?", que
+    pergunta sobre o que foi entregue). Com a chave `pendencias.anexo_ligado` desligada, nada. Uma falha
+    nao desfaz o texto, que ja saiu: o erro fica na mensagem e no log, e o arquivo continua no chamado."""
+    if _ajuste(con, "pendencias.anexo_ligado", True) is not True:
+        return 0
+    feitas = 0
+    for _t, p, msgs in lote:
+        for m in msgs:
+            a = m.get("anexo")
+            if not a:
+                continue
+            try:
+                dados = Path(a["arquivo"]).read_bytes()
+                w = saida.documento(numero, dados, a["nome"], legenda="Chamado #%s" % p["referencia"],
+                                    mime_type=a.get("media_type") or "application/pdf")
+            except Exception as falha:  # noqa: BLE001 -- o texto ja saiu; o resto do lote continua
+                print("pendencias: anexo da mensagem %d: %s" % (m["id"], falha), flush=True)
+                con.execute("UPDATE atendimento.pendencias_mensagens SET erro = %s WHERE id = %s",
+                            (("anexo: %s" % falha)[:300], m["id"]))
+                continue
+            _enviada(con, w, numero, "documento", "pendencias: anexo do chamado #%s" % p["referencia"])
+            feitas += 1
+    return feitas
+
+
 def _mandar_numero(con, saida, numero: str, agora: datetime) -> int:
     """Manda tudo o que espera para o numero (a janela ja foi conferida). Devolve quantas mensagens."""
     blocos = _blocos(con, numero)
@@ -125,6 +152,7 @@ def _mandar_numero(con, saida, numero: str, agora: datetime) -> int:
         con.execute("""UPDATE atendimento.pendencias_mensagens SET estado = 'enviada', wamid = %s, enviada_em = %s
                         WHERE id = ANY(%s)""", (w, agora, ids))
         feitas += 1
+        feitas += _mandar_anexos(con, saida, numero, lote)
         for _t, p, msgs in lote:
             if any(m["classe"] == "entrega" for m in msgs) and p["espera"] == "validacao":
                 wb = saida.botoes(numero, "%s: ficou bom?" % rotulo(p),
