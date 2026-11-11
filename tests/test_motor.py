@@ -7,7 +7,7 @@ import pytest
 
 from backend import recepcionista as R
 from backend.banco import conexao
-from tests.avisos_meta import aviso, texto, toque
+from tests.avisos_meta import aviso, na_hora, texto, toque
 from tests.saida_falsa import IAFalsa, SaidaFalsa
 
 QUINTA_14H = datetime(2026, 10, 8, 17, 0, tzinfo=timezone.utc)    # 14:00 em Sao Paulo
@@ -22,7 +22,9 @@ def ligado(cfg):
 
 
 def passo(cfg, s, mensagem, agora=QUINTA_14H, ia=None):
-    R.gravar(cfg, aviso([mensagem]))
+    # #1289: a mensagem vai com a hora do passo. Desde o #1237 a janela de 24 h conta da hora da
+    # MENSAGEM, e a hora fixa dos ajudantes (09/10/2025) deixava a retomada sempre "fora da janela".
+    R.gravar(cfg, aviso([na_hora(mensagem, agora)]))
     R.processar_pendentes(cfg, s, ia, agora=agora)
     return s.ultima
 

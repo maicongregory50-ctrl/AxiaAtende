@@ -10,7 +10,7 @@ from backend import motor, recepcionista as R
 from backend.banco import conexao
 from backend.envio import Envio
 from backend.main import criar_app
-from tests.avisos_meta import aviso, status, texto, toque
+from tests.avisos_meta import aviso, na_hora, status, texto, toque
 from tests.saida_falsa import IAFalsa, SaidaFalsa
 
 QUINTA_10H = datetime(2026, 10, 8, 13, 0, tzinfo=timezone.utc)   # 10:00 em Sao Paulo, dentro da janela (#1192)
@@ -318,10 +318,14 @@ def test_1189_o_portao_retroativo_acha_quem_escreveu_e_manda_uma_vez(ligado, ima
     spec.loader.exec_module(m)
     s, env = _convidar(ligado, imagens, [cliente(1, 10), cliente(2, 5)])
     numero = destinatarios(ligado)[1]["whatsapp"]
-    R.gravar(ligado, aviso([texto("wamid.r", "voces tem azevem?", numero=numero)], numero=numero, bsuid="BR." + numero))
-    agora = datetime.now(timezone.utc)
+    # #1289: relogio CONGELADO no dia do convite. Com `datetime.now()` o teste venceu sozinho em 07/11/2026
+    # (o convite e de 08/10, e o portao olha 30 dias); e a mensagem vai com a hora do passo, nao a fixa de 2025.
+    agora = QUINTA_10H + timedelta(hours=3)
+    R.gravar(ligado, aviso([na_hora(texto("wamid.r", "voces tem azevem?", numero=numero), agora - timedelta(hours=2))],
+                           numero=numero, bsuid="BR." + numero))
     with conexao(ligado) as con:   # escreveu antes do portao: o evento ja processado, sem resposta
-        con.execute("UPDATE atendimento.eventos_meta SET processado_em = now(), recebido_em = now() - interval '2 hours'")
+        con.execute("UPDATE atendimento.eventos_meta SET processado_em = %s, recebido_em = %s",
+                    (agora - timedelta(hours=2), agora - timedelta(hours=2)))
         lista = m.quem_escreveu(con, env, agora)
         assert [d["erp_codigo"] for _, _, d in lista] == [1]
         assert motor.portao_do_cliente(con, s, None, lista[0][1], agora, env, origem="portao_retroativo")
