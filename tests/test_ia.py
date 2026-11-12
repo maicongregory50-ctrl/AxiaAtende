@@ -183,26 +183,38 @@ def test_triar_sem_pdf_nem_pergunta():
 def test_ler_visita_preenche_so_de_dentro_das_listas():
     from datetime import date
     motivos = [{"id": 3, "nome": "Preço"}]
+    # #1439: o MEIO saiu; entrou o CLIENTE (aberto, desconhecido ou o codigo de um candidato da fila)
+    cands = [{"codigo": 4461, "nome": "COOPERPASSO", "contato": "Márcio", "cidade": "Tangará"},
+             {"codigo": 4655, "nome": "PLANTAGRO", "contato": "Junior", "cidade": "Guarapuava"}]
     c = ClienteFalso(resposta(json.dumps({
-        "meio": "ligacao", "quando": "2026-10-23", "ofereceu": "nao", "resposta": "interesse", "motivo": "nenhum",
+        "cliente": "4655", "quando": "2026-10-23", "ofereceu": "nao", "resposta": "interesse", "motivo": "nenhum",
         "interesse": "+Palha no inverno", "retomar": "2026-11-05", "pedido": "", "anotacao": "plantando o verão"})))
-    r = IAmod.IA(cliente=c).ler_visita("liguei pro Márcio...", {"nome": "COOPERPASSO", "campanha": None},
-                                       motivos, date(2026, 10, 23))
-    assert r == {"meio": "ligacao", "quando": "2026-10-23", "ofereceu": False, "resposta": "interesse",
+    r = IAmod.IA(cliente=c).ler_visita("liguei pro Junior da Plantagro...", {"nome": "COOPERPASSO", "campanha": None},
+                                       motivos, date(2026, 10, 23), cands)
+    assert r == {"cliente": 4655, "quando": "2026-10-23", "ofereceu": False, "resposta": "interesse",
                  "motivo_id": None, "interesse_texto": "+Palha no inverno", "retomar_em": "2026-11-05",
                  "pedido_numero": "", "anotacao": "plantando o verão"}
     p = c.pedidos[0]
     props = p["output_config"]["format"]["schema"]["properties"]
-    assert props["motivo"]["enum"] == ["Preço", "nenhum"] and "nenhum" in props["meio"]["enum"]
+    assert props["motivo"]["enum"] == ["Preço", "nenhum"] and "meio" not in props
+    assert props["cliente"]["enum"] == ["aberto", "desconhecido", "4461", "4655"]
     assert "tools" not in p and "<texto>" in p["messages"][0]["content"] and "2026-10-23" in p["system"]
-    assert "cortesia" in p["system"]
+    assert "cortesia" in p["system"] and "4655 · PLANTAGRO · Junior · Guarapuava" in p["messages"][0]["content"]
+    # sem candidatos, "desconhecido" vira "aberto" (nao ha a quem perguntar); codigo fora da lista tambem
+    for dito in ("desconhecido", "9999"):
+        c2 = ClienteFalso(resposta(json.dumps({"cliente": dito, "quando": "", "ofereceu": "nao", "resposta": "nenhuma",
+                                                "motivo": "nenhum", "interesse": "", "retomar": "", "pedido": "", "anotacao": ""})))
+        assert IAmod.IA(cliente=c2).ler_visita("x", {"nome": "X"}, motivos, date(2026, 10, 23))["cliente"] == "aberto"
+    c3 = ClienteFalso(resposta(json.dumps({"cliente": "desconhecido", "quando": "", "ofereceu": "nao", "resposta": "nenhuma",
+                                            "motivo": "nenhum", "interesse": "", "retomar": "", "pedido": "", "anotacao": ""})))
+    assert IAmod.IA(cliente=c3).ler_visita("x", {"nome": "X"}, motivos, date(2026, 10, 23), cands)["cliente"] == "desconhecido"
 
 
 def test_ler_visita_com_campanha_motivo_pelo_nome_e_falha_vira_none():
     from datetime import date
     motivos = [{"id": 3, "nome": "Preço"}]
     c = ClienteFalso(resposta(json.dumps({
-        "meio": "visita", "quando": "", "ofereceu": "sim", "resposta": "recusou", "motivo": "Preço",
+        "cliente": "aberto", "quando": "", "ofereceu": "sim", "resposta": "recusou", "motivo": "Preço",
         "interesse": "", "retomar": "", "pedido": "", "anotacao": ""})))
     ficha = {"nome": "X", "campanha": {"nome": "Inverno"}}
     r = IAmod.IA(cliente=c).ler_visita("ofereci, achou caro", ficha, motivos, date(2026, 10, 23))
