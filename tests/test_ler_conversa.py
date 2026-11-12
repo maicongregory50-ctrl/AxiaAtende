@@ -98,6 +98,10 @@ def test_a_candidatura_aparece_sem_o_conteudo_do_pdf(cfg, capsys, tmp_path):
     from tests.test_vaga import CANDIDATO, do_anuncio, doc
     from tests.saida_falsa import SaidaFalsa
     c = replace(cfg, responde=True)
+    # #1474: a 062 fechou a Comercial; este teste nasceu com ela como a unica aberta (o anuncio
+    # 120249624037810192 e dela). O mesmo estado da fixture `so_a_comercial` de test_vaga.py.
+    with conexao(c) as con:
+        con.execute("UPDATE atendimento.vagas SET aberta = (id = 1), fechada_em = CASE WHEN id = 1 THEN NULL ELSE now() END")
     s = SaidaFalsa()
     R.gravar(c, aviso([do_anuncio("w1")], numero=CANDIDATO, bsuid="BR.cand.1"))
     R.gravar(c, aviso([doc("w2")], numero=CANDIDATO, bsuid="BR.cand.1"))

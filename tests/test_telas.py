@@ -235,6 +235,10 @@ def test_1205_a_janela_le_a_pessoa_inteira_com_o_atendimento_em_destaque(ligado,
 
 def test_recepcao_conversa_de_vaga_nao_e_parou_no_meio(ligado, tela):
     """#1098: quem chegou pelo anuncio e nao mandou o PDF termina "sem curriculo", fora das paradas."""
+    # #1474: a 062 fechou a Comercial; este teste nasceu com ela como a unica aberta (o anuncio
+    # 120249624037810192 e dela). O mesmo estado da fixture `so_a_comercial` de test_vaga.py.
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.vagas SET aberta = (id = 1), fechada_em = CASE WHEN id = 1 THEN NULL ELSE now() END")
     s = SaidaFalsa()
     m = texto("w1", "Olá! Posso ter mais informações sobre isso?", numero="5549988887777")
     m["referral"] = {"source_type": "ad", "source_id": "120249624037810192"}
@@ -247,6 +251,10 @@ def test_recepcao_conversa_de_vaga_nao_e_parou_no_meio(ligado, tela):
 
 
 def test_destinos_mostra_a_vaga_fecha_e_desliga_a_triagem(ligado, tela):
+    # #1474: a 062 fechou a Comercial; este teste nasceu com ela como a unica aberta (o anuncio
+    # 120249624037810192 e dela). O mesmo estado da fixture `so_a_comercial` de test_vaga.py.
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.vagas SET aberta = (id = 1), fechada_em = CASE WHEN id = 1 THEN NULL ELSE now() END")
     d = tela.get("/api/destinos").json()
     trabalhe = next(o for o in d["opcoes"] if o["chave"] == "trabalhe")   # a Fran continua trocavel
     assert trabalhe["destino_id"]
@@ -256,5 +264,7 @@ def test_destinos_mostra_a_vaga_fecha_e_desliga_a_triagem(ligado, tela):
     assert tela.put("/api/vagas/%d/triagem" % v["id"], json={"ligada": False}).json() == {"triagem_ligada": False}
     assert tela.post("/api/vagas/%d/fechar" % v["id"]).status_code == 200
     assert tela.post("/api/vagas/%d/fechar" % v["id"]).status_code == 422   # ja fechada
-    v = tela.get("/api/destinos").json()["vagas"][0]
+    # #1474: com as tres vagas na tabela, a primeira da lista depois de fechar nao e mais a Comercial
+    # (a ordem e aberta primeiro, depois a mais nova): procura-se pelo id.
+    v = next(x for x in tela.get("/api/destinos").json()["vagas"] if x["id"] == v["id"])
     assert not v["aberta"] and not v["triagem_ligada"] and v["fechada_em"]
