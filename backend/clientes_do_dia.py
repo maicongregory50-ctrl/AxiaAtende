@@ -552,7 +552,10 @@ def rodar(con, saida, ia, agora: datetime) -> int:
         if reg["estado"] == "gravado":
             con.execute("UPDATE atendimento.clientes_registros SET avisado = true WHERE id = %s", (reg["id"],))
             _texto(con, saida, reg["para"], "%s (%s)" % (GRAVADO, reg["ficha"].get("nome") or ""))
-            if c:
+            # #1439 (12/11 09:40): ele ja tinha tocado Depois e recebido a proxima ficha quando o "Gravado"
+            # chegou, e o proximo repetiu a ficha. Registro vivo MAIS NOVO que o gravado ja foi mostrado.
+            vivo = _aberto(con, reg["wa_id"], agora)
+            if c and not (vivo and vivo["id"] > reg["id"]):
                 proximo(con, saida, c, reg["para"], agora)
         else:
             con.execute("""UPDATE atendimento.clientes_registros

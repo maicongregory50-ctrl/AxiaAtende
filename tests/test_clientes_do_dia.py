@@ -314,6 +314,24 @@ def test_parar_por_hoje_com_relato_nao_lido_guarda_e_sem_relato_descarta(piloto)
     assert s.ultima[2] == K.ATE_LOGO and _registros(piloto)[0]["estado"] == "descartado"
 
 
+def test_gravado_nao_repete_a_ficha_que_ele_ja_recebeu_tocando_depois(piloto):
+    """12/11 09:40: Confere, Depois (vem a PLANTAGRO) e so entao "Gravado" -- que mandava a PLANTAGRO de novo."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.visita = dict(LEITURA)
+    _abrir(piloto, s)
+    t = AGORA + timedelta(minutes=2)
+    passo(piloto, s, texto("w3", "liguei pro Márcio, vão querer +Palha", numero=EQUIPE), agora=t)
+    _rodar(piloto, s, ia, t + timedelta(seconds=31))
+    rid = _registros(piloto)[0]["id"]
+    passo(piloto, s, toque("w4", "cli:confere:%d" % rid, numero=EQUIPE), agora=t + timedelta(minutes=1))
+    passo(piloto, s, texto("w5", "meus clientes", numero=EQUIPE), agora=t + timedelta(minutes=1, seconds=10))
+    assert "PLANTAGRO" in s.enviadas[-2][2]                              # ja recebeu a proxima ficha
+    n = len(s.enviadas)
+    clientes_erp.enviar_registros(piloto, gravar=lambda cfg, corpo: {"id": 777})
+    _rodar(piloto, s, ia, t + timedelta(minutes=2))
+    assert s.ultima[2].startswith(K.GRAVADO) and len(s.enviadas) == n + 1   # so o "Gravado", sem a ficha de novo
+
+
 def test_o_erp_recusa_e_a_frase_volta_ao_consultor(piloto):
     s, ia = SaidaFalsa(), IAFalsa()
     ia.visita = dict(LEITURA)
