@@ -29,13 +29,17 @@ entre uma visita e outra.
    Se você tiver outro assunto aberto ao mesmo tempo (um chamado esperando resposta, uma foto
    esperando a legenda), o sistema lê de qual deles a mensagem fala (#1238; manual `roteador.md`): o
    nome do cliente na frase ajuda. Entrou no lugar errado? Escreva *"isso era do cliente"*.
-4. Se faltar alguma coisa, ela pergunta com botões, uma por vez: **como foi** (visita, ligação,
-   WhatsApp), **se ofereceu a campanha**, **a resposta**, e, em recusa, **o motivo**.
+   **Fale do cliente que quiser:** se o relato é de outro cliente da sua lista (um que você deixou
+   para depois, ou falou ontem), diga o nome dele na frase e a OlivIA registra nele, respondendo
+   *"Entendi: isso é sobre X"*. Se ela não entender de quem é, pergunta com botões (desde 12/11/2026).
+4. Se faltar alguma coisa, ela pergunta com botões, uma por vez: **se ofereceu a campanha**, **a
+   resposta**, e, em recusa, **o motivo**. Não pergunta mais como foi o contato.
 5. Vem o cartão **"Confere?"** com o registro montado. Toque **✅ Confere**. Em seguida vem
    **"Gravado no sistema ✔"** e o próximo cliente. Se algo estiver errado, toque **✏️ Corrigir** e
    escreva de novo, completo.
 6. **⏭ Depois** deixa o cliente para amanhã e manda o próximo. **🛑 Parar por hoje** encerra; para
-   voltar, escreva *meus clientes* (ou *próximo*), e ele continua de onde parou. Com um cliente
+   voltar, escreva *meus clientes* (ou *próximo*), e ele continua de onde parou. Se você tinha
+   acabado de escrever um relato, ela responde *"Guardei o que você escreveu"* e lê mesmo assim. Com um cliente
    aberto, *meus clientes* repete a ficha dele.
 
 ## 4. O que significa cada sinal
@@ -44,6 +48,9 @@ entre uma visita e outra.
 |---|---|
 | **cortesia** | não há campanha aberta para aquele cliente: não há "ofereceu", nem recusa com motivo |
 | **campanha *X* · recompra / apresentação** | há oferta a fazer; a versão é a que o histórico de compra dele indica |
+| **"Entendi: isso é sobre X"** | o relato foi para outro cliente que não o da ficha; a ficha volta depois |
+| **"Esse relato é de qual cliente?"** | ela não soube de quem era: toque o nome certo, ou **Outro cliente** para ver a lista |
+| **"Guardei o que você escreveu"** | você parou com relato pendente; ele continua quando você voltar |
 | **⏰ atrasado N dias** | passou do prazo de contato de pessoa |
 | **próximo contato: 05/11** | o que você disse; **(sugerido)** = você não disse, e vale o ritmo do cliente, como na tela |
 | **"Anotado. Vai ao sistema agora."** | você conferiu; falta o sistema receber |
@@ -55,6 +62,8 @@ entre uma visita e outra.
 ## 5. O que NÃO faz
 
 - **Não grava nada sem o seu Confere.**
+- **Não pergunta como foi o contato** (visita, ligação, WhatsApp): desde 12/11/2026 isso não se
+  registra. O que importa é o dia, a oferta e a resposta.
 - **Não manda nada ao cliente:** quem fala com ele é você.
 - **Não entende foto nem print** nesta primeira versão. O **áudio** passa a valer como texto quando a
   transcrição da equipe estiver ligada (#1238): ele vira *"(áudio) …"* e entra como se você tivesse

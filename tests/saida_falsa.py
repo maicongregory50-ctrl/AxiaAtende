@@ -78,9 +78,12 @@ class IAFalsa:
         self.campo, self.frases = campo, []   # #970: o que `ler_campo` devolve, e as frases lidas
         self.bastidores_vistos = []           # #1048: as chaves que o cadastro entregou ao modelo
 
-    def ler_visita(self, texto, ficha, motivos, hoje):
-        """#1090 etapa 3: `visita` e o dict devolvido (ou uma lista, um por leitura)."""
+    def ler_visita(self, texto, ficha, motivos, hoje, candidatos=()):
+        """#1090 etapa 3: `visita` e o dict devolvido (ou uma lista, um por leitura). #1439: guarda os
+        candidatos vistos e a ficha de cada leitura."""
         self.visitas = getattr(self, "visitas", []) + [texto]
+        self.candidatos_vistos = getattr(self, "candidatos_vistos", []) + [[c["codigo"] for c in candidatos]]
+        self.fichas_vistas = getattr(self, "fichas_vistas", []) + [ficha.get("nome")]
         if self.falha:
             return None
         v = getattr(self, "visita", None)

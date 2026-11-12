@@ -10,7 +10,9 @@ O CAMINHO:
 2. O que ele escreve fica no registro aberto. Textos mandados ate ESPERA um do outro sao um so: a leitura
    pela IA roda quando ele para de escrever (`rodar`, chamado pelo laco do recepcionista).
 3. A IA preenche os campos da tela do ERP; o que faltar e perguntado por botao, UMA coisa por vez
-   (como foi, ofereceu, a resposta, o motivo). O proximo contato, se ele nao disse, e o sugerido pela
+   (ofereceu, a resposta, o motivo). O MEIO (visita, ligacao...) saiu em 12/11/2026 (#1439): o dono
+   decidiu que nao importa como contatamos. E a IA diz DE QUEM e o relato: se nomeia outro cliente da
+   fila, o texto vai para o registro dele ("Entendi: isso e sobre X"); na duvida, pergunta por botao. O proximo contato, se ele nao disse, e o sugerido pela
    cadencia (vem do ERP na ficha), como a tela faz.
 4. "Confere?" com o cartao. Confere -> `confirmado`; o processo das TELAS leva ao ERP (`clientes_erp`)
    e marca `gravado` ou `recusado`; `rodar` avisa e manda o proximo cliente.
@@ -38,8 +40,6 @@ ESPERA = timedelta(seconds=30)        # textos mandados ate 30 s um do outro sao
 JANELA = timedelta(hours=24)          # a janela da Meta para mensagem de sessao
 VIVO = timedelta(hours=24)            # registro aberto ha mais que isto nao recebe mais texto
 
-MEIOS = {"visita": "🚗 Visita", "ligacao": "📞 Ligação", "whatsapp": "💬 WhatsApp"}
-MEIOS_ROTULO = {"visita": "Visita", "ligacao": "Ligação", "whatsapp": "WhatsApp", "email": "E-mail"}
 # As mesmas listas da tela do ERP (relacionamento_regras.RESPOSTAS_*). O ERP confere de novo ao gravar.
 RESPOSTAS_OFERTA = {"fechou": "Fechou (pedido)", "analisando": "Analisando", "pediu_proposta": "Pediu proposta",
                     "recusou": "Recusou", "nao_atendeu": "Não atendeu"}
@@ -54,6 +54,11 @@ ANOTADO = "Anotado. Vai ao sistema agora."
 GRAVADO = "Gravado no sistema ✔"
 CORRIGIR = "Tudo bem. Me escreva de novo como foi, completo."
 ATE_LOGO = "Até a próxima. Para voltar, escreva *meus clientes*."
+# #1439 (12/11/2026, 08:27): "Parar por hoje" descartava o relato que a IA ainda nao tinha lido.
+GUARDEI = "Guardei o que você escreveu sobre %s. Continuo quando você voltar: escreva *meus clientes*."
+ENTENDI = "Entendi: isso é sobre *%s*."
+DE_QUEM = "Esse relato é de qual cliente?"
+OUTRO = "Outro cliente"
 SEM_LIBERACAO = "O 📋 Meus clientes ainda não está liberado para você."
 SEM_FILA = "Sua lista ainda não chegou do sistema. Tente de novo em alguns minutos."
 ACABOU = "Acabaram os clientes da sua lista por hoje. 👏"
@@ -122,7 +127,8 @@ def texto_da_ficha(ficha: dict, n: int, total: int) -> str:
     c = ficha.get("contato") or {}
     if c.get("nome") or c.get("telefone"):
         linhas.append("👤 " + " · ".join(x for x in (c.get("nome"), c.get("telefone")) if x))
-    ult = ("último contato %s (%s)" % (_data_br(ficha["ultimo_contato"]), (ficha.get("ultimo_meio") or "").lower())
+    meio = (" (%s)" % ficha["ultimo_meio"].lower()) if ficha.get("ultimo_meio") else ""   # historico antigo
+    ult = ("último contato %s%s" % (_data_br(ficha["ultimo_contato"]), meio)
            if ficha.get("ultimo_contato") else "nunca teve contato registrado")
     meses = ficha.get("meses_compra") or []
     linhas.append("📅 " + (("compra em %s · " % ", ".join(meses)) if meses else "") + ult)
@@ -287,8 +293,25 @@ def _toque(con, saida, ia, c: dict, para: str, toque: str, agora: datetime) -> N
         con.execute("UPDATE atendimento.clientes_registros SET estado = 'depois' WHERE id = %s", (reg["id"],))
         proximo(con, saida, c, para, agora)
     elif acao == "parar" and vivo:
-        con.execute("UPDATE atendimento.clientes_registros SET estado = 'descartado' WHERE id = %s", (reg["id"],))
-        _texto(con, saida, para, ATE_LOGO)
+        if reg["textos"] and not reg["lido"]:
+            # #1439: ha relato que a IA ainda nao leu -- fica aberto, e `rodar` o le na proxima volta
+            _texto(con, saida, para, GUARDEI % (reg["ficha"].get("nome") or "o cliente"))
+        else:
+            con.execute("UPDATE atendimento.clientes_registros SET estado = 'descartado' WHERE id = %s", (reg["id"],))
+            _texto(con, saida, para, ATE_LOGO)
+    elif acao == "dequem" and vivo:
+        # #1439: a resposta a "esse relato e de qual cliente?"
+        if valor == "aberto":
+            seguir(con, saida, reg, para, agora)
+        elif valor == "lista":
+            cands = candidatos(con, c)
+            _lista(con, saida, para, DE_QUEM, "Escolher",
+                   [Opcao("cli:dequem:%d:%d" % (reg["id"], x["codigo"]), (x["nome"] or "?")[:24], (x.get("contato") or "")[:72])
+                    for x in cands[:10]])
+        elif valor.isdigit():
+            destino = _mover_relato(con, saida, reg, int(valor), para, agora)
+            if destino is not None:
+                seguir(con, saida, destino, para, agora)
     elif acao == "confere" and reg["estado"] == "conferir":
         con.execute("""UPDATE atendimento.clientes_registros
                           SET estado = 'confirmado', confirmado_em = %s, avisado = false, erro = NULL
@@ -299,12 +322,10 @@ def _toque(con, saida, ia, c: dict, para: str, toque: str, agora: datetime) -> N
                           SET estado = 'aberto', textos = '', proposta = '{}'::jsonb, pergunta = NULL, lido = true
                         WHERE id = %s""", (reg["id"],))
         _texto(con, saida, para, CORRIGIR)
-    elif acao in ("meio", "ofer", "resp", "motivo") and vivo:
+    elif acao in ("ofer", "resp", "motivo") and vivo:
         p = dict(reg["proposta"] or {})
         tocados = dict(p.get("_tocados") or {})
-        if acao == "meio" and valor in MEIOS_ROTULO:
-            tocados["meio"] = valor
-        elif acao == "ofer" and valor in ("sim", "nao"):
+        if acao == "ofer" and valor in ("sim", "nao"):
             tocados["ofereceu"] = valor == "sim"
             tocados.pop("resposta", None)
         elif acao == "resp" and valor in {**RESPOSTAS_OFERTA, **RESPOSTAS_CORTESIA}:
@@ -358,8 +379,6 @@ def completar(p: dict, ficha: dict, hoje: date) -> dict:
 
 
 def _falta(r: dict, ficha: dict) -> str | None:
-    if not r.get("meio"):
-        return "meio"
     if ficha.get("campanha") and "ofereceu" not in (r.get("_tocados") or {}) and not r.get("resposta"):
         return "ofer"
     if not r.get("resposta"):
@@ -378,10 +397,7 @@ def seguir(con, saida, reg, para: str, agora: datetime) -> None:
     con.execute("UPDATE atendimento.clientes_registros SET proposta = %s, pergunta = %s, estado = %s WHERE id = %s",
                 (json.dumps(r), falta, "aberto" if falta else "conferir", rid))
     nome = ficha.get("nome") or "o cliente"
-    if falta == "meio":
-        _botoes(con, saida, para, "Com %s, foi como?" % nome,
-                     [Opcao("cli:meio:%d:%s" % (rid, k), v) for k, v in MEIOS.items()])
-    elif falta == "ofer":
+    if falta == "ofer":
         camp = ficha["campanha"]
         _botoes(con, saida, para, "Você ofereceu a campanha *%s*?" % (camp.get("nome") or camp.get("codigo")),
                      [Opcao("cli:ofer:%d:sim" % rid, "Sim, ofereci"), Opcao("cli:ofer:%d:nao" % rid, "Não, só conversa")])
@@ -400,8 +416,7 @@ def seguir(con, saida, reg, para: str, agora: datetime) -> None:
 
 
 def cartao(r: dict, ficha: dict, motivos: dict | None = None) -> str:
-    linhas = ["Confere?", "*%s* · %s · %s" % (ficha.get("nome") or "?", MEIOS_ROTULO.get(r.get("meio"), "?"),
-                                              _data_br(r.get("quando")))]
+    linhas = ["Confere?", "*%s* · %s" % (ficha.get("nome") or "?", _data_br(r.get("quando")))]
     camp = ficha.get("campanha")
     if camp:
         linhas.append("ofereceu *%s*: %s" % (camp.get("nome") or camp.get("codigo"), "sim" if r.get("ofereceu") else "não"))
@@ -418,6 +433,72 @@ def cartao(r: dict, ficha: dict, motivos: dict | None = None) -> str:
     if r.get("anotacao"):
         linhas.append("anotação: %s" % r["anotacao"])
     return "\n".join(linhas)
+
+
+# ── de quem e o relato (#1439, 12/11/2026) ───────────────────────────────────
+# Medido no atendimento do dono em 12/11: o relato da Plantimar (deixada para depois) caiu no registro da
+# Itaipu, porque a leitura so conhecia a ficha do aberto; e a correcao escrita foi somada ao registro
+# errado. Agora a leitura recebe a fila inteira e diz de quem e; o texto muda de registro, nao de assunto.
+
+def candidatos(con, c: dict) -> list[dict]:
+    """A fila do consultor, resumida para a leitura: codigo, nome, contato, cidade."""
+    out = []
+    for f in con.execute("SELECT codigo, ficha FROM atendimento.clientes_fila WHERE comercial_id = %s ORDER BY posicao",
+                         (c["comercial_id"],)).fetchall():
+        ficha = f["ficha"] or {}
+        out.append({"codigo": f["codigo"], "nome": ficha.get("nome") or "", "cidade": ficha.get("cidade") or "",
+                    "contato": (ficha.get("contato") or {}).get("nome") or ""})
+    return out
+
+
+def _sem_acento(t: str) -> str:
+    return unicodedata.normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower()
+
+
+def _mover_relato(con, saida, reg, codigo: int, para: str, agora: datetime):
+    """O texto de `reg` passa a um registro NOVO do cliente `codigo` (o mais novo e o corrente). O
+    antigo vivo/depois daquele codigo e descartado; `reg` fica aberto e vazio, e volta quando o novo
+    fechar. None quando o codigo nao esta na fila (vira "desconhecido")."""
+    f = con.execute("SELECT ficha FROM atendimento.clientes_fila WHERE comercial_id = %s AND codigo = %s",
+                    (reg["comercial_id"], codigo)).fetchone()
+    if f is None:
+        return None
+    con.execute("""UPDATE atendimento.clientes_registros SET estado = 'descartado'
+                    WHERE wa_id = %s AND codigo = %s AND estado IN ('aberto', 'conferir', 'depois')""",
+                (reg["wa_id"], codigo))
+    con.execute("""UPDATE atendimento.clientes_registros
+                      SET textos = '', proposta = '{}'::jsonb, pergunta = NULL, lido = true, estado = 'aberto'
+                    WHERE id = %s""", (reg["id"],))
+    p = {k: v for k, v in (reg["proposta"] or {}).items() if k != "_tocados"}
+    destino = con.execute("""INSERT INTO atendimento.clientes_registros
+                                 (wa_id, para, comercial_id, codigo, ficha, criado_em, textos, ultimo_texto_em, lido, proposta)
+                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true, %s) RETURNING *""",
+                          (reg["wa_id"], para, reg["comercial_id"], codigo, json.dumps(f["ficha"]), agora,
+                           reg["textos"], agora, json.dumps({**p, "_tocados": {}}))).fetchone()
+    _texto(con, saida, para, ENTENDI % ((f["ficha"] or {}).get("nome") or codigo))
+    return destino
+
+
+def _perguntar_de_quem(con, saida, reg, para: str, cands: list[dict]) -> None:
+    """Botoes: o aberto + ate dois da fila cujo nome aparece no texto; tres ou mais, lista; nenhum,
+    "Outro cliente" abre a lista dos dez primeiros."""
+    con.execute("UPDATE atendimento.clientes_registros SET pergunta = 'dequem', estado = 'aberto' WHERE id = %s",
+                (reg["id"],))
+    rid, t = reg["id"], _sem_acento(reg["textos"])
+    casados = [x for x in cands if x["codigo"] != reg["codigo"] and any(
+        len(w) >= 4 and w in t for w in _sem_acento(x["nome"] + " " + x["contato"]).split())]
+    nome_aberto = (reg["ficha"].get("nome") or "?")[:20]
+    if len(casados) >= 3:
+        _lista(con, saida, para, DE_QUEM, "Escolher",
+               [Opcao("cli:dequem:%d:aberto" % rid, nome_aberto[:24], "o cliente da ficha")]
+               + [Opcao("cli:dequem:%d:%d" % (rid, x["codigo"]), (x["nome"] or "?")[:24], (x["contato"] or "")[:72])
+                  for x in casados[:9]])
+        return
+    opcoes = [Opcao("cli:dequem:%d:aberto" % rid, nome_aberto)]
+    opcoes += [Opcao("cli:dequem:%d:%d" % (rid, x["codigo"]), (x["nome"] or "?")[:20]) for x in casados[:2]]
+    if not casados:
+        opcoes.append(Opcao("cli:dequem:%d:lista" % rid, OUTRO))
+    _botoes(con, saida, para, DE_QUEM, opcoes)
 
 
 # ── a rotina (laco do recepcionista) ─────────────────────────────────────────
@@ -439,15 +520,28 @@ def rodar(con, saida, ia, agora: datetime) -> int:
                                WHERE estado = 'aberto' AND NOT lido AND ultimo_texto_em <= %s
                                ORDER BY id LIMIT 10""", (agora - ESPERA,)).fetchall():
         lido = None
+        cands = candidatos(con, {"comercial_id": reg["comercial_id"]})
         if ia is not None:
             try:
-                lido = ia.ler_visita(reg["textos"], reg["ficha"], motivos, _hoje(agora))
+                lido = ia.ler_visita(reg["textos"], reg["ficha"], motivos, _hoje(agora), cands)
             except Exception as falha:  # noqa: BLE001 -- sem leitura, pergunta por botao
                 print("clientes: leitura %s" % type(falha).__name__, flush=True)
-        p = {**(lido or {}), "_tocados": (reg["proposta"] or {}).get("_tocados") or {}}
+        lido = dict(lido or {})
+        cliente = lido.pop("cliente", "aberto")
+        p = {**lido, "_tocados": (reg["proposta"] or {}).get("_tocados") or {}}
         reg = con.execute("UPDATE atendimento.clientes_registros SET proposta = %s, lido = true WHERE id = %s RETURNING *",
                           (json.dumps(p), reg["id"])).fetchone()
-        seguir(con, saida, reg, reg["para"], agora)
+        # #1439: de quem e o relato. Outro cliente da fila -> o texto vai para o registro dele; na duvida, botoes
+        if isinstance(cliente, int) and cliente != reg["codigo"]:
+            destino = _mover_relato(con, saida, reg, cliente, reg["para"], agora)
+            if destino is not None:
+                seguir(con, saida, destino, reg["para"], agora)
+            else:
+                _perguntar_de_quem(con, saida, reg, reg["para"], cands)
+        elif cliente == "desconhecido":
+            _perguntar_de_quem(con, saida, reg, reg["para"], cands)
+        else:
+            seguir(con, saida, reg, reg["para"], agora)
         feitos += 1
     for reg in con.execute("""SELECT * FROM atendimento.clientes_registros
                                WHERE estado IN ('gravado', 'recusado') AND NOT avisado

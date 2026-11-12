@@ -24,7 +24,7 @@ COOPERPASSO = {"posicao_fila": 1, "codigo": 4461, "nome": "COOPERPASSO", "cidade
 PLANTAGRO = dict(COOPERPASSO, posicao_fila=2, codigo=4655, nome="PLANTAGRO", posicao=7,
                  contato={"nome": "Junior Picolo", "telefone": "(42) 99948-3552",
                           "link_whatsapp": "https://wa.me/5542999483552"})
-LEITURA = {"meio": "ligacao", "quando": "2026-10-12", "ofereceu": False, "resposta": "interesse",
+LEITURA = {"cliente": "aberto", "quando": "2026-10-12", "ofereceu": False, "resposta": "interesse",
            "motivo_id": None, "interesse_texto": "+Palha e aveia para o inverno", "retomar_em": "2026-11-05",
            "pedido_numero": "", "anotacao": "terminando de plantar o verão"}
 
@@ -95,7 +95,8 @@ def test_o_caminho_da_maquete(piloto):
     assert r == {"gravados": 1, "recusados": 0}
     c = enviados[0]
     assert (c["stakeholder_id"], c["comercial_id"], c["ref_externa"]) == (4461, 42, "atende-cli:%d" % rid)
-    assert (c["meio"], c["resposta"], c["retomar_em"], c["ofereceu"]) == ("ligacao", "interesse", "2026-11-05", False)
+    assert (c["meio"], c["resposta"], c["retomar_em"], c["ofereceu"]) == (None, "interesse", "2026-11-05", False)
+    assert ia.candidatos_vistos == [[4461, 4655]]   # #1439: a leitura ve a fila inteira
 
     _rodar(piloto, s, ia, t + timedelta(minutes=2))
     textos = [e[2] for e in s.enviadas[-3:]]
@@ -121,18 +122,17 @@ def test_o_que_meus_clientes_manda_fica_em_enviadas(piloto):
 
 def test_o_que_falta_e_perguntado_por_botao_uma_coisa_por_vez(piloto):
     s, ia = SaidaFalsa(), IAFalsa()
-    ia.visita = dict(LEITURA, meio=None, resposta=None)
+    # #1439: o meio deixou de ser perguntado; a primeira pergunta e a resposta
+    ia.visita = dict(LEITURA, resposta=None)
     _abrir(piloto, s)
     t = AGORA + timedelta(minutes=2)
     passo(piloto, s, texto("w3", "falei com ele", numero=EQUIPE), agora=t)
     _rodar(piloto, s, ia, t + timedelta(seconds=31))
     rid = _registros(piloto)[0]["id"]
-    assert s.ultima[0] == "botoes" and [o[0] for o in s.ultima[3]] == [
-        "cli:meio:%d:visita" % rid, "cli:meio:%d:ligacao" % rid, "cli:meio:%d:whatsapp" % rid]
-    passo(piloto, s, toque("w4", "cli:meio:%d:visita" % rid, numero=EQUIPE), agora=t + timedelta(minutes=1))
     assert s.ultima[0] == "lista" and "cli:resp:%d:conversou" % rid in [o[0] for o in s.ultima[3]]
+    assert not any("cli:meio:" in e[2] or any("cli:meio:" in o[0] for o in e[3]) for e in s.enviadas)
     passo(piloto, s, toque("w5", "cli:resp:%d:conversou" % rid, lista=True, numero=EQUIPE), agora=t + timedelta(minutes=2))
-    assert "Confere?" in s.ultima[2] and "Visita" in s.ultima[2] and "(sugerido)" not in s.ultima[2]
+    assert "Confere?" in s.ultima[2] and "Visita" not in s.ultima[2] and "(sugerido)" not in s.ultima[2]
 
 
 def test_sem_proximo_dito_vem_o_sugerido(piloto):
@@ -230,6 +230,90 @@ def test_parar_por_hoje_e_o_texto_seguinte_vai_ao_canal_de_campo(piloto):
     assert _registros(piloto)[0]["textos"] == ""
 
 
+# ── #1439 (12/11/2026): de quem e o relato, e Parar sem perder texto ─────────
+
+def test_relato_de_outro_cliente_da_fila_vai_para_o_registro_dele(piloto):
+    """O caso de 12/11 08:2x: a PLANTAGRO (deixada para depois) e contada enquanto a COOPERPASSO esta
+    aberta. A leitura diz o codigo dela, o texto muda de registro, e a COOPERPASSO volta depois."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    _abrir(piloto, s)                                                     # COOPERPASSO aberta
+    rid1 = _registros(piloto)[0]["id"]
+    passo(piloto, s, toque("w3", "cli:depois:%d" % rid1, numero=EQUIPE), agora=AGORA + timedelta(minutes=1))
+    assert "PLANTAGRO" in s.enviadas[-2][2]                              # PLANTAGRO aberta, COOPERPASSO depois
+    rid2 = _registros(piloto)[1]["id"]
+    passo(piloto, s, toque("w4", "cli:depois:%d" % rid2, numero=EQUIPE), agora=AGORA + timedelta(minutes=2))
+    assert s.ultima[2] == K.ACABOU                                        # a fila tem dois; os dois ficaram para depois
+    # amanha: COOPERPASSO volta primeiro; ele conta a PLANTAGRO
+    amanha = AGORA + timedelta(days=1)
+    passo(piloto, s, texto("w5", "meus clientes", numero=EQUIPE), agora=amanha)
+    assert "COOPERPASSO" in s.enviadas[-2][2]
+    rid3 = _registros(piloto)[2]["id"]
+    ia.visita = dict(LEITURA, cliente=4655, resposta="conversou")
+    t = amanha + timedelta(minutes=2)
+    passo(piloto, s, texto("w6", "falei com o Junior da Plantagro, so conversa, nada agora", numero=EQUIPE), agora=t)
+    _rodar(piloto, s, ia, t + timedelta(seconds=31))
+    assert ia.fichas_vistas == ["COOPERPASSO"] and ia.candidatos_vistos == [[4461, 4655]]
+    regs = _registros(piloto)
+    assert [(r["codigo"], r["estado"]) for r in regs] == [(4461, "depois"), (4655, "descartado"),
+                                                         (4461, "aberto"), (4655, "conferir")]
+    assert regs[2]["textos"] == "" and regs[3]["textos"].startswith("falei com o Junior")
+    assert s.enviadas[-2][2] == K.ENTENDI % "PLANTAGRO"
+    assert "Confere?" in s.ultima[2] and "*PLANTAGRO*" in s.ultima[2] and "resposta: *Conversou*" in s.ultima[2]
+    # o texto seguinte cai no registro da PLANTAGRO (o mais novo), nao no da COOPERPASSO
+    passo(piloto, s, toque("w7", "cli:confere:%d" % regs[3]["id"], numero=EQUIPE), agora=t + timedelta(minutes=1))
+    clientes_erp.enviar_registros(piloto, gravar=lambda cfg, corpo: {"id": 778})
+    _rodar(piloto, s, ia, t + timedelta(minutes=2))
+    textos = [e[2] for e in s.enviadas[-3:]]
+    assert textos[0].startswith(K.GRAVADO) and "COOPERPASSO" in textos[1]   # a COOPERPASSO volta como corrente
+    assert _registros(piloto)[2]["id"] == rid3 and len(_registros(piloto)) == 4   # mesma linha, sem registro novo
+
+
+def test_relato_de_quem_a_leitura_nao_sabe_pergunta_com_botoes_e_o_toque_move(piloto):
+    s, ia = SaidaFalsa(), IAFalsa()
+    _abrir(piloto, s)
+    rid = _registros(piloto)[0]["id"]
+    ia.visita = dict(LEITURA, cliente="desconhecido", resposta="conversou")
+    t = AGORA + timedelta(minutes=2)
+    passo(piloto, s, texto("w3", "conversei com ele, nada por agora", numero=EQUIPE), agora=t)
+    _rodar(piloto, s, ia, t + timedelta(seconds=31))
+    assert s.ultima[0] == "botoes" and s.ultima[2] == K.DE_QUEM
+    assert [o[0] for o in s.ultima[3]] == ["cli:dequem:%d:aberto" % rid, "cli:dequem:%d:lista" % rid]
+    assert _registros(piloto)[0]["pergunta"] == "dequem"
+    passo(piloto, s, toque("w4", "cli:dequem:%d:lista" % rid, numero=EQUIPE), agora=t + timedelta(minutes=1))
+    assert s.ultima[0] == "lista" and [o[1] for o in s.ultima[3]] == ["COOPERPASSO", "PLANTAGRO"]
+    passo(piloto, s, toque("w5", "cli:dequem:%d:4655" % rid, lista=True, numero=EQUIPE), agora=t + timedelta(minutes=2))
+    regs = _registros(piloto)
+    assert [(r["codigo"], r["estado"]) for r in regs] == [(4461, "aberto"), (4655, "conferir")]
+    assert s.enviadas[-2][2] == K.ENTENDI % "PLANTAGRO" and "*PLANTAGRO*" in s.ultima[2]
+    # com o nome de outro cliente no texto, ele vem como botao direto
+    s2, ia2 = SaidaFalsa(), IAFalsa()
+    passo(piloto, s2, toque("w6", "cli:corrigir:%d" % regs[1]["id"], numero=EQUIPE), agora=t + timedelta(minutes=3))
+    ia2.visita = dict(LEITURA, cliente="desconhecido")
+    passo(piloto, s2, texto("w7", "isso era da Cooperpasso, do Marcio", numero=EQUIPE), agora=t + timedelta(minutes=4))
+    _rodar(piloto, s2, ia2, t + timedelta(minutes=5))
+    assert [o[1] for o in s2.ultima[3]] == ["PLANTAGRO", "COOPERPASSO"]
+
+
+def test_parar_por_hoje_com_relato_nao_lido_guarda_e_sem_relato_descarta(piloto):
+    """12/11 08:27: o relato do Evandro foi escrito e o Parar veio antes da leitura; o texto sumiu."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.visita = dict(LEITURA, resposta="conversou")
+    _abrir(piloto, s)
+    rid = _registros(piloto)[0]["id"]
+    t = AGORA + timedelta(minutes=2)
+    passo(piloto, s, texto("w3", "falei com o Marcio, so conversa", numero=EQUIPE), agora=t)
+    passo(piloto, s, toque("w4", "cli:parar:%d" % rid, numero=EQUIPE), agora=t + timedelta(seconds=5))
+    assert s.ultima[2] == K.GUARDEI % "COOPERPASSO"
+    r = _registros(piloto)[0]
+    assert r["estado"] == "aberto" and r["textos"].startswith("falei com o Marcio")
+    _rodar(piloto, s, ia, t + timedelta(seconds=40))                     # a leitura acontece mesmo assim
+    assert "Confere?" in s.ultima[2]
+    # sem relato pendente, Parar descarta como sempre
+    passo(piloto, s, toque("w5", "cli:corrigir:%d" % rid, numero=EQUIPE), agora=t + timedelta(minutes=1))
+    passo(piloto, s, toque("w6", "cli:parar:%d" % rid, numero=EQUIPE), agora=t + timedelta(minutes=2))
+    assert s.ultima[2] == K.ATE_LOGO and _registros(piloto)[0]["estado"] == "descartado"
+
+
 def test_o_erp_recusa_e_a_frase_volta_ao_consultor(piloto):
     s, ia = SaidaFalsa(), IAFalsa()
     ia.visita = dict(LEITURA)
@@ -271,7 +355,7 @@ def test_sem_ia_pergunta_tudo_por_botao(piloto):
     t = AGORA + timedelta(minutes=2)
     passo(piloto, s, texto("w3", "liguei", numero=EQUIPE), agora=t)
     _rodar(piloto, s, None, t + timedelta(seconds=31))
-    assert s.ultima[0] == "botoes" and s.ultima[3][0][1] == "🚗 Visita"
+    assert s.ultima[0] == "lista" and s.ultima[3][0][1] == "Conversou"   # #1439: sem o meio, a resposta vem primeiro
 
 
 def test_copiar_filas_troca_a_copia_e_os_motivos(piloto):

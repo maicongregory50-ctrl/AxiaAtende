@@ -55,7 +55,8 @@ def corpo_do_registro(reg) -> dict:
     return {
         "stakeholder_id": reg["codigo"], "comercial_id": reg["comercial_id"],
         "ref_externa": "atende-cli:%d" % reg["id"],
-        "meio": p.get("meio"), "quando": p.get("quando"), "ofereceu": bool(p.get("ofereceu")),
+        "meio": None,   # #1439: o meio saiu; o ERP aceita sem ele desde a fase 647 (#1440)
+        "quando": p.get("quando"), "ofereceu": bool(p.get("ofereceu")),
         "resposta": p.get("resposta"), "motivo_id": p.get("motivo_id"),
         "interesse_texto": p.get("interesse_texto") or None, "anotacao": _anotacao(reg, p),
         "retomar_em": p.get("retomar_em"), "pedido_numero": p.get("pedido_numero") or None,
