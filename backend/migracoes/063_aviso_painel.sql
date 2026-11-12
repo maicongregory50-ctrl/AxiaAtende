@@ -22,7 +22,7 @@ ALTER TABLE atendimento.modelos ADD CONSTRAINT modelos_uso
 -- Ver da reabertura (fora dela): o modelo e so CADASTRO, como o aviso_integracao da 060.
 INSERT INTO atendimento.modelos (nome, categoria, uso, cabecalho_imagem, variaveis, botao, texto) VALUES
     ('aviso_painel', 'UTILITY', 'aviso_painel_classe1', false, ARRAY['aviso1'], 'nenhum',
-     'Aviso do painel da casa: {{1}} O detalhe está no painel.');
+     'Aviso do painel da casa: {{1}}');
 
 -- Quem recebe: o mesmo de integracoes_para (o dono).
 INSERT INTO atendimento.ajustes (chave, valor)
