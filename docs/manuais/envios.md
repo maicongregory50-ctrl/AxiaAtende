@@ -213,6 +213,14 @@ precisa. Se um dia o porteiro for desligado, ele precisa ser aprovado antes. O c
 **O que NÃO faz.**
 - Não manda a mais ninguém além dos destinos do ajuste.
 - Não repete: sai um aviso por episódio, e quem controla isso é o ERP.
+
+**O aviso do painel da casa (#1434, 12/11/2026).** Mesmo caminho, outra origem: quando algo parou no
+servidor e sobrou para o dono, a revisão do painel (AxiaSecurity) deixa o pedido numa pasta, e as
+telas o mandam como *"Aviso do painel da casa: [CRÍTICO] …"*. Na aba de avisos aparece com o tipo
+`painel_classe1`. Quem recebe é o ajuste `painel_para` (nasceu igual ao `integracoes_para`: só o
+dono). O estado volta para a revisão em `C:\Dados\AxiaAtende\painel\`. Não depende do ERP: com a
+ligação do ERP desligada, este canal continua. O modelo `aviso_painel` está só cadastrado, como o
+`aviso_integracao`.
 - Não avisa quando o serviço volta; isso fica no chamado, não no celular.
 - Não conserta nada.
 

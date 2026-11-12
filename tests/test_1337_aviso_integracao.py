@@ -71,11 +71,14 @@ def test_a_volta_da_060_desfaz_e_a_ida_refaz(ligado):
     _volta(ligado, ErpFalso([PENDENTE]))
     raiz = Path(migracoes.__file__).parent / "migracoes"
     with conexao(ligado) as con:
+        # #1434: a 063 esta por cima da 060; desfaz-se na ordem inversa e refaz-se na direta.
+        con.execute((raiz / "063_aviso_painel_VOLTA.sql").read_text(encoding="utf-8"))
         con.execute((raiz / "060_aviso_integracao_VOLTA.sql").read_text(encoding="utf-8"))
         assert not con.execute("SELECT 1 FROM atendimento.ajustes WHERE chave = 'integracoes_para'").fetchone()
         assert not con.execute("""SELECT 1 FROM information_schema.columns WHERE table_schema = 'atendimento'
                                    AND table_name = 'avisos_auditoria_erp' AND column_name = 'canal'""").fetchone()
         con.execute((raiz / "060_aviso_integracao.sql").read_text(encoding="utf-8"))
+        con.execute((raiz / "063_aviso_painel.sql").read_text(encoding="utf-8"))
     assert _avisos(ligado) == []
 
 
@@ -140,7 +143,8 @@ def test_canal_fora_do_ar_nao_para_o_outro(ligado):
 
 
 def test_a_volta_padrao_tem_os_dois_canais(ligado, monkeypatch):
-    assert [c.nome for c in auditoria_erp.CANAIS] == ["auditoria_estoque", "integracao_recusada"]
+    # #1434: o terceiro canal e o do painel da casa (arquivo, sem ERP).
+    assert [c.nome for c in auditoria_erp.CANAIS] == ["auditoria_estoque", "integracao_recusada", "painel_classe1"]
     assert auditoria_erp.CANAIS[1].ir is erp.integracoes_pendentes
     assert auditoria_erp.CANAIS[1].devolver is erp.estado_do_aviso_integracao
 

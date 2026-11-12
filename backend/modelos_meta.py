@@ -69,6 +69,9 @@ EXEMPLOS_AVISO = {
     "aviso_auditoria_estoque": ["Matriz", "13/10/2026"],     # #350, a auditoria de estoque
     # #1337: o texto vem pronto do ERP (#1280); so vai a Meta se o porteiro for desligado
     "aviso_integracao_recusada": ["a SEFAZ (NF-e) recusou 3 vezes seguidas. Chamado #1400."],
+    # #1434: o aviso de classe 1 do painel da casa (texto pronto da revisao do AxiaSecurity)
+    "aviso_painel_classe1": ["[CRÍTICO] axiaatende-recepcionista -- visto às 14:02 no painel. "
+                             "Feito até agora: reinício pela porta, e não voltou. Chamado #1500."],
 }
 
 

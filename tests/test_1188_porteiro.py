@@ -90,6 +90,7 @@ def test_a_volta_desfaz_e_a_ida_volta_a_aplicar(cfg):
     avisar(cfg)
     volta_sql = (migracoes.PASTA / "039_porteiro_dos_avisos_VOLTA.sql").read_text(encoding="utf-8")
     with conexao(cfg) as con:
+        con.execute((migracoes.PASTA / "063_aviso_painel_VOLTA.sql").read_text(encoding="utf-8"))   # #1434: a 063 reescreve os mesmos CHECKs
         con.execute((migracoes.PASTA / "060_aviso_integracao_VOLTA.sql").read_text(encoding="utf-8"))   # #1337: a 060 reescreve os mesmos CHECKs
         con.execute((migracoes.PASTA / "049_aviso_auditoria_estoque_VOLTA.sql").read_text(encoding="utf-8"))   # #350: a 049 reescreve os mesmos CHECKs
         con.execute((migracoes.PASTA / "045_informativo_so_ola_VOLTA.sql").read_text(encoding="utf-8").split("BEGIN;", 1)[1].rsplit("COMMIT;", 1)[0])
@@ -102,7 +103,7 @@ def test_a_volta_desfaz_e_a_ida_volta_a_aplicar(cfg):
         assert con.execute("SELECT count(*) AS n FROM atendimento.avisos").fetchone()["n"] == 1   # nada apagado
     assert migracoes.aplicar(cfg) == ["039_porteiro_dos_avisos.sql", "043_informativo_ao_comprador.sql",
                                       "044_informativo_sem_link.sql", "045_informativo_so_ola.sql", "049_aviso_auditoria_estoque.sql",
-                                      "060_aviso_integracao.sql"]
+                                      "060_aviso_integracao.sql", "063_aviso_painel.sql"]
     with conexao(cfg) as con:
         assert con.execute("SELECT 1 FROM atendimento.modelos WHERE nome = 'reabrir_avisos'").fetchone()
 

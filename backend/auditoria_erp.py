@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from . import erp
+from . import erp, painel_avisos
 from .banco import conexao
 
 INTERVALO_SEGUNDOS = 60
@@ -38,11 +38,13 @@ class Canal:
     ir: Callable         # cfg -> {"pendentes": [{"id", "partes"}], "token"}
     devolver: Callable   # (cfg, token, id, estado, motivo=, wamid=) -> None
     ajuste: str          # a chave dos destinos em atendimento.ajustes
+    precisa_erp: bool = True   # #1434: o canal do painel nao vem do ERP e roda com a ligacao desligada
 
 
 CANAIS = (
     Canal("auditoria_estoque", erp.auditoria_pendentes, erp.estado_do_aviso_auditoria, AJUSTE),
     Canal("integracao_recusada", erp.integracoes_pendentes, erp.estado_do_aviso_integracao, "integracoes_para"),
+    Canal("painel_classe1", painel_avisos.ir, painel_avisos.devolver, "painel_para", precisa_erp=False),
 )
 
 
@@ -74,11 +76,18 @@ def volta(cfg, ir=None, devolver=None, canais=CANAIS) -> dict:
 
     A assinatura do #350, `volta(cfg, ir=..., devolver=...)`, continua aceita: ela monta o canal da
     auditoria com as funcoes dadas e devolve a contagem dele sozinho, como antes."""
-    if not cfg.erp_segredo:
-        return {"erro": "a ligação com o ERP não está ligada"}
     if ir is not None or devolver is not None:
+        if not cfg.erp_segredo:
+            return {"erro": "a ligação com o ERP não está ligada"}
         c = CANAIS[0]
         return volta_do_canal(cfg, Canal(c.nome, ir or c.ir, devolver or c.devolver, c.ajuste))
+    # #1434: sem o segredo do ERP, so os canais do ERP ficam de fora; o do painel (arquivo local) roda.
+    if not cfg.erp_segredo:
+        fora = [c for c in canais if not c.precisa_erp]
+        r = {"erro": "a ligação com o ERP não está ligada"}
+        if fora:
+            r["canais"] = {c.nome: volta_do_canal(cfg, c) for c in fora}
+        return r
     return {"canais": {c.nome: volta_do_canal(cfg, c) for c in canais}}
 
 
@@ -86,7 +95,7 @@ def volta_do_canal(cfg, canal: Canal) -> dict:
     """Uma volta de um canal. Devolve a contagem, ou {"erro": motivo}."""
     try:
         r = canal.ir(cfg)
-    except erp.ErpIndisponivel as e:
+    except (erp.ErpIndisponivel, painel_avisos.OrigemIndisponivel) as e:
         return {"erro": str(e)}
     token, novos, devolvidos = r["token"], 0, 0
 
@@ -124,7 +133,7 @@ def volta_do_canal(cfg, canal: Canal) -> dict:
     for erp_id, (estado, motivo, wamid) in respostas:
         try:
             canal.devolver(cfg, token, erp_id, estado, motivo=motivo, wamid=wamid)
-        except erp.ErpIndisponivel as e:
+        except (erp.ErpIndisponivel, OSError) as e:
             print("%s: estado do aviso %s: %s" % (canal.nome, erp_id, e), flush=True)
             continue
         with conexao(cfg) as con:

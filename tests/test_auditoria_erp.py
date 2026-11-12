@@ -50,7 +50,10 @@ def test_a_migracao_poe_o_dono_e_a_fran(cfg):
 
 
 def test_sem_o_segredo_nem_tenta(cfg):
-    assert auditoria_erp.volta(cfg) == {"erro": "a ligação com o ERP não está ligada"}
+    # #1434: os canais do ERP nem tentam; o do painel (arquivo local, sem ERP) continua rodando.
+    r = auditoria_erp.volta(cfg)
+    assert r["erro"] == "a ligação com o ERP não está ligada"
+    assert set(r.get("canais") or {}) == {"painel_classe1"}
 
 
 def test_erp_fora_do_ar_e_dito(ligado):

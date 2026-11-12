@@ -69,6 +69,10 @@ class Config:
     # dono do cache do perfil dele. Pode ser a pasta do modelo ou a copia inteira do cache do Hugging Face
     # (com `snapshots\<hash>` dentro): `audio.achar_modelo` acha o `model.bin` nos dois casos.
     audio_modelo_pasta: Path = Path(r"C:\Dados\AxiaAtende\modelos")
+    # #1434: o aviso de classe 1 do painel da casa. A revisao do AxiaSecurity (SYSTEM) escreve os pedidos;
+    # as telas (LocalSystem) leem e devolvem o estado na pasta delas, que a revisao le.
+    painel_pedidos: Path = Path(r"C:\Logs\Seguranca\revisao\avisos")
+    painel_devolucao: Path = Path(r"C:\Dados\AxiaAtende\painel")
     logs: Path = Path(r"C:\Logs\AxiaAtende")
     tela: Path = RAIZ / "frontend" / "dist"
     cookie_seguro: bool = False
@@ -179,6 +183,8 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             envios_pasta=Path(r"C:\Dados\AxiaAtende\%s\envios" % ambiente),
             campo_pasta=Path(r"C:\Dados\AxiaAtende\%s\campo" % ambiente),
             audio_modelo_pasta=Path(r"C:\Dados\AxiaAtende\%s\modelos" % ambiente),
+            painel_pedidos=Path(r"C:\Dados\AxiaAtende\%s\painel_pedidos" % ambiente),
+            painel_devolucao=Path(r"C:\Dados\AxiaAtende\%s\painel" % ambiente),
         )
     if ambiente == "producao" and os.environ.get("AXIAATENDE_LOGS"):
         base["logs"] = Path(os.environ["AXIAATENDE_LOGS"])   # o recepcionista escreve so no dele

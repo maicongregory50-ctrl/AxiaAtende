@@ -53,14 +53,14 @@ def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
     feitos = modelos_meta.propor(replace(cfg, meta_token="t"), imagem,
                                  http=cliente_falso(pedidos, ja_tem=["aviso_recusa"]), documento=pdf)
     assert sorted(f["nome"] for f in feitos) == ["abertura_do_canal", "aviso_auditoria_estoque", "aviso_avaliacao_ruim", "aviso_endereco_fora",
-                                                 "aviso_endereco_voltou", "aviso_integracao", "aviso_lote_do_representante",
+                                                 "aviso_endereco_voltou", "aviso_integracao", "aviso_lote_do_representante", "aviso_painel",
                                                  "aviso_plano_sem_registro",
                                                  "aviso_sem_atendimento", "curriculo_para_fran",
                                                  "epoca_de_plantio", "informativo_ao_comprador", "informativo_curto",
                                                  "informativo_renascer",
                                                  "pecas_da_revenda", "reabrir_avisos"]
     criados = [p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]
-    assert len(criados) == 16   # #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 a 045: + informativos; #350: + auditoria; #1337: + integracao
+    assert len(criados) == 17   # #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 a 045: + informativos; #350: + auditoria; #1337: + integracao; #1434: + painel
     import json
     reabrir = next(json.loads(p.content) for p in criados if json.loads(p.content)["name"] == "reabrir_avisos")
     assert reabrir["category"] == "UTILITY"
