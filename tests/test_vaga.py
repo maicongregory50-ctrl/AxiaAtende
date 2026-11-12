@@ -22,6 +22,21 @@ TRIAGEM = {"requisitos": [{"situacao": "consta", "fonte": "Agronomia UFSC"},
            "resumo": "perfil comercial", "legivel": True}
 
 
+@pytest.fixture(autouse=True)
+def so_a_comercial(cfg):
+    """#1474: a migracao 062 fecha a Comercial e abre duas vagas. Estes testes nasceram com a
+    Comercial como a UNICA vaga aberta (o anuncio, os requisitos, a pergunta do menu): a fixture
+    devolve esse estado; os testes da lista (#1474) reabrem as duas de proposito."""
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.vagas SET aberta = (id = 1), fechada_em = CASE WHEN id = 1 THEN NULL ELSE now() END")
+
+
+def duas_abertas(cfg):
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.vagas SET aberta = (id <> 1), fechada_em = CASE WHEN id <> 1 THEN NULL ELSE now() END")
+        return con.execute("SELECT id, titulo FROM atendimento.vagas WHERE aberta ORDER BY id").fetchall()
+
+
 @pytest.fixture
 def ligado(cfg):
     return replace(cfg, responde=True)
@@ -473,3 +488,63 @@ def test_a_volta_da_029_devolve_a_pergunta(ligado):
         assert r["texto"].endswith("Você atende a esses requisitos?")
         assert not con.execute("""SELECT 1 FROM atendimento.respostas_da_vaga
                                    WHERE chave IN ('pergunta_menu', 'pedir_pdf_banco')""").fetchone()
+
+
+# ── #1474: mais de uma vaga aberta -- a lista das vagas no menu ──────────────
+
+def test_com_duas_vagas_abertas_o_menu_mostra_a_lista_e_a_escolhida_abre_com_os_requisitos_dela(ligado):
+    abertas = duas_abertas(ligado)
+    assert [v["titulo"] for v in abertas] == ["Vaga Auxiliar de produção", "Vaga Operador de empilhadeira"]
+    s = SaidaFalsa()
+    passo(ligado, s, texto("w1", "oi", numero=CANDIDATO))
+    tipo, _, corpo, opcoes = passo(ligado, s, toque("w2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    assert tipo == "lista" and corpo.startswith("Olá, Gabriel! Obrigado pelo interesse em trabalhar")
+    assert "mais de uma vaga aberta" in corpo
+    assert [o[1] for o in opcoes] == ["Auxiliar de produção", "Operador de empilhadeira", "Outras áreas", "Era outro assunto"]
+    assert opcoes[1][0] == "%s%d" % (V.ESCOLHER, abertas[1]["id"])
+    assert conversa(ligado)["trabalhe"] and conversa(ligado)["vaga_id"] is None
+    tipo, _, corpo, opcoes = passo(ligado, s, toque("w3", opcoes[1][0], lista=True, numero=CANDIDATO))
+    assert tipo == "botoes" and "*Vaga Operador de empilhadeira*" in corpo
+    assert "Curso de operador de empilhadeira (NR-11)" in corpo and "Não exige experiência" not in corpo
+    assert "*currículo em PDF*" in corpo and [o[1] for o in opcoes] == ["Era outro assunto"]
+    assert conversa(ligado)["vaga_id"] == abertas[1]["id"]
+    passo(ligado, s, doc("w4"))
+    assert candidaturas(ligado)[0]["vaga_id"] == abertas[1]["id"]
+
+
+def test_com_duas_abertas_outras_areas_continua_sendo_o_banco(ligado):
+    duas_abertas(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, texto("w1", "oi", numero=CANDIDATO))
+    passo(ligado, s, toque("w2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    tipo, _, corpo, _ = passo(ligado, s, toque("w3", V.OUTRAS, lista=True, numero=CANDIDATO))
+    assert tipo == "texto" and corpo.startswith("Mande aqui o seu *currículo em PDF*: ele fica guardado")
+    passo(ligado, s, doc("w4"))
+    assert candidaturas(ligado)[0]["vaga_id"] is None
+
+
+def test_vaga_escolhida_que_fechou_no_meio_tempo_volta_a_lista(ligado):
+    abertas = duas_abertas(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, texto("w1", "oi", numero=CANDIDATO))
+    passo(ligado, s, toque("w2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.vagas SET aberta = false, fechada_em = now() WHERE id = %s", (abertas[1]["id"],))
+    tipo, _, corpo, opcoes = passo(ligado, s, toque("w3", "%s%d" % (V.ESCOLHER, abertas[1]["id"]), lista=True, numero=CANDIDATO))
+    # sobrou UMA aberta: a pergunta volta no jeito de uma vaga so (botoes)
+    assert tipo == "botoes" and "temos aberta a *Vaga Auxiliar de produção*" in corpo
+    # o botao da vaga e o titulo cortado em 20 (como sempre foi); os outros dois, iguais
+    assert opcoes[0][1].startswith("Vaga Auxiliar de") and [o[1] for o in opcoes[1:]] == ["Outras áreas", "Era outro assunto"]
+
+
+def test_com_uma_vaga_so_nada_muda_e_a_migracao_062_abre_as_duas(ligado):
+    # a fixture devolve a Comercial como unica aberta; o teste de cima prova a lista. Aqui, o cadastro
+    # que a 062 deixou: as duas vagas com os requisitos e a regiao ditos pelo dono (11 e 12/11/2026)
+    with conexao(ligado) as con:
+        vagas = {v["titulo"]: v for v in con.execute("SELECT * FROM atendimento.vagas ORDER BY id").fetchall()}
+        r = con.execute("SELECT texto FROM atendimento.respostas_da_vaga WHERE chave = 'pergunta_menu_varias'").fetchone()
+    assert vagas["Vaga Auxiliar de produção"]["requisitos"] == ["Não exige experiência"]
+    assert vagas["Vaga Operador de empilhadeira"]["requisitos"] == ["Curso de operador de empilhadeira (NR-11)"]
+    assert "Cunha Porã (SC)" in vagas["Vaga Operador de empilhadeira"]["regiao"]
+    assert r and "Ver as vagas" in r["texto"]
+    assert V._titulo_curto(vagas["Vaga Operador de empilhadeira"]) == "Operador de empilhadeira"

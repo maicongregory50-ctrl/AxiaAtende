@@ -39,6 +39,7 @@ COMENTARIO_ATE = timedelta(hours=24)
 
 OUTRO = "vaga:outro"
 ESTA, OUTRAS = "vaga:esta", "vaga:outras"   # quem vem pelo menu: a vaga aberta ou outras areas (029)
+ESCOLHER = "vaga:escolher:"                 # #1474: a vaga escolhida na lista, com mais de uma aberta
 # A pergunta "Voce atende a esses requisitos?" saiu em 22/10/2026 (029, dono: quem analisa e a
 # triagem). Os toques dela continuam aceitos: a mensagem antiga pode estar na tela de alguem.
 TODOS, NEM_TODOS = "vaga:todos", "vaga:nem_todos"
@@ -59,6 +60,20 @@ def vaga_aberta(con, anuncio: str | None = None):
         return con.execute("""SELECT * FROM atendimento.vagas WHERE aberta AND %s = ANY(anuncio_ids)
                                ORDER BY id LIMIT 1""", (anuncio,)).fetchone()
     return con.execute("SELECT * FROM atendimento.vagas WHERE aberta ORDER BY id LIMIT 1").fetchone()
+
+
+def vagas_abertas(con) -> list:
+    """#1474: TODAS as vagas abertas, na ordem do cadastro. Com mais de uma, quem vem pelo menu
+    escolhe a dele numa lista; quem vem pelo anuncio continua caindo na vaga do anuncio."""
+    return con.execute("SELECT * FROM atendimento.vagas WHERE aberta ORDER BY id").fetchall()
+
+
+def _titulo_curto(vaga) -> str:
+    """O titulo sem o "Vaga " da frente, no limite da linha de lista da Meta (24)."""
+    t = _uma_linha(vaga["titulo"])
+    if t.lower().startswith("vaga "):
+        t = t[5:]
+    return _cortar(t, 24)
 
 
 def _vaga(con, vaga_id):
@@ -119,6 +134,16 @@ def abrir(con, saida: Saida, pessoa, conversa, vaga, agora: datetime, pelo_menu:
     if vaga is None:
         w = saida.texto(pessoa.para, _texto(con, "sem_vaga"))
         _registrar(con, conversa["id"], pessoa.para, "texto", "vaga: sem vaga aberta", w)
+    elif pelo_menu and len(abertas := vagas_abertas(con)) > 1:
+        # #1474 (dono, 12/11/2026): com mais de uma vaga aberta, a lista das vagas -- o candidato
+        # escolhe a dele (ate 8 vagas: a lista da Meta tem 10 linhas, e duas sao "Outras areas" e
+        # "Era outro assunto"). A conversa ainda nao tem vaga: ela e marcada no toque da escolha.
+        conversa = _marcar(con, conversa, None)
+        linhas = [Opcao("%s%d" % (ESCOLHER, v["id"]), _titulo_curto(v),
+                        _cortar(v["requisitos"][0], 72) if v["requisitos"] else "") for v in abertas[:8]]
+        w = saida.lista(pessoa.para, _texto(con, "pergunta_menu_varias", saudacao=_saudacao(pessoa)),
+                        "Ver as vagas", linhas + [Opcao(OUTRAS, "Outras áreas"), Opcao(OUTRO, "Era outro assunto")])
+        _registrar(con, conversa["id"], pessoa.para, "lista", "vaga: pergunta do menu", w)
     elif pelo_menu:
         w = saida.botoes(pessoa.para, _texto(con, "pergunta_menu", vaga, saudacao=_saudacao(pessoa)),
                          [Opcao(ESTA, _cortar(vaga["titulo"], 20)), Opcao(OUTRAS, "Outras áreas"),
@@ -302,6 +327,13 @@ def tratar(con, saida: Saida, ia, e, agora: datetime) -> bool:
         _sair_da_vaga(con, saida, p, conversa)
     elif e.toque == ESTA:
         abrir(con, saida, p, conversa, vaga or vaga_aberta(con), agora)
+    elif e.toque.startswith(ESCOLHER) if e.toque else False:
+        # #1474: a vaga escolhida na lista; fechada nesse meio-tempo, a lista volta
+        escolhida = _vaga(con, int(e.toque[len(ESCOLHER):]) if e.toque[len(ESCOLHER):].isdigit() else None)
+        if escolhida and escolhida["aberta"]:
+            abrir(con, saida, p, conversa, escolhida, agora)
+        else:
+            abrir(con, saida, p, conversa, vaga_aberta(con), agora, pelo_menu=True)
     elif e.toque == OUTRAS:
         # outras areas: banco de curriculos, sem vaga e por isso sem triagem contra requisitos que nao
         # sao os dele

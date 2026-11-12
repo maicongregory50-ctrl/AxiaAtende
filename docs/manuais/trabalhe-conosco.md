@@ -22,9 +22,13 @@ em PDF e entrega cada um à Fran já com uma pré-triagem. A decisão sobre o ca
    currículo **em PDF**, com o aviso de que ele é guardado e lido por uma ferramenta de análise, e
    que a decisão é de uma pessoa. Há um botão só, *Era outro assunto*. **O candidato não é perguntado
    se atende aos requisitos:** quem analisa é a pré-triagem e a Fran (dono, 22/10/2026).
-2. Quem toca *Trabalhe conosco* no menu escolhe antes: **a vaga aberta** (*Vaga Comercial*), que segue
-   como no item 1, ou **Outras áreas**: o atendimento pede o PDF e avisa que ele fica guardado para as
-   próximas vagas. Esse currículo vai à Fran como *Banco de currículos*, sem pré-triagem.
+2. Quem toca *Trabalhe conosco* no menu escolhe antes: **a vaga aberta**, que segue como no item 1,
+   ou **Outras áreas**: o atendimento pede o PDF e avisa que ele fica guardado para as próximas
+   vagas. Esse currículo vai à Fran como *Banco de currículos*, sem pré-triagem. **Com mais de uma
+   vaga aberta** (#1474, 12/11/2026: *Auxiliar de produção* e *Operador de empilhadeira*), a pergunta
+   vem como **lista** — *Ver as vagas* — com uma linha por vaga (o nome e o primeiro requisito), mais
+   *Outras áreas* e *Era outro assunto*; a escolhida segue como no item 1, com os requisitos dela.
+   Quem vem pelo anúncio continua caindo direto na vaga daquele anúncio. Cabem até 8 vagas na lista.
 3. Mandou o PDF: recebe *"Recebemos o seu currículo ✅"*, com o aviso da pré-triagem e de que os
    pré-selecionados recebem retorno por ali.
 4. Se escrever em vez de mandar, o atendimento responde com um dos textos aprovados: a região da vaga,
