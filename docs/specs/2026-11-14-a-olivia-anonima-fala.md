@@ -49,7 +49,7 @@ precisamos fazer tudo, mas tem que ir construindo até lá"*.
 | D1 | Quanta autonomia | **Degrau B e além**: a OlivIA fala com **texto próprio** ao anônimo. Não um sandbox de frase: *"se ela nasce num sandbox de frase, não vai conseguir chegar lá"* |
 | D2 | O cerco contra injeção | **O contexto e a ausência de ferramenta, não a frase.** Injeção só faz dano a quem tem o que vazar ou o que fazer. O anônimo fala com uma OlivIA que não sabe nada de cliente e não tem ferramenta que toque dado. O filtro de saída fica como rede, não como parede |
 | D3 | Quando ela entra | **Toda conversa** de quem escreve: ela é quem recebe; o menu vira ferramenta dela, não a porta |
-| D4 | O que ela sabe | **O que o menu já diz + um cartão da empresa** escrito pelo dono (quem somos, o que vendemos, para quem, como comprar, como ser fornecedor, horário, onde fica, o que fazer em financeiro e frete). Sem leitura do catálogo do ERP nesta etapa |
+| D4 | O que ela sabe | **O que o menu já diz + a base de conhecimento da empresa**, composta do que a casa já escreveu (o posicionamento nas palavras do dono, o institucional e o FAQ do Marketing, quem atende o quê, o tom de voz da marca) e corrigida pelo dono. **Emendada em 14/11/2026**: *"pode falar tudo, desde que não invente"* -- cada afirmação com fonte e data; só fonte vigente; os números de produto (dose, janela, massa) ficam fora até o #857 reconciliar a base técnica; sem preço, prazo, salário. Sem leitura do catálogo do ERP nesta etapa |
 | D5 | Foto de currículo | **Entra como currículo, sem triagem**: vai à Fran como imagem, com o que a pessoa escreveu. Revoga a decisão 7 do #1098 para a foto. A triagem da imagem fica para quando a Fran disser que a foto vale |
 | D6 | O vigia | **Os dois**: marca e filtro "sem saída" na tela Conversas, e resumo ao WhatsApp do dono **só quando houver** conversa sem saída ou frase recusada. Dia limpo não manda nada: silêncio quer dizer "nada a ver", não "ninguém olhou" |
 | D7 | A forma | **Caminho B: agente com ferramentas, lista fechada por degrau** (contra A, "uma chamada por mensagem com JSON de ações", e C, "A agora, B depois") |
@@ -78,9 +78,10 @@ precisamos fazer tudo, mas tem que ir construindo até lá"*.
   "Recebi"), a tela Trabalhe conosco, e o apagamento de 12 meses (decisão 5 do #1098), que **não muda**.
 - `atendimento.uso_ia` (#1223): cada chamada da OlivIA anota função `conversa`, modelo e tokens. A tela
   Custos soma. É o que mede o custo desta etapa desde o primeiro dia.
-- **O cartão da empresa**: arquivo versionado em `docs/olivia/cartao-da-empresa.md`, lido ao subir e
-  a cada mudança (sem restart: o laço relê quando o `mtime` muda). **Escrito pelo dono**; a sessão
-  rascunha a partir do site e do `CLAUDE.md`, ele corrige.
+- **A base da empresa**: `docs/olivia/FONTES.md` (o inventário das fontes, com veredito) e
+  `docs/olivia/base-da-empresa.md` (a composição, cada afirmação com fonte e data), versionados, lidos ao
+  subir e a cada mudança (sem restart). A sessão compõe do que o Marketing e o Atende já escreveram; **o
+  dono corrige**.
 - A **política de uso de IA** (`C:\AxiaSecurity\docs\governanca\politica-uso-ia.md`) e o **inventário
   de agentes**: ganham a linha "OlivIA · conversa com o anônimo". Ver *Conformidade com a casa*.
 

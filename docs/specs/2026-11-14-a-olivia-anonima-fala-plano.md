@@ -15,12 +15,29 @@
    `migracoes.py` aplica ao subir o backend no banco de teste (a bateria sobe o 5437); `\d` mostra as
    três. — reversão: a `_VOLTA` (a imagem já recebida fica como candidatura sem triagem).
 
-2. **O cartão da empresa** — `docs/olivia/cartao-da-empresa.md`: a sessão **rascunha** (quem somos, o que
-   vendemos, para quem, como comprar, como ser fornecedor, horário, onde fica, o que fazer em financeiro
-   e frete, o que NÃO afirmar: preço, prazo, salário) a partir do `CLAUDE.md`, do site e das descrições
-   do menu; **o dono corrige** antes do passo 14. `backend/olivia.py: cartao()` lê o arquivo e relê quando
-   o `mtime` muda, sem restart. — verificação: o texto é dele; `cartao()` devolve o conteúdo e detecta
-   a mudança no teste. — reversão: apagar o arquivo; sem cartão a OlivIA sabe só o menu e as vagas.
+2. **A base de conhecimento da OlivIA** (D4 emendada em 14/11/2026: *"pode falar tudo, desde que não
+   invente"*), em dois atos:
+   2a. **Inventário das fontes, com veredito** — `docs/olivia/FONTES.md`: o que a casa já diz sobre a
+   empresa, por projeto, e se entra. Começa pelo `AlivIA.docx` e `AlivIA v.2.docx` da base dispersa do
+   Marketing (o desenho anterior da própria OlivIA). Entram: `C:\AxiaMarketing\dados\posicionamento.md`
+   (história, objetivo, valores, público, nas palavras do dono), `FAQ_Institucional_Sementes_Renascer.docx`,
+   `RENASCER INSTITUCIONAL.pdf`, `sementes_renascer_institucional.docx`, o folder,
+   `Atendentes_Humanos_Tipo_Atendimento.csv` e `HUMANA AGENCIA.docx` (quem atende o quê),
+   `manual-da-marca.md` §11 (tom de voz), as descrições dos nós do menu e as respostas aprovadas da
+   vaga. **Com reserva:** `portfolio.csv`, `faq-tecnico.md` e as planilhas de cultivares — o catálogo do
+   #857 (28/09/2026) mediu a base vigente discordando de si mesma (18 produtos no ciclo, 41 valores):
+   entram o nome, a espécie e para que serve; **dose, janela, massa e qualquer número ficam fora** até o
+   #857 reconciliar. **Não entram:** `C:\AxiaGestao\Exemplos` (operação interna e fiscal), as
+   duplicatas defasadas listadas no catálogo, preço, prazo, salário, dado de cliente.
+   2b. **A composição** — `docs/olivia/base-da-empresa.md`: por seção (quem somos; o que fazemos e para
+   quem; os produtos, sem número; como comprar; como ser fornecedor; frete e financeiro: o que a OlivIA
+   diz e para quem encaminha; horário e onde fica; trabalhe conosco; o que ela NÃO afirma), **cada
+   afirmação com a fonte e a data** no próprio arquivo. A sessão compõe; **o dono corrige** antes do
+   passo 14. `backend/olivia.py: base()` lê o arquivo e relê quando o `mtime` muda, sem restart; a
+   instrução de sistema usa cache de prompt (a base inteira custa quase o mesmo que uma página por
+   conversa). — verificação: `FONTES.md` lista cada fonte com entra/não entra e por quê; nenhuma linha
+   da base sem fonte; o texto é do dono. — reversão: apagar os arquivos; sem base a OlivIA sabe só o
+   menu e as vagas.
 
 3. **A chave e o modelo** — `backend/config.py`: `olivia_fala: bool` (`OLIVIA_FALA` do `.env.recepcionista`,
    padrão `false`); `backend/olivia.py: MODELO_CONVERSA = "claude-sonnet-5"`. O Haiku de `ia.py` não
@@ -126,7 +143,7 @@
     verificação: alguém de fora lê `olivia.md` e sabe o que ela faz, o que não faz e como desligá-la. —
     reversão: revert.
 
-13. **Commit** citando `#1520` (código, migração, testes, manuais, cartão rascunho) e **push**; o
+13. **Commit** citando `#1520` (código, migração, testes, manuais, FONTES.md e base rascunho) e **push**; o
     AxiaSecurity em commit próprio citando `#1520`.
 
 14. **Ligar, na janela do dono**: (a) corrigir o cartão e commitar; (b) `Restart-Service
@@ -151,8 +168,8 @@
 
 ## O que só você pode fazer
 
-- **Corrigir o cartão da empresa** (`docs/olivia/cartao-da-empresa.md`) antes de ligar: é o que a
-  OlivIA pode afirmar sobre a Renascer. O que não estiver nele, ela encaminha.
+- **Corrigir a base da empresa** (`docs/olivia/base-da-empresa.md`) antes de ligar: é o que a
+  OlivIA pode afirmar sobre a Renascer. O que não estiver nela, ela encaminha.
 - **Os restarts** e a chave, na ordem do passo 14 (janela elevada):
   ```
   Restart-Service axiaatende-backend; Restart-Service axiaatende-recepcionista
@@ -164,7 +181,7 @@
 - **A prova dirigida** de um número de fora (passo 15) e a leitura da medição da semana (passo 16).
 
 ```pos-entrega
-dono=corrigir o cartão da empresa; Restart-Service axiaatende-backend e axiaatende-recepcionista com OLIVIA_FALA=false; conferir Conversas e Custos; OLIVIA_FALA=true e Restart-Service axiaatende-recepcionista; prova de um número de fora
+dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende-recepcionista com OLIVIA_FALA=false; conferir Conversas e Custos; OLIVIA_FALA=true e Restart-Service axiaatende-recepcionista; prova de um número de fora
 ```
 
 ## Riscos de execução identificados
@@ -189,7 +206,7 @@ Leia `C:\AxiaAtende\CLAUDE.md` e `C:\SuporteAxia\docs\PADRAO-TRABALHO.md` §1. E
 "aplicação de plano aprovado". Chamado **#1520**; todo commit cita `#1520`, e o primeiro ato é
 `python C:\SuporteAxia\skills\demanda\demanda.py tratar 1520 --status em_andamento` pela skill `/demanda`.
 Decisões que NÃO se reabrem (D1 a D9 da spec): texto próprio ao anônimo, cerco pelo contexto e pela
-ausência de ferramenta (não pela frase), toda conversa de fora, cartão + menu + vagas como o que ela
+ausência de ferramenta (não pela frase), toda conversa de fora, base da empresa (fontes vigentes, cada afirmação com fonte, sem número de produto até o #857) + menu + vagas como o que ela
 sabe, foto como currículo sem triagem, vigia nos dois lugares com aviso só quando há o que dizer,
 caminho B (agente com cinco ferramentas), Sonnet na conversa pela API paga, chave `OLIVIA_FALA` nasce
 `false`. A ordem dos passos é por dependência e a chave só liga no passo 14. O que vai para a tela
