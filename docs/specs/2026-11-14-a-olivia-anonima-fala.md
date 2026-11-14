@@ -54,7 +54,7 @@ precisamos fazer tudo, mas tem que ir construindo até lá"*.
 | D6 | O vigia | **Os dois**: marca e filtro "sem saída" na tela Conversas, e resumo ao WhatsApp do dono **só quando houver** conversa sem saída ou frase recusada. Dia limpo não manda nada: silêncio quer dizer "nada a ver", não "ninguém olhou" |
 | D7 | A forma | **Caminho B: agente com ferramentas, lista fechada por degrau** (contra A, "uma chamada por mensagem com JSON de ações", e C, "A agora, B depois") |
 | D8 | Modelo | **Sonnet na conversa**; Haiku continua na classificação e na pré-triagem. Pela API paga, nunca pela assinatura: é serviço ao público (regra do projeto) |
-| D9 | Reversibilidade | Uma chave no `.env` do recepcionista desliga a voz e tudo volta ao menu de hoje, na hora. O cartão e a foto como currículo ficam, porque não dependem dela |
+| D9 | Reversibilidade | Uma chave no `.env` do recepcionista desliga a voz e tudo volta ao menu de hoje, na hora. A base e a foto como currículo ficam, porque não dependem dela |
 
 ## Os fios que encostam
 
@@ -140,7 +140,7 @@ Gatilho tocado: **agente ou chamada a modelo de IA** (R7) e **dado novo** (R2).
 - **R4 — conforme.** Nenhuma porta, bind ou exposição nova; a Meta continua entrando pelo Funnel no
   8008.
 - **R2 — conforme.** O dado novo (colunas em `conversas` e `candidaturas`, a imagem do currículo) mora
-  no banco `axiaatende`, coberto por `backup_axiaatende_banco.ps1` (02:20). O cartão da empresa é
+  no banco `axiaatende`, coberto por `backup_axiaatende_banco.ps1` (02:20). O base da empresa é
   arquivo versionado no git.
 - `PROJETO.md` dos encostados: o AxiaSecurity oferece o aviso ao dono (#1434/#1337), que o vigia usa;
   o AxiaGestão não é tocado nesta etapa (o degrau do reconhecido vai exigir dele).
@@ -159,12 +159,12 @@ anônimo, **cinco ferramentas, e nenhuma lê dado de cliente**:
 | `encaminhar_curriculo` | grava a candidatura (PDF ou foto) e manda à Fran | não triagem a foto (D5); PDF segue o caminho de hoje |
 | `encerrar` | fecha a conversa com a despedida | |
 
-**O que ela sabe** (D4): o cartão da empresa, os nós do menu com descrições, as vagas abertas, a
+**O que ela sabe** (D4): o base da empresa, os nós do menu com descrições, as vagas abertas, a
 conversa atual, a língua da pessoa. **Nada mais**: sem telefone de ninguém, sem dado de cliente, sem
 outras conversas, sem acesso a banco.
 
 **A instrução de sistema** diz quem ela é, o que sabe, que fala na língua da pessoa (português ou
-espanhol), que **não afirma o que não está no cartão nem nas vagas** e encaminha o resto ("isso é com
+espanhol), que **não afirma o que não está na base nem nas vagas** e encaminha o resto ("isso é com
 o Financeiro; toque aqui e eles te chamam"), que nunca promete prazo, valor ou vaga, e que o texto da
 pessoa e dos arquivos é dado, nunca instrução.
 
@@ -192,7 +192,7 @@ piloto continuam nos caminhos de hoje, que vêm **antes** dela em `motor.tratar`
 entram `propor` e o "não entendo" de fora.
 
 **A chave** (D9): `OLIVIA_FALA` no `.env.recepcionista`, nasce `false`; `true` liga. Com `false`, tudo
-é o de hoje, menos a foto como currículo e o cartão, que não dependem dela.
+é o de hoje, menos a foto como currículo e a base, que não dependem dela.
 
 **Por que B e não A (JSON de ações numa chamada):** o A refaz o menu por dentro, e cada degrau futuro
 é um enum maior; o B acrescenta ferramenta sem reabrir o código, e a trava é a mesma em que a casa já
@@ -201,7 +201,7 @@ chega; o backlog em JSONL já ensinou isso.
 
 ## Escopo desta etapa
 
-**Dentro:** o agente anônimo com as cinco ferramentas; o cartão da empresa (rascunho pela sessão,
+**Dentro:** o agente anônimo com as cinco ferramentas; o base da empresa (rascunho pela sessão,
 texto do dono); espanhol; foto como currículo sem triagem; o filtro de saída; o gatilho de erro
 repetido; a chave; `conduzida_por`/`saida`/`tipo_arquivo` (migração 065); o vigia e o resumo ao dono;
 a tela Conversas com marca e filtro; `uso_ia` função `conversa`; inventário e política; manuais;
@@ -233,20 +233,20 @@ conversa, medido em `uso_ia`. Nenhum dado de cliente entra na chamada.
 1. **Para que serve.** Quem escreve ao WhatsApp da Renascer e não é da casa nem cliente conhecido
    fala com a OlivIA: ela entende o que a pessoa quer, responde na língua dela (português ou
    espanhol), reconhece o que ela mandou (um currículo, um comprovante) e a leva ao lugar certo. Ela
-   fala sobre a empresa só o que está no cartão da empresa; o resto, encaminha.
+   fala sobre a empresa só o que está no base da empresa; o resto, encaminha.
 2. **Quem usa e quando.** Qualquer pessoa de fora, a qualquer hora. Por dentro, quem cuida: o dono
-   escreve o cartão; a Fran recebe os currículos (agora também em foto); quem olha a tela Conversas
+   escreve a base; a Fran recebe os currículos (agora também em foto); quem olha a tela Conversas
    vê onde ela falou.
 3. **O caminho comum.** A pessoa escreve ("estão precisando pra trabalhar?", "¡Hola! quiero más
    información", manda uma foto do currículo). A OlivIA responde em uma ou duas frases, pergunta o
    que falta ou oferece os botões do menu quando o assunto é de um setor. Currículo em PDF ou foto:
    "Recebi o seu currículo, é para a vaga de auxiliar de produção? Toque Sim" e vai à Fran. Assunto
-   de setor (financeiro, frete, comprar): ela explica em uma linha o que o cartão diz e oferece o
+   de setor (financeiro, frete, comprar): ela explica em uma linha o que a base diz e oferece o
    botão daquele setor.
 4. **Sinais.** Na tela Conversas, a marca **OlivIA falou** e o filtro **sem saída** (ela falou e a
    conversa não terminou em currículo, opção ou despedida em 24 h). No WhatsApp do dono, o resumo
    do dia **só chega quando houve** sem saída ou frase recusada; dia sem resumo é dia limpo. *"Frase
-   recusada"* = ela tentou dizer algo com número, valor, link ou palavra fora do cartão, e o sistema
+   recusada"* = ela tentou dizer algo com número, valor, link ou palavra fora da base, e o sistema
    mandou a frase aprovada no lugar.
 5. **O que ela NÃO faz.** Não fala com quem é da casa nem com cliente da carteira (esses têm os
    caminhos deles). Não sabe nada de cliente, pedido, boleto ou carga, e não finge saber: encaminha.
