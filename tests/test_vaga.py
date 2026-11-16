@@ -562,3 +562,61 @@ def test_com_uma_vaga_so_nada_muda_e_a_migracao_062_abre_as_duas(ligado):
     assert "Cunha Porã (SC)" in vagas["Vaga Operador de empilhadeira"]["regiao"]
     assert r and "Ver as vagas" in r["texto"]
     assert V._titulo_curto(vagas["Vaga Operador de empilhadeira"]) == "Operador de empilhadeira"
+
+
+# ── #1522: quem volta por texto nao cai na primeira vaga aberta ──────────────
+
+def _lista_sem_escolher_e_a_conversa_para(cfg, s):
+    """Dia 1: toca Trabalhe conosco, recebe a lista das vagas e nao escolhe; a conversa para."""
+    passo(cfg, s, texto("v1", "oi", numero=CANDIDATO))
+    passo(cfg, s, toque("v2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    with conexao(cfg) as con:
+        R.motor.marcar_paradas(con, QUINTA_14H + timedelta(hours=1))
+    assert conversa(cfg)["situacao"] == "sem_curriculo"
+
+
+def test_1522_quem_volta_por_texto_com_duas_abertas_recebe_a_lista_e_nao_a_primeira_vaga(ligado):
+    abertas = duas_abertas(ligado)
+    s = SaidaFalsa()
+    _lista_sem_escolher_e_a_conversa_para(ligado, s)
+    depois = QUINTA_14H + timedelta(hours=2)
+    # o caso de 16/11: a IA le "regiao"; a resposta sairia com a regiao da PRIMEIRA vaga do cadastro
+    tipo, _, corpo, opcoes = passo(ligado, s, texto("v3", "Queria ve se tem so vaga pra empilhadeira", numero=CANDIDATO),
+                                   agora=depois, ia=IAFalsa(resposta="regiao"))
+    assert tipo == "lista" and "mais de uma vaga aberta" in corpo
+    assert [o[1] for o in opcoes][:2] == ["Auxiliar de produção", "Operador de empilhadeira"]
+    assert conversa(ligado)["trabalhe"] and conversa(ligado)["vaga_id"] is None
+    # "Sim", sem escolher: a lista de novo, nunca a abertura da Auxiliar de producao
+    tipo, _, corpo, _ = passo(ligado, s, texto("v4", "Sim", numero=CANDIDATO), agora=depois, ia=IAFalsa(resposta="nada"))
+    assert tipo == "lista" and "Vaga Auxiliar de produção" not in corpo
+    assert conversa(ligado)["vaga_id"] is None
+    # a escolha dele e a que vale, ate a candidatura
+    tipo, _, corpo, _ = passo(ligado, s, toque("v5", "%s%d" % (V.ESCOLHER, abertas[1]["id"]), lista=True, numero=CANDIDATO),
+                              agora=depois)
+    assert tipo == "botoes" and "*Vaga Operador de empilhadeira*" in corpo
+    passo(ligado, s, doc("v6"), agora=depois)
+    assert candidaturas(ligado)[0]["vaga_id"] == abertas[1]["id"]
+
+
+def test_1522_quem_volta_e_ja_tinha_escolhido_continua_na_vaga_dele(ligado):
+    abertas = duas_abertas(ligado)
+    s = SaidaFalsa()
+    passo(ligado, s, texto("v1", "oi", numero=CANDIDATO))
+    passo(ligado, s, toque("v2", "menu:trabalhe", lista=True, numero=CANDIDATO))
+    passo(ligado, s, toque("v3", "%s%d" % (V.ESCOLHER, abertas[1]["id"]), lista=True, numero=CANDIDATO))
+    with conexao(ligado) as con:
+        R.motor.marcar_paradas(con, QUINTA_14H + timedelta(hours=1))
+    tipo, *_ = passo(ligado, s, texto("v4", "qual a cidade?", numero=CANDIDATO),
+                     agora=QUINTA_14H + timedelta(hours=2), ia=IAFalsa(resposta="regiao"))
+    assert tipo == "texto"                                  # a regiao da vaga DELE, sem lista
+    assert conversa(ligado)["vaga_id"] == abertas[1]["id"]  # a segunda do cadastro, nao a primeira
+
+
+def test_1522_a_vaga_unica_so_existe_com_uma_aberta(ligado):
+    with conexao(ligado) as con:
+        assert V._vaga_unica(con)["id"] == 1               # a fixture: so a Comercial aberta
+    duas_abertas(ligado)
+    with conexao(ligado) as con:
+        assert V._vaga_unica(con) is None
+        con.execute("UPDATE atendimento.vagas SET aberta = false")
+        assert V._vaga_unica(con) is None

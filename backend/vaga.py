@@ -69,6 +69,21 @@ def vagas_abertas(con) -> list:
     return con.execute("SELECT * FROM atendimento.vagas WHERE aberta ORDER BY id").fetchall()
 
 
+def _vaga_unica(con):
+    """#1522: a vaga aberta quando ha UMA so; None sem vaga aberta OU com mais de uma. Com duas
+    abertas ninguem e posto numa delas sem escolher: `vaga_aberta(con)` devolve a de id menor, e
+    quem queria a outra recebia os requisitos (e a triagem) da vaga errada."""
+    abertas = vagas_abertas(con)
+    return abertas[0] if len(abertas) == 1 else None
+
+
+def _falta_escolher(con, conversa) -> bool:
+    """#1522: a conversa de vaga ainda sem vaga, com mais de uma aberta, e que nao foi para o banco
+    ("Outras areas" tambem deixa a conversa sem vaga, e ali e de proposito)."""
+    return (conversa["vaga_id"] is None and len(vagas_abertas(con)) > 1
+            and not _ja_mandou(con, conversa, ("vaga: banco",)))
+
+
 def _titulo_curto(vaga) -> str:
     """O titulo sem o "Vaga " da frente, no limite da linha de lista da Meta (24)."""
     t = _uma_linha(vaga["titulo"])
@@ -302,14 +317,18 @@ def _responder_texto(con, saida: Saida, ia, pessoa, conversa, texto: str) -> Non
             w = saida.texto(pessoa.para, _texto(con, "recebemos_nao", vaga))
         _registrar(con, conversa["id"], pessoa.para, "texto", "vaga: recebemos", w)
         return
-    if chave == "apresentacao":
+    # #1522: sem vaga escolhida e com mais de uma aberta, nada do que depende da vaga (a regiao, o
+    # salario, o pedido do PDF) e respondido -- sairia em branco, ou com a vaga de outro. A lista das
+    # vagas volta, e a resposta vem depois da escolha.
+    sem_escolha = _falta_escolher(con, conversa)
+    if chave == "apresentacao" and not sem_escolha:
         # um lembrete so; o texto ja fica na conversa e vai junto a Fran quando o PDF chegar
         ja = con.execute("""SELECT 1 FROM atendimento.enviadas WHERE conversa_id = %s
                              AND resumo = 'vaga: apresentacao' LIMIT 1""", (conversa["id"],)).fetchone()
         if ja:
             print("vaga: %s se apresentou de novo: sem segundo lembrete" % pessoa.para, flush=True)
             return
-    if chave in ("regiao", "salario", "retorno", "apresentacao", "sem_pdf"):
+    if chave in ("regiao", "salario", "retorno", "apresentacao", "sem_pdf") and not sem_escolha:
         w = saida.texto(pessoa.para, _texto(con, chave, vaga))
         _registrar(con, conversa["id"], pessoa.para, "texto", "vaga: %s" % chave, w)
         return
@@ -319,6 +338,9 @@ def _responder_texto(con, saida: Saida, ia, pessoa, conversa, texto: str) -> Non
         data = c["recebida_em"].astimezone(_fuso()).strftime("%d/%m")
         w = saida.botoes(pessoa.para, _texto(con, "recebemos", vaga, data=data), [Opcao(OUTRO, "Era outro assunto")])
         _registrar(con, conversa["id"], pessoa.para, "botoes", "vaga: recebemos", w)
+        return
+    if sem_escolha:
+        abrir(con, saida, pessoa, conversa, vaga_aberta(con), None, pelo_menu=True)   # a lista das vagas
         return
     _pedir_de_novo(con, saida, pessoa, conversa, vaga)
 
@@ -352,7 +374,9 @@ def tratar(con, saida: Saida, ia, e, agora: datetime) -> bool:
             return True
         if not (e.toque or "").startswith("vaga:"):
             return False
-        conversa = _marcar(con, conversa, vaga_aberta(con))   # toque de vaga numa conversa antiga
+        # toque de vaga numa conversa antiga. #1522: com mais de uma aberta a conversa fica SEM vaga
+        # ate a escolha (o toque `vaga:escolher:N` diz qual, logo abaixo)
+        conversa = _marcar(con, conversa, _vaga_unica(con))
     else:
         _chegou(con, p, conversa, agora)
     vaga = _vaga(con, conversa["vaga_id"])
@@ -360,7 +384,12 @@ def tratar(con, saida: Saida, ia, e, agora: datetime) -> bool:
     if e.toque == OUTRO:
         _sair_da_vaga(con, saida, p, conversa)
     elif e.toque == ESTA:
-        abrir(con, saida, p, conversa, vaga or vaga_aberta(con), agora)
+        # #1522: o botao "esta vaga" sem vaga na conversa e com mais de uma aberta nao diz QUAL:
+        # a lista das vagas, em vez da primeira do cadastro
+        if vaga is None and len(vagas_abertas(con)) > 1:
+            abrir(con, saida, p, conversa, vaga_aberta(con), agora, pelo_menu=True)
+        else:
+            abrir(con, saida, p, conversa, vaga or vaga_aberta(con), agora)
     elif e.toque.startswith(ESCOLHER) if e.toque else False:
         # #1474: a vaga escolhida na lista; fechada nesse meio-tempo, a lista volta
         escolhida = _vaga(con, int(e.toque[len(ESCOLHER):]) if e.toque[len(ESCOLHER):].isdigit() else None)
@@ -413,7 +442,11 @@ def volta(con, saida: Saida, ia, pessoa, conversa, texto: str, agora: datetime) 
                         (pessoa.bsuid, conversa["id"], agora - VOLTA)).fetchone()
     if not antes:
         return False
-    vaga = vaga_aberta(con)
+    # #1522: quem volta NAO cai na primeira vaga aberta do cadastro. A vaga e a que ele mesmo tinha
+    # na conversa anterior, se continua aberta; senao a unica aberta; e com mais de uma aberta a
+    # conversa fica sem vaga, e `_responder_texto` devolve a lista para ele escolher.
+    anterior = _vaga(con, antes["vaga_id"])
+    vaga = anterior if anterior and anterior["aberta"] else _vaga_unica(con)
     conversa = _marcar(con, conversa, vaga)
     _responder_texto(con, saida, ia, pessoa, conversa, texto)
     return True
