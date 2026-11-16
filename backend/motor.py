@@ -711,6 +711,9 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # devolve o texto, e a corrente roda de novo sem este degrau.
     if not pular_pendencias:
         r = pendencias.tratar(con, saida, e, agora)
+        if isinstance(r, Entrada):   # #1528: o arquivo era de "Outro assunto" -- segue a corrente de sempre
+            tratar(con, saida, ia, r, agora, envio, campo, pular_pendencias=True, olivia=olivia)
+            return
         if isinstance(r, str):
             tratar(con, saida, ia, replace(e, texto=r, toque=None, contexto=None), agora, envio, campo,
                    pular_pendencias=True, olivia=olivia)
@@ -745,6 +748,14 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # vem com o texto transcrito. Interno, chave desligada ou teto: False, e segue o de sempre.
     if (e.audio is not None and campo is not None and olivia is not None
             and audio.receber(con, saida, e, agora, campo.pasta, olivia, envio, so_de_fora=True)):
+        return
+    # #1525 (D1): com a chave `olivia.conduz_vaga` ligada, a OlivIA conduz a conversa de vaga de quem e de
+    # fora -- o anuncio, o toque "Trabalhe conosco", e texto, arquivo ou audio transcrito na conversa de vaga.
+    # ANTES do fluxo fixo, que vira reserva: `False` (API fora, erro antes da primeira fala) segue para ele.
+    # Os toques `vaga:*` (mensagens antigas) e o retorno da Fran (acima) ficam onde estao.
+    if (olivia is not None and hasattr(olivia, "conduz_vaga") and olivia.conduz_vaga(con)
+            and olivia.mensagem_de_vaga(con, e, agora)
+            and olivia.atender(con, saida, ia, e, agora, envio, de_vaga=True)):
         return
     if vaga.tratar(con, saida, ia, e, agora):
         return

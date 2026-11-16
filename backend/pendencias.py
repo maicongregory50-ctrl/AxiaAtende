@@ -176,6 +176,8 @@ def mandar(con, saida, agora: datetime) -> int:
     """A volta do minuto (RECEPCIONISTA). Desligado, nada."""
     if not ligado(con):
         return 0
+    from . import arquivo_volta   # #1528: a recusa do ERP, o "sem antivirus" e a confirmacao da rajada
+    feitas_arquivo = arquivo_volta.mandar(con, saida, agora)
     juntar = timedelta(minutes=int(_ajuste(con, "pendencias.juntar_minutos", 10) or 0))
     feitas = 0
     # 7 dias guardada sem a pessoa voltar: nao sai mais, e a pendencia deixa de esperar
@@ -210,7 +212,7 @@ def mandar(con, saida, agora: datetime) -> int:
                 # fora da janela e so informativo: espera calado (dono, 31/10/2026)
         except Exception as falha:  # noqa: BLE001 -- um numero com erro nao segura os outros
             print("pendencias: envio a ...%s: %s" % (g["numero"][-4:], falha), flush=True)
-    return feitas
+    return feitas + feitas_arquivo
 
 
 def soltar_agora(con, saida, numero: str, agora: datetime) -> int:
@@ -277,9 +279,9 @@ def _lista_de_escolha(con, saida, para, numero, mid) -> None:
     _enviada(con, w, para, "lista", "pendencias: escolher o assunto")
 
 
-def _toque(con, saida, e, agora) -> str | None:
+def _toque(con, saida, e, agora):
     """Os toques `pend:`. Devolve o texto guardado quando a pessoa escolheu "Outro assunto" (o motor
-    segue a corrente de sempre com ele); senao None."""
+    segue a corrente de sempre com ele) -- ou, no arquivo (#1528), a mensagem original relida; senao None."""
     para, numero = e.pessoa.para, e.pessoa.wa_id or ""
     partes = e.toque.split(":")
     acao = partes[1] if len(partes) > 1 else ""
@@ -304,6 +306,17 @@ def _toque(con, saida, e, agora) -> str | None:
                         WHERE m.id = %s AND m.estado = 'escolher'""", (mid,)).fetchone() if mid else None
     if not m or m["para_whatsapp"] != com_nove(numero):
         return None   # toque antigo ou de outro numero: nada a fazer, e nao e menu
+    # #1528: o ARQUIVO que esperava a confirmacao ("E para o Chamado N?") usa os mesmos toques
+    if m["classe"] == "arquivo" and acao in ("sim", "para", "outro"):
+        from . import arquivo_volta
+        if acao == "outro":
+            con.execute("UPDATE atendimento.pendencias_mensagens SET estado = 'descartada' WHERE id = %s", (mid,))
+            return arquivo_volta.entrada_guardada(con, m, e.pessoa)
+        if acao == "para" and not (len(partes) == 4 and partes[3].isdigit()):
+            return None
+        p = _pendencia(con, int(partes[3]) if acao == "para" else m["pendencia_id"], numero)
+        arquivo_volta.escolhido(con, saida, para, numero, m, p, agora)
+        return None
     if acao == "sim":
         p = _pendencia(con, m["pendencia_id"], numero)
         con.execute("UPDATE atendimento.pendencias_mensagens SET estado = 'descartada' WHERE id = %s", (mid,))
@@ -323,14 +336,19 @@ def _toque(con, saida, e, agora) -> str | None:
 
 
 def tratar(con, saida, e, agora: datetime):
-    """O degrau do TOPO da corrente. Devolve False (nao era daqui), True (tratado) ou um texto (a pessoa
-    escolheu "Outro assunto": o motor segue a corrente com ele)."""
+    """O degrau do TOPO da corrente. Devolve False (nao era daqui), True (tratado), um texto (a pessoa
+    escolheu "Outro assunto": o motor segue a corrente com ele) ou, no arquivo (#1528), a Entrada original
+    para a corrente seguir com ela."""
     if not ligado(con):
         return False
     numero = e.pessoa.wa_id or ""
     if e.toque and e.toque.startswith("pend:"):
         texto = _toque(con, saida, e, agora)
         return texto if texto else True
+    # #1528: o arquivo devolvido a um chamado (e o texto que fecha a rajada). Chave desligada: False.
+    from . import arquivo_volta
+    if arquivo_volta.tratar(con, saida, e, agora):
+        return True
     if not e.texto or e.toque:
         return False
     # o motivo do "Nao ficou bom"

@@ -75,6 +75,12 @@ EXEMPLOS_AVISO = {
     # #1520: o resumo do vigia da OlivIA (texto pronto, so nos dias em que ha o que dizer)
     "aviso_olivia_resumo": ["Hoje a OlivIA falou em 14 conversas: 11 terminaram bem, 2 sem saída "
                             "(#412, #419), 1 frase recusada (#415)."],
+    # #1528: a volta com arquivo -- o antivirus fora (e a volta dele) e a ameaca acusada
+    "aviso_arquivo_sem_antivirus": ["está recusando por falta de antivírus: o Defender não respondeu no servidor. "
+                                    "Chamado 1525, de Fran, 16/11 14:02. Os arquivos estão esperando."],
+    "aviso_arquivo_ameaca": ["'descricoes.docx', de Fran (5549999330003), chamado 1525."],
+    # #1525: a visita aceita depois de a ficha ou o curriculo ter ido a Fran
+    "aviso_vaga_visita": ["Maria da Silva (49 9 9999-0000), da Vaga Auxiliar de produção"],
 }
 
 

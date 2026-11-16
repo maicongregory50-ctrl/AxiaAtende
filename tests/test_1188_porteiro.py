@@ -90,6 +90,8 @@ def test_a_volta_desfaz_e_a_ida_volta_a_aplicar(cfg):
     avisar(cfg)
     volta_sql = (migracoes.PASTA / "039_porteiro_dos_avisos_VOLTA.sql").read_text(encoding="utf-8")
     with conexao(cfg) as con:
+        con.execute((migracoes.PASTA / "068_arquivo_volta_VOLTA.sql").read_text(encoding="utf-8"))   # #1528: a 068 reescreve os mesmos CHECKs
+        con.execute((migracoes.PASTA / "067_olivia_conduz_vaga_VOLTA.sql").read_text(encoding="utf-8"))   # #1525: a 067 reescreve os mesmos CHECKs
         con.execute((migracoes.PASTA / "065_olivia_fala_VOLTA.sql").read_text(encoding="utf-8"))   # #1520: a 065 reescreve os mesmos CHECKs
         con.execute((migracoes.PASTA / "063_aviso_painel_VOLTA.sql").read_text(encoding="utf-8"))   # #1434: a 063 reescreve os mesmos CHECKs
         con.execute((migracoes.PASTA / "060_aviso_integracao_VOLTA.sql").read_text(encoding="utf-8"))   # #1337: a 060 reescreve os mesmos CHECKs
@@ -105,7 +107,7 @@ def test_a_volta_desfaz_e_a_ida_volta_a_aplicar(cfg):
     assert migracoes.aplicar(cfg) == ["039_porteiro_dos_avisos.sql", "043_informativo_ao_comprador.sql",
                                       "044_informativo_sem_link.sql", "045_informativo_so_ola.sql", "049_aviso_auditoria_estoque.sql",
                                       "060_aviso_integracao.sql", "063_aviso_painel.sql",
-                                      "065_olivia_fala.sql"]
+                                      "065_olivia_fala.sql", "067_olivia_conduz_vaga.sql", "068_arquivo_volta.sql"]
     with conexao(cfg) as con:
         assert con.execute("SELECT 1 FROM atendimento.modelos WHERE nome = 'reabrir_avisos'").fetchone()
 

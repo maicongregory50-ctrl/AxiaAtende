@@ -7,6 +7,7 @@ na proxima mensagem.
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -103,6 +104,11 @@ class CanalDeCampo(BaseModel):
 
 class Triagem(BaseModel):
     ligada: bool
+
+
+class ModoDaVaga(BaseModel):
+    """#1525 (D3): se a vaga aceita a ficha de contato de quem nao tem curriculo."""
+    modo: Literal["ficha_ou_curriculo", "curriculo"]
 
 
 # #1249 (dono, 04/11/2026): "cada numero que entra gera UMA linha de conversa, atualizada com a data e hora
@@ -355,6 +361,7 @@ def rotas(cfg, usuario) -> APIRouter:
             chamados = con.execute("""SELECT m.id, m.sentido, m.classe, m.estado, m.resultado, m.erro,
                                              left(m.texto, 140) AS texto, m.criado_em,
                                              coalesce(m.entregue_em, m.enviada_em) AS em,
+                                             m.arquivo->>'motivo' AS motivo,   -- #1528: a recusa do arquivo
                                              p.referencia, p.titulo, p.para_whatsapp, p.espera
                                         FROM atendimento.pendencias_mensagens m
                                         JOIN atendimento.pendencias p ON p.id = m.pendencia_id
@@ -368,7 +375,7 @@ def rotas(cfg, usuario) -> APIRouter:
                 "nota": dict(nota, lida_em=nota["lida_em"].isoformat()) if nota else None,
                 "avisos": [estado_do_aviso(a) for a in avisos],
                 "chamados": [{**{k: c[k] for k in ("id", "sentido", "classe", "estado", "resultado", "erro", "texto",
-                                                   "referencia", "titulo", "espera")},
+                                                   "referencia", "titulo", "espera", "motivo")},
                               "numero": mascarar(c["para_whatsapp"]), "criado_em": c["criado_em"].isoformat(),
                               "em": c["em"].isoformat() if c["em"] else None} for c in chamados]}
 
@@ -464,8 +471,12 @@ def rotas(cfg, usuario) -> APIRouter:
                       FROM atendimento.menu m JOIN c ON m.pai_id = c.id WHERE m.ativo)
                 SELECT c.id, c.chave, c.caminho, c.perguntas, c.destino_id, c.texto_antes
                   FROM c WHERE c.acao IN ('destino', 'vaga') ORDER BY c.ord""").fetchall()
-            vagas = con.execute("""SELECT id, titulo, aberta, triagem_ligada, fechada_em,
-                                          (SELECT count(*) FROM atendimento.candidaturas k WHERE k.vaga_id = v.id) AS curriculos
+            # #1525: o modo da vaga (D3) e a contagem separada: "N currículos, M fichas"
+            vagas = con.execute("""SELECT id, titulo, aberta, triagem_ligada, fechada_em, modo,
+                                          (SELECT count(*) FROM atendimento.candidaturas k
+                                            WHERE k.vaga_id = v.id AND k.tipo_arquivo <> 'ficha') AS curriculos,
+                                          (SELECT count(*) FROM atendimento.candidaturas k
+                                            WHERE k.vaga_id = v.id AND k.tipo_arquivo = 'ficha') AS fichas
                                      FROM atendimento.vagas v ORDER BY aberta DESC, id DESC LIMIT 5""").fetchall()
             ds = con.execute("SELECT id, nome, whatsapp, ativo FROM atendimento.destinos ORDER BY nome").fetchall()
             aj = {a["chave"]: a["valor"] for a in con.execute("SELECT chave, valor FROM atendimento.ajustes")}
@@ -555,6 +566,15 @@ def rotas(cfg, usuario) -> APIRouter:
         if not n:
             raise HTTPException(status_code=404, detail="vaga não encontrada")
         return {"triagem_ligada": dados.ligada}
+
+    @r.put("/vagas/{vaga_id}/modo")
+    def modo_da_vaga(vaga_id: int, dados: ModoDaVaga):
+        """#1525 (D3): "Ficha ou currículo" ou "Currículo obrigatório". Vale na próxima mensagem do candidato."""
+        with conexao(cfg) as con:
+            n = con.execute("UPDATE atendimento.vagas SET modo = %s WHERE id = %s", (dados.modo, vaga_id)).rowcount
+        if not n:
+            raise HTTPException(status_code=404, detail="vaga não encontrada")
+        return {"modo": dados.modo}
 
     @r.put("/ajustes/avisado")
     def avisado(a: Avisado):

@@ -98,6 +98,9 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
     if campo is None:   # #970: o canal de campo; com a chave desligada ele nao faz nada
         from .campo import Campo
         campo = Campo(cfg.campo_pasta, ia)
+    from pathlib import Path
+    from . import arquivo_volta   # #1528: o transito do arquivo devolvido a um chamado
+    arquivo_volta.PASTA = Path(cfg.envios_pasta) / "chamados_volta"
     if olivia is None and cfg.olivia_fala:   # #1520: a voz da OlivIA, so com OLIVIA_FALA=true
         from .olivia import Olivia
         olivia = Olivia()
@@ -190,6 +193,13 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
                 olivia.fechar_dia(con, momento)
     except Exception as falha:  # noqa: BLE001
         print("olivia: vigia: %s: %s" % (type(falha).__name__, falha), flush=True)
+    try:   # #1525: o toque unico da conversa de vaga (so com a chave) e a ficha parcial (mesmo sem ela)
+        from . import olivia
+        with conexao(cfg) as con:
+            olivia.tocar_vagas(con, saida, momento)
+            olivia.enviar_parciais(con, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("olivia: toque da vaga: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #1223: o que a Meta diz ter cobrado (uma vez por dia, depois das 06:00); nunca segura o resto
         from . import custos_meta
         with conexao(cfg) as con:
@@ -297,6 +307,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 aud = audio.saude(cfg, con)
                 from . import segurar   # #1169: o "segurar tudo" do envio a carteira
                 seg = segurar.estado(con)
+                from . import olivia as olivia_mod   # #1525: a chave da conducao da vaga (no banco)
+                vaga_ligada = olivia_mod.conduz_vaga(con)
         except Exception as erro:  # noqa: BLE001
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
@@ -305,6 +317,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
                 # #1520: a voz da OlivIA para quem e de fora (OLIVIA_FALA no .env.recepcionista)
                 "olivia": "ligada" if cfg.olivia_fala else "desligada",
+                # #1525: a OlivIA conduz a conversa de vaga (ajuste `olivia.conduz_vaga`; vale so com a de cima)
+                "olivia_vaga": "ligada" if vaga_ligada else "desligada",
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
                 "chegadas": chegadas,
                 # #1028: o que o motor DEIXOU de mandar desde que o servico subiu, para a regra que
