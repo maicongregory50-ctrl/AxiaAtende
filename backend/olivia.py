@@ -36,6 +36,20 @@ ouvir, `[nao foi possivel ouvir o audio]`, e ela pede para a pessoa escrever ou 
 
 O VIGIA (D6): `fechar_dia`, as 23:40, da a cada conversa dela `saida = bem | sem_saida`, e so manda o
 resumo ao dono quando ha sem saida ou frase recusada. Dia limpo: nada.
+
+A CONVERSA DA VAGA (#1525, spec docs/specs/2026-11-16-olivia-conduz-a-vaga-ficha-e-curriculo.md): com a
+chave `olivia.conduz_vaga` ligada (ajuste no banco, `scripts/olivia.py`), ela conduz TODA conversa de vaga
+de quem e de fora, antes do fluxo fixo de `vaga.tratar`, que vira reserva (chave desligada, API fora). As
+ferramentas passam a depender do estado da conversa (o que nao e oferecido nao pode ser chamado):
+
+    escolher_vaga   com vaga aberta: marca a vaga da conversa (lista fechada)
+    comecar_ficha   vaga `ficha_ou_curriculo`, sem aviso ainda: o AVISO de cadastro (texto do dono)
+    anotar_ficha    depois do aviso: os cinco campos fixos (D2); com os cinco, O CODIGO cria a candidatura
+    marcar_visita   ja ha candidatura na conversa: "quer visitar a empresa" (D7); ela nao agenda
+
+O toque unico (D4, D6) e a ficha parcial saem da rotina do minuto (`tocar_vagas`, `enviar_parciais`). A
+fala que diz ter anotado ou encaminhado sem candidatura gravada e recusada (`PROMESSA`): o fracasso
+silencioso que a spec nomeia.
 """
 import re
 import unicodedata
@@ -64,6 +78,134 @@ TRAVOU_MARCA = ("A CONVERSA TRAVOU: a pessoa repetiu a mensagem, disse que não 
                 "precisa e ofereça a opção do menu que mais se aproxima (oferecer_opcao_do_menu).")
 NAO_E_ISSO = ("nao e isso", "nao entendi", "nao foi isso", "nao era isso", "voce nao entendeu", "no es eso",
               "no entendi", "no entiendo")
+
+# ── a conversa da vaga (#1525) ──────────────────────────────────────────────
+
+AJUSTE_CONDUZ = "olivia.conduz_vaga"
+AVISO_FICHA = "olivia: aviso da ficha"
+TOQUE_VAGA = "olivia: toque da vaga"
+RECUSADA_PROMESSA = RECUSADA + ": promessa"
+FUNCOES = RAIZ_PROJETO / "docs" / "olivia" / "funcoes"
+# D2: as cinco perguntas, e so elas. A ordem e a das perguntas.
+CAMPOS = ("nome", "cidade", "experiencia", "quando_comeca", "como_chega")
+CAMPO_ATE = 200
+# como cada campo e dito ao candidato (o que falta) e a Fran (a pagina), nas duas linguas
+FALTA = {"nome": ("o seu nome completo", "tu nombre completo"),
+         "cidade": ("a cidade onde você mora", "la ciudad donde vives"),
+         "experiencia": ("no que você já trabalhou", "en qué has trabajado"),
+         "quando_comeca": ("quando você pode começar", "cuándo puedes empezar"),
+         "como_chega": ("se você tem como chegar a Cunha Porã todos os dias",
+                        "si tienes cómo llegar a Cunha Porã todos los días")}
+# A trava da promessa (passo 9): numa conversa de vaga SEM candidatura gravada, a fala que diz ter anotado,
+# encaminhado ou passado a equipe e recusada. Sem acento, em portugues e espanhol; curta de proposito.
+PROMESSA = ("anotei", "anotado", "anotada", "encaminhei", "encaminhado", "encaminhada", "ja passei",
+            "passei para a equipe", "passei a sua ficha", "passei sua ficha", "ja esta com a equipe",
+            "enviei para a equipe", "enviei a sua ficha", "registrei", "anote tus", "ya pase", "ya envie",
+            "ya esta con el equipo", "envie tu ficha", "pase tu ficha", "registre tus")
+
+
+def conduz_vaga(con) -> bool:
+    """A chave da conducao da vaga (ajuste no banco; nasce false na 067). Liga e desliga sem restart."""
+    return motor._ajuste(con, AJUSTE_CONDUZ, False) is True
+
+
+def _horas(con, chave: str, padrao: float) -> timedelta:
+    try:
+        return timedelta(hours=float(motor._ajuste(con, chave, padrao)))
+    except (TypeError, ValueError):
+        return timedelta(hours=padrao)
+
+
+def _lingua(x) -> str:
+    return "es" if x == "es" else "pt"
+
+
+def _cadastro(con, chave: str, lingua: str, **extra) -> str:
+    """Um texto de cadastro da ficha (`respostas_da_vaga`), na lingua da conversa; sem o espanhol, o portugues."""
+    if _lingua(lingua) == "es" and vaga._resposta(con, chave + "_es"):
+        return vaga._texto(con, chave + "_es", **extra)
+    return vaga._texto(con, chave, **extra)
+
+
+def falta_da_ficha(ficha: dict | None, lingua: str = "pt") -> list[str]:
+    """Os campos ainda vazios, na ordem das perguntas."""
+    ficha = ficha or {}
+    return [k for k in CAMPOS if not (ficha.get(k) or "").strip()]
+
+
+def _juntar(partes: list[str], lingua: str = "pt") -> str:
+    e = " y " if _lingua(lingua) == "es" else " e "
+    return partes[0] if len(partes) == 1 else ", ".join(partes[:-1]) + e + partes[-1] if partes else ""
+
+
+def falta_dito(ficha: dict | None, lingua: str = "pt") -> str:
+    i = 1 if _lingua(lingua) == "es" else 0
+    return _juntar([FALTA[k][i] for k in falta_da_ficha(ficha)], lingua)
+
+
+def _tem_candidatura(con, conversa_id) -> bool:
+    return con.execute("SELECT 1 FROM atendimento.candidaturas WHERE conversa_id = %s LIMIT 1",
+                       (conversa_id,)).fetchone() is not None
+
+
+def _mandou(con, conversa_id, resumo: str) -> bool:
+    return con.execute("SELECT 1 FROM atendimento.enviadas WHERE conversa_id = %s AND resumo = %s LIMIT 1",
+                       (conversa_id, resumo)).fetchone() is not None
+
+
+def _conversa_de_vaga_dela(con, pessoa, agora: datetime):
+    """A conversa de vaga desta pessoa: a de vaga em curso; senao a de vaga DELA que fechou (sem curriculo,
+    com curriculo ou parada) e teve mensagem da pessoa nas ultimas 24 h -- quem responde ao toque unico, ou
+    aceita a visita depois da ficha, volta a mesma conversa. Uma conversa em curso que NAO e de vaga vence."""
+    c = motor._conversa_aberta(con, pessoa)
+    if c is not None:
+        return c if c["trabalhe"] else None
+    return con.execute("""SELECT * FROM atendimento.conversas
+                           WHERE bsuid = %s AND trabalhe AND conduzida_por = 'olivia'
+                             AND situacao IN ('sem_curriculo', 'curriculo_recebido', 'parou_no_meio')
+                             AND ultimo_toque_em > %s ORDER BY id DESC LIMIT 1""",
+                       (pessoa.bsuid, agora - RETOMA_ATE)).fetchone()
+
+
+def mensagem_de_vaga(con, e, agora: datetime) -> bool:
+    """D1: a mensagem e da conversa de vaga? O anuncio de uma vaga aberta, o toque do no "Trabalhe conosco"
+    (no menu ou no "Sim" da proposta), e texto, arquivo ou audio transcrito numa conversa de vaga em curso.
+    Os toques `vaga:*` (mensagens antigas e o retorno da Fran) NAO: ficam no fluxo fixo."""
+    toque = e.toque or ""
+    if toque.startswith("vaga:") or e.tipo == "reaction":
+        return False
+    if toque:
+        for prefixo in ("menu:", "ia:sim:"):
+            if toque.startswith(prefixo):
+                no = motor._no(con, toque[len(prefixo):])
+                return no is not None and no["acao"] == "vaga"
+        return False
+    if not (e.texto or e.documento is not None or e.midia is not None):
+        return False
+    if e.anuncio and vaga.vaga_aberta(con, e.anuncio) is not None:
+        return True
+    return _conversa_de_vaga_dela(con, e.pessoa, agora) is not None
+
+
+# ── o que cada funcao faz (D9): o lugar, vazio nesta etapa ────────────────────
+
+_funcoes: dict = {}
+
+
+def funcao_da_vaga(vaga_id, pasta: Path | None = None) -> str:
+    """O resumo do que a funcao faz (`docs/olivia/funcoes/<vaga_id>.md`), quando existe; relido quando muda
+    (o dono corrige sem restart). Sem arquivo, vazio -- e ela diz so o que o cadastro da vaga diz."""
+    caminho = (pasta or FUNCOES) / ("%s.md" % vaga_id)
+    try:
+        mtime = caminho.stat().st_mtime
+    except OSError:
+        _funcoes.pop(caminho, None)
+        return ""
+    guardado = _funcoes.get(caminho)
+    if guardado is None or guardado[0] != mtime:
+        guardado = (mtime, caminho.read_text(encoding="utf-8").strip())
+        _funcoes[caminho] = guardado
+    return guardado[1]
 
 # ── a base (D4) ─────────────────────────────────────────────────────────────
 
@@ -156,12 +298,47 @@ def _opcoes_do_menu(con) -> list[dict]:
     return motor.folhas_e_menus(con)
 
 
+MODO_DITO = {"ficha_ou_curriculo": "aceita currículo OU a ficha de contato (cinco perguntas) de quem não tem currículo",
+             "curriculo": "currículo OBRIGATÓRIO (PDF ou foto); sem currículo não há candidatura"}
+
+
 def _vagas(con) -> str:
     linhas = []
+    conduz = conduz_vaga(con)
     for v in vaga.vagas_abertas(con):
         reqs = "; ".join(v["requisitos"] or [])
-        linhas.append("- vaga_id %d: %s. Região: %s. Requisitos: %s." % (v["id"], v["titulo"], v["regiao"] or "—", reqs or "—"))
+        linha = "- vaga_id %d: %s. Região: %s. Requisitos: %s." % (v["id"], v["titulo"], v["regiao"] or "—", reqs or "—")
+        if conduz:
+            # #1525: o modo (D3), os beneficios do cadastro (D8) e, quando existe, o que a funcao faz (D9)
+            linha += " Modo: %s." % MODO_DITO.get(v.get("modo"), MODO_DITO["curriculo"])
+            if (v.get("beneficios") or "").strip():
+                linha += " Benefícios: %s." % v["beneficios"].strip().rstrip(".")
+            funcao = funcao_da_vaga(v["id"])
+            if funcao:
+                linha += "\n  O QUE A FUNÇÃO FAZ (fonte entre colchetes, que você NÃO repete):\n  " + \
+                         funcao.replace("\n", "\n  ")
+        linhas.append(linha)
     return "\n".join(linhas) or "- Nenhuma vaga aberta agora. Currículo ainda pode ir ao banco de currículos (vaga_id nulo)."
+
+
+REGRAS_DA_VAGA = (
+    "\n\nA CONVERSA DE VAGA (quem quer trabalhar na Renascer). O objetivo é trazer o máximo de candidaturas "
+    "sem insistir:\n"
+    "11. Sem vaga escolhida e com mais de uma aberta, pergunte em uma frase qual interessa e use escolher_vaga. "
+    "Com a vaga escolhida (ou a do anúncio), diga em uma frase qual é a vaga e pergunte se a pessoa tem currículo.\n"
+    "12. Tem currículo: peça o PDF ou uma foto dele (encaminhar_curriculo quando chegar).\n"
+    "13. Não tem, e a vaga aceita ficha: use comecar_ficha, com a língua da pessoa, e depois faça as cinco "
+    "perguntas, UMA POR VEZ, com as suas palavras: o nome completo; a cidade onde mora; no que já trabalhou; "
+    "quando pode começar; se tem como chegar a Cunha Porã todos os dias. Assim que ela responder, use "
+    "anotar_ficha com o que ela disse (como ela disse). Pergunte SÓ essas cinco: nunca idade, estado civil, "
+    "nacionalidade, filhos, saúde ou documento.\n"
+    "14. Vaga de currículo obrigatório e a pessoa não tem: diga com clareza que, para essa vaga, o currículo é "
+    "indispensável e pode ser uma foto; se houver vaga aberta que aceita ficha, ofereça essa vaga.\n"
+    "15. Recebida a ficha ou o currículo, diga UMA vez que a pessoa pode vir conhecer a empresa. Se ela quiser, "
+    "use marcar_visita e diga que a equipe chama para combinar. Você não marca dia nem horário.\n"
+    "16. Nunca diga que anotou, encaminhou ou passou algo à equipe antes de a ferramenta confirmar.\n"
+    "17. Benefícios: diga só os do cadastro da vaga, sem valor.\n"
+)
 
 
 def instrucao(con) -> str:
@@ -177,7 +354,9 @@ def instrucao(con) -> str:
         "SEJA CURTA: no máximo duas frases curtas por mensagem, uma pergunta por vez, sem repetir o que "
         "já disse. Nada de listas longas.\n\n"
         "REGRAS, sem exceção:\n"
-        "1. Fale na língua da pessoa: português ou espanhol.\n"
+        # #1525 (D7 da spec, item 7): na prova de 16/11 um audio em espanhol foi respondido em portugues
+        "1. Fale na língua da ÚLTIMA mensagem da pessoa, português ou espanhol, inclusive quando ela é a "
+        "transcrição de um áudio.\n"
         "2. Só afirme sobre a empresa o que está na BASE DA EMPRESA ou nas VAGAS abaixo. O que não estiver, "
         "não invente: diga que quem cuida disso é o setor e ofereça a opção do menu (oferecer_opcao_do_menu).\n"
         "3. Nunca prometa prazo, valor, preço, salário ou vaga. Nunca escreva número de telefone, e-mail, "
@@ -206,7 +385,7 @@ def instrucao(con) -> str:
         "10. Mensagem que começa com (áudio) é a transcrição do que a pessoa FALOU: pode ter palavra trocada; "
         "responda ao sentido, e se não der para entender peça em uma frase que ela escreva. Se vier "
         "[não foi possível ouvir o áudio], diga que não conseguiu ouvir e peça para escrever ou mandar de "
-        "novo, curto.\n\n"
+        "novo, curto." + (REGRAS_DA_VAGA if conduz_vaga(con) else "\n") + "\n"
         "BASE DA EMPRESA (o que você pode afirmar; cada linha traz a fonte entre colchetes, que você NÃO "
         "repete para a pessoa):\n<base>\n" + (base() or "(vazia: afirme só o que o menu e as vagas dizem)")
         + "\n</base>\n\nOPÇÕES DO MENU (chave: caminho (descrição)); use a chave em oferecer_opcao_do_menu, "
@@ -217,8 +396,53 @@ def instrucao(con) -> str:
 FERRAMENTAS_NOMES = ("ver_vagas", "ler_arquivo_recebido", "oferecer_opcao_do_menu", "encaminhar_curriculo", "encerrar")
 
 
-def ferramentas(con) -> list[dict]:
-    """As cinco, e so elas (D7). A chave do menu e a vaga vem de listas fechadas (enum)."""
+def ferramentas(con, conversa=None) -> list[dict]:
+    """As cinco do #1520, sempre, e -- com a chave `olivia.conduz_vaga` ligada -- as da vaga pelo ESTADO da
+    conversa (#1525): o que nao e oferecido nao pode ser chamado. A chave do menu e a vaga vem de listas
+    fechadas (enum). Refeita a cada volta do laco: o estado muda dentro da mesma mensagem."""
+    lista = _as_cinco(con)
+    if conversa is None or not conduz_vaga(con):
+        return lista
+    abertas = vaga.vagas_abertas(con)
+    vazio = {"type": "object", "properties": {}, "additionalProperties": False}
+    if abertas:
+        lista.append({"name": "escolher_vaga",
+                      "description": "Marca a vaga que a pessoa quer (a conversa passa a ser de vaga). Use a vaga_id "
+                                     "da lista VAGAS ABERTAS.",
+                      "input_schema": {"type": "object",
+                                       "properties": {"vaga_id": {"type": "integer", "enum": [v["id"] for v in abertas]}},
+                                       "required": ["vaga_id"], "additionalProperties": False}, "strict": True})
+    if not conversa["trabalhe"]:
+        return lista
+    c = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (conversa["id"],)).fetchone() or conversa
+    tem = _tem_candidatura(con, c["id"])
+    v = vaga._vaga(con, c["vaga_id"])
+    avisou = _mandou(con, c["id"], AVISO_FICHA)
+    if not tem and not avisou and v is not None and v["aberta"] and v["modo"] == "ficha_ou_curriculo":
+        lista.append({"name": "comecar_ficha",
+                      "description": "Para quem NÃO tem currículo, numa vaga que aceita ficha: manda o aviso de que as "
+                                     "respostas vão à equipe de seleção e ficam guardadas por 12 meses. Depois dele, as "
+                                     "cinco perguntas. lingua: a da pessoa (pt ou es).",
+                      "input_schema": {"type": "object", "properties": {"lingua": {"type": "string", "enum": ["pt", "es"]}},
+                                       "required": ["lingua"], "additionalProperties": False}, "strict": True})
+    if avisou and not tem:
+        texto = {"type": "string", "description": "como a pessoa respondeu, até %d letras" % CAMPO_ATE}
+        lista.append({"name": "anotar_ficha",
+                      "description": "Anota na ficha uma ou mais respostas da pessoa, como ela disse. Com as cinco "
+                                     "anotadas, a ficha vai sozinha à equipe; antes disso, a ferramenta diz o que falta.",
+                      "input_schema": {"type": "object",
+                                       "properties": {"nome": texto, "cidade": texto, "experiencia": texto,
+                                                      "quando_comeca": texto, "como_chega": texto,
+                                                      "lingua": {"type": "string", "enum": ["pt", "es"]}},
+                                       "additionalProperties": False}})
+    if tem:
+        lista.append({"name": "marcar_visita",
+                      "description": "A pessoa quer vir conhecer a empresa: a equipe é avisada e combina o dia com ela.",
+                      "input_schema": vazio})
+    return lista
+
+
+def _as_cinco(con) -> list[dict]:
     chaves = [o["chave"] for o in _opcoes_do_menu(con)] + [motor.RAIZ]
     vagas = [v["id"] for v in vaga.vagas_abertas(con)]
     vazio = {"type": "object", "properties": {}, "additionalProperties": False}
@@ -319,8 +543,33 @@ def _resumo_legivel(resumo: str) -> str:
     return "[%s]" % r if r else ""
 
 
-def _a_mensagem_atual(e) -> str:
+def _marcar_de_vaga(con, conversa, e):
+    """#1525: a conversa passa a ser de vaga. A vaga do anuncio vale; senao a que a conversa ja tinha; senao a
+    unica aberta (com mais de uma, fica sem vaga e ela pergunta: o defeito do #1522 nao se repete aqui)."""
+    v = vaga.vaga_aberta(con, e.anuncio) if e.anuncio else None
+    vaga_id = v["id"] if v is not None else conversa["vaga_id"]
+    if vaga_id is None and not conversa["trabalhe"]:
+        unica = vaga._vaga_unica(con)
+        vaga_id = unica["id"] if unica is not None else None
+    return con.execute("UPDATE atendimento.conversas SET trabalhe = true, vaga_id = %s WHERE id = %s RETURNING *",
+                       (vaga_id, conversa["id"])).fetchone()
+
+
+def _a_mensagem_atual(e, con=None) -> str:
+    """O que a pessoa fez agora. `con` (#1525, so na conversa de vaga): o toque do menu e o anuncio entram
+    como nota, para ela saber de onde a pessoa veio."""
     partes = []
+    if con is not None and e.toque:
+        rotulo = ""
+        for prefixo in ("menu:", "ia:sim:"):
+            if e.toque.startswith(prefixo):
+                no = motor._no(con, e.toque[len(prefixo):])
+                rotulo = no["rotulo"] if no is not None else ""
+        partes.append("[tocou: %s]" % (rotulo or "Trabalhe conosco"))
+    if con is not None and e.anuncio:
+        v = vaga.vaga_aberta(con, e.anuncio)
+        if v is not None:
+            partes.append("[chegou pelo anúncio da %s]" % v["titulo"])
     if e.texto:
         partes.append(e.texto)
     if e.documento is not None:
@@ -355,6 +604,8 @@ def travou(con, conversa, e) -> str | None:
             return FORTE
     if con.execute("SELECT 1 FROM atendimento.candidaturas WHERE conversa_id = %s LIMIT 1", (conversa["id"],)).fetchone():
         return None
+    if conversa.get("ficha"):
+        return None   # #1525: a ficha anda (cinco perguntas sao cinco falas); so o forte conta
     ultimo_toque = con.execute("""SELECT max(recebido_em) AS em FROM atendimento.eventos_meta
                                    WHERE tipo = 'mensagem' AND corpo->'msg'->>'type' IN ('interactive', 'button')
                                      AND (bsuid = %s OR corpo->'msg'->>'from' = %s)""",
@@ -380,12 +631,19 @@ class _Desfazer(Exception):
 class Olivia:
     """O que `motor.tratar` recebe quando a chave esta ligada (`OLIVIA_FALA=true`)."""
 
-    def atender(self, con, saida, ia, e, agora: datetime, envio=None) -> bool:
-        return atender(con, saida, ia, e, agora, envio)
+    def atender(self, con, saida, ia, e, agora: datetime, envio=None, de_vaga: bool = False) -> bool:
+        return atender(con, saida, ia, e, agora, envio, de_vaga=de_vaga)
+
+    def conduz_vaga(self, con) -> bool:
+        return conduz_vaga(con)
+
+    def mensagem_de_vaga(self, con, e, agora: datetime) -> bool:
+        return mensagem_de_vaga(con, e, agora)
 
 
-def atender(con, saida, ia, e, agora: datetime, envio=None) -> bool:
-    """True quando a OlivIA respondeu. False: o chamador segue o caminho de hoje."""
+def atender(con, saida, ia, e, agora: datetime, envio=None, de_vaga: bool = False) -> bool:
+    """True quando a OlivIA respondeu. False: o chamador segue o caminho de hoje. `de_vaga` (#1525): a
+    mensagem e da conversa de vaga e a chave `olivia.conduz_vaga` esta ligada; False devolve ao fluxo fixo."""
     if ia is None or not hasattr(ia, "conversar"):
         return False
     if not e_de_fora(con, e, agora, envio):
@@ -397,11 +655,11 @@ def atender(con, saida, ia, e, agora: datetime, envio=None) -> bool:
             return False   # #1189 / #1031: a conversa do cliente da carteira e a da casa nao sao dela
         if aberta["conduzida_por"] == "menu" and _ja_falou(con, aberta["id"]):
             return False   # travou duas vezes: ela ofereceu o menu e parou
-        if e.texto and no is not None:
+        if e.texto and no is not None and not de_vaga:
             certo, _ = motor.casar_opcao(con, None, no, e.texto)
             if certo is not None:
                 return False   # "Sc" no "em qual estado?": o casamento exato de hoje, sem IA
-    estado = {"falou": False, "acabou": False, "conversa": None, "e": e}
+    estado = {"falou": False, "acabou": False, "conversa": None, "e": e, "de_vaga": de_vaga}
     try:
         with con.transaction():   # ponto de retorno: se nada sair, a conversa que ela abriu e desfeita
             if not _atender(con, saida, ia, e, agora, estado):
@@ -417,15 +675,24 @@ def atender(con, saida, ia, e, agora: datetime, envio=None) -> bool:
 
 def _atender(con, saida, ia, e, agora: datetime, estado: dict) -> bool:
     p = e.pessoa
+    de_vaga = estado.get("de_vaga", False)
     turnos = historico(con, p, agora, e.wamid)
-    turnos.append({"role": "user", "content": _a_mensagem_atual(e)})
+    turnos.append({"role": "user", "content": _a_mensagem_atual(e, con if de_vaga else None)})
     if len(turnos) >= 2 and turnos[-2]["role"] == "user":
         turnos[-2]["content"] += "\n" + turnos.pop()["content"]
-    conversa = _conversa_dela(con, p, agora)
+    conversa = _conversa_de_vaga_dela(con, p, agora) if de_vaga else None
+    if conversa is not None and conversa["situacao"] != "em_curso":
+        # #1525: quem responde ao toque unico, ou aceita a visita, volta a MESMA conversa de vaga
+        conversa = con.execute("UPDATE atendimento.conversas SET situacao = 'em_curso' WHERE id = %s RETURNING *",
+                               (conversa["id"],)).fetchone()
+    if conversa is None:
+        conversa = _conversa_dela(con, p, agora)
     nova = conversa is None
     if nova:
         conversa = motor._nova_conversa(con, p, agora)
     motor._chegou(con, p, conversa, agora)
+    if de_vaga:
+        conversa = _marcar_de_vaga(con, conversa, e)
     marca = ""
     oferecer_menu = False
     sinal = None if nova else travou(con, conversa, e)
@@ -440,9 +707,13 @@ def _atender(con, saida, ia, e, agora: datetime, estado: dict) -> bool:
         con.execute("UPDATE atendimento.conversas SET conduzida_por = 'menu' WHERE id = %s", (conversa["id"],))
         print("olivia: conversa %d travou de novo: o menu, e ela para" % conversa["id"], flush=True)
         return estado["falou"]
-    con.execute("UPDATE atendimento.conversas SET conduzida_por = 'olivia' WHERE id = %s", (conversa["id"],))
-    sistema, lista = instrucao(con), ferramentas(con)
+    conversa = con.execute("UPDATE atendimento.conversas SET conduzida_por = 'olivia' WHERE id = %s RETURNING *",
+                           (conversa["id"],)).fetchone()
+    estado["conversa"] = conversa
+    sistema = instrucao(con)
     for volta in range(VOLTAS):
+        lista = ferramentas(con, estado["conversa"])   # #1525: o estado muda dentro da mesma mensagem
+        estado["oferecidas"] = {f["name"] for f in lista}
         r = ia.conversar(sistema, marca, turnos, lista)
         if r is None:
             if not estado["falou"]:
@@ -470,6 +741,15 @@ def _registrar(con, conversa_id, para, tipo, resumo, wamid):
 def _falar(con, saida, estado, texto: str, travada: bool = False) -> None:
     p, c = estado["e"].pessoa, estado["conversa"]
     ok, motivo = frase_permitida(texto)
+    if ok and promessa_sem_candidatura(con, c, texto):
+        # #1525 (passo 9): "anotei, a equipe vai te chamar" sem nada gravado e o fracasso silencioso da spec.
+        # No lugar, a frase de cadastro do que ainda falta.
+        print("olivia: promessa sem candidatura na conversa %d: %s" % (c["id"], " ".join(texto.split())[:300]),
+              flush=True)
+        w = saida.texto(p.para, _frase_do_que_falta(con, c))
+        _registrar(con, c["id"], p.para, "texto", RECUSADA_PROMESSA, w)
+        estado["falou"] = estado["falou"] or bool(w)
+        return
     if not ok:
         # a frase que ela tentou dizer vai ao log (so aqui no servidor), para ajustar a instrucao
         print("olivia: frase recusada na conversa %d (%s): %s" % (c["id"], motivo, " ".join(texto.split())[:300]),
@@ -480,6 +760,28 @@ def _falar(con, saida, estado, texto: str, travada: bool = False) -> None:
         w = saida.texto(p.para, texto)
         _registrar(con, c["id"], p.para, "texto", "%s: %s" % (FALA_TRAVOU if travada else FALA, texto), w)
     estado["falou"] = estado["falou"] or bool(w)
+
+
+def promessa_sem_candidatura(con, conversa, texto: str) -> bool:
+    """A fala afirma ter anotado/encaminhado, numa conversa de vaga sem candidatura gravada (nesta mensagem
+    ou antes). So com a chave da vaga ligada."""
+    if not conversa or not conversa.get("trabalhe") or not conduz_vaga(con):
+        return False
+    s = _sem_acento(texto)
+    if not any(p in s for p in PROMESSA):
+        return False
+    return not _tem_candidatura(con, conversa["id"])
+
+
+def _frase_do_que_falta(con, conversa) -> str:
+    """A frase de cadastro `ficha_falta`: com a ficha comecada, os campos que faltam; sem ela, o curriculo."""
+    c = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (conversa["id"],)).fetchone() or conversa
+    lingua = _lingua(c.get("lingua"))
+    if _mandou(con, c["id"], AVISO_FICHA) and falta_da_ficha(c.get("ficha")):
+        falta = falta_dito(c.get("ficha"), lingua)
+    else:
+        falta = "tu currículum (puede ser una foto)" if lingua == "es" else "o seu currículo (pode ser uma foto)"
+    return _cadastro(con, "ficha_falta", lingua, falta=falta)
 
 
 def _oferecer(con, saida, estado, chave: str, agora: datetime) -> str:
@@ -547,6 +849,10 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
     """Uma das cinco. Qualquer outro nome e recusado (o modelo so ve as cinco)."""
     e, c = estado["e"], estado["conversa"]
     print("olivia: conversa %d, %s %s" % (c["id"], FERRAMENTA, nome), flush=True)
+    if "oferecidas" in estado and nome not in estado["oferecidas"]:
+        return "Essa ferramenta não está disponível agora."   # #1525: o que nao foi oferecido nao se chama
+    if nome in ("escolher_vaga", "comecar_ficha", "anotar_ficha", "marcar_visita"):
+        return _executar_da_vaga(con, saida, estado, nome, entrada, agora)
     if nome == "ver_vagas":
         return _vagas(con)
     if nome == "ler_arquivo_recebido":
@@ -612,6 +918,133 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
     return "Ferramenta desconhecida."
 
 
+# ── a vaga: as quatro ferramentas (#1525) ───────────────────────────────────
+
+def _executar_da_vaga(con, saida, estado, nome: str, entrada: dict, agora: datetime) -> str:
+    import json
+    e, c = estado["e"], estado["conversa"]
+    p = e.pessoa
+    c = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (c["id"],)).fetchone()
+    if nome == "escolher_vaga":
+        v = con.execute("SELECT * FROM atendimento.vagas WHERE id = %s AND aberta", (entrada.get("vaga_id"),)).fetchone()
+        if v is None:
+            return "Essa vaga não está aberta. Use uma vaga_id da lista VAGAS ABERTAS."
+        estado["conversa"] = con.execute("""UPDATE atendimento.conversas SET trabalhe = true, vaga_id = %s
+                                             WHERE id = %s RETURNING *""", (v["id"], c["id"])).fetchone()
+        return "Vaga marcada: %s. %s." % (v["titulo"], MODO_DITO.get(v["modo"], MODO_DITO["curriculo"]).capitalize())
+    if nome == "comecar_ficha":
+        lingua = _lingua(entrada.get("lingua"))
+        w = saida.texto(p.para, _cadastro(con, "ficha_aviso", lingua))
+        _registrar(con, c["id"], p.para, "texto", AVISO_FICHA, w)
+        estado["conversa"] = con.execute("""UPDATE atendimento.conversas SET lingua = %s, ficha = coalesce(ficha, '{}'::jsonb)
+                                             WHERE id = %s RETURNING *""", (lingua, c["id"])).fetchone()
+        estado["falou"] = estado["falou"] or bool(w)
+        if not w:
+            return "O aviso não pôde ser mandado agora. Não comece as perguntas."
+        return ("O aviso foi mandado. Agora faça as cinco perguntas, uma por vez, começando pelo nome completo, e "
+                "anote cada resposta com anotar_ficha.")
+    if nome == "anotar_ficha":
+        if _tem_candidatura(con, c["id"]):
+            return "A ficha desta conversa já foi encaminhada à equipe. Não anote de novo."
+        ficha = dict(c["ficha"] or {})
+        for k in CAMPOS:
+            valor = " ".join(str(entrada.get(k) or "").split())[:CAMPO_ATE]
+            if valor:
+                ficha[k] = valor
+        if entrada.get("lingua") in ("pt", "es"):
+            ficha["lingua"] = entrada["lingua"]
+        lingua = _lingua(ficha.get("lingua") or c["lingua"])
+        estado["conversa"] = c = con.execute("""UPDATE atendimento.conversas SET ficha = %s::jsonb, lingua = %s
+                                                 WHERE id = %s RETURNING *""", (json.dumps(ficha), lingua, c["id"])).fetchone()
+        falta = falta_da_ficha(ficha)
+        if falta:
+            return "Anotado na ficha (ainda NÃO foi à equipe). Falta: %s. Pergunte o próximo, um por vez." % \
+                   falta_dito(ficha, "pt")
+        vaga.receber_ficha(con, c, ficha, agora)
+        estado["conversa"] = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (c["id"],)).fetchone()
+        return ("Ficha completa e encaminhada à equipe de seleção. Agradeça, diga que a equipe vai olhar (sem prazo "
+                "nem promessa) e ofereça, uma vez, que a pessoa pode vir conhecer a empresa.")
+    if nome == "marcar_visita":
+        k = con.execute("""SELECT * FROM atendimento.candidaturas WHERE conversa_id = %s
+                            ORDER BY id DESC LIMIT 1""", (c["id"],)).fetchone()
+        if k is None:
+            return "Ainda não há ficha nem currículo nesta conversa."
+        if not k["quer_visita"]:
+            con.execute("UPDATE atendimento.candidaturas SET quer_visita = true WHERE id = %s", (k["id"],))
+            if k["fran_em"] is not None:
+                vaga.avisar_visita(con, k)   # a pagina ja foi: a Fran recebe uma linha
+        return ("Anotado que a pessoa quer conhecer a empresa; a equipe chama para combinar. Não marque dia nem "
+                "horário.")
+    return "Ferramenta desconhecida."
+
+
+# ── o toque unico e a ficha parcial (D4, D6), na rotina do minuto ────────────
+
+def tocar_vagas(con, saida, agora: datetime) -> int:
+    """UM toque por conversa de vaga dela SEM candidatura, dentro da janela de 24 h, depois de
+    `olivia.vaga_toque_h` sem a pessoa escrever. O texto, pelo estado: a ficha comecada (o que falta), o
+    convite para a ficha, ou o curriculo. Fora da janela nada sai (so modelo pago alcancaria, e esta etapa
+    nao usa). Nunca um segundo: `vaga_lembrada_em` e gravado mesmo se o envio falhar. So com a chave ligada."""
+    from .envio import inicio_da_janela
+    if not conduz_vaga(con):
+        return 0
+    espera = _horas(con, "olivia.vaga_toque_h", 2)
+    n = 0
+    for c in con.execute("""SELECT c.* FROM atendimento.conversas c
+                             WHERE c.trabalhe AND c.conduzida_por = 'olivia' AND c.vaga_lembrada_em IS NULL
+                               AND c.situacao <> 'encerrada' AND c.iniciada_em > %s
+                               AND NOT EXISTS (SELECT 1 FROM atendimento.candidaturas k WHERE k.conversa_id = c.id)
+                               AND NOT EXISTS (SELECT 1 FROM atendimento.conversas d
+                                                WHERE d.bsuid = c.bsuid AND d.id > c.id)
+                             ORDER BY c.id""", (agora - timedelta(hours=48),)).fetchall():
+        numero = c["wa_id"] or c["bsuid"]
+        ultima = inicio_da_janela(con, c["wa_id"]) if c["wa_id"] else c["ultimo_toque_em"]
+        if ultima is None or agora - ultima < espera or agora - ultima >= motor.JANELA_DA_META:
+            continue
+        lingua = _lingua(c["lingua"])
+        v = vaga._vaga(con, c["vaga_id"])
+        if c["ficha"] is not None and _mandou(con, c["id"], AVISO_FICHA):
+            texto = _cadastro(con, "toque_ficha_falta", lingua, falta=falta_dito(c["ficha"], lingua))
+        elif v is not None and v["modo"] == "curriculo":
+            texto = _cadastro(con, "toque_curriculo", lingua)
+        elif (v is not None and v["modo"] == "ficha_ou_curriculo") or (
+                v is None and any(x["modo"] == "ficha_ou_curriculo" for x in vaga.vagas_abertas(con))):
+            texto = _cadastro(con, "toque_convite", lingua)
+        else:
+            texto = _cadastro(con, "toque_curriculo", lingua)
+        con.execute("UPDATE atendimento.conversas SET vaga_lembrada_em = %s WHERE id = %s", (agora, c["id"]))
+        try:
+            w = saida.texto(numero, texto)
+        except Exception as falha:   # noqa: BLE001 -- o toque e um so, mesmo quando nao sai
+            print("olivia: toque da vaga na conversa %d nao saiu: %s" % (c["id"], type(falha).__name__), flush=True)
+            continue
+        _registrar(con, c["id"], numero, "texto", TOQUE_VAGA, w)
+        n += 1 if w else 0
+    return n
+
+
+def enviar_parciais(con, agora: datetime) -> int:
+    """A ficha que parou no meio, com ao menos o nome, vira candidatura INCOMPLETA e vai a Fran:
+    `olivia.ficha_parcial_h` depois do toque sem a pessoa responder, ou quando a janela de 24 h fechou.
+    Rascunho sem nome nao vira nada (o vigia o conta como sem saida). RODA MESMO COM A CHAVE DESLIGADA
+    (rollback da spec, item 2): quem deu o nome antes do desligamento ainda chega a Fran."""
+    from .envio import inicio_da_janela
+    depois = _horas(con, "olivia.ficha_parcial_h", 4)
+    n = 0
+    for c in con.execute("""SELECT c.* FROM atendimento.conversas c
+                             WHERE c.ficha IS NOT NULL AND coalesce(c.ficha->>'nome', '') <> ''
+                               AND NOT EXISTS (SELECT 1 FROM atendimento.candidaturas k WHERE k.conversa_id = c.id)
+                             ORDER BY c.id""").fetchall():
+        ultima = inicio_da_janela(con, c["wa_id"]) if c["wa_id"] else c["ultimo_toque_em"]
+        fechou = ultima is None or agora - ultima >= motor.JANELA_DA_META
+        lembrada = c["vaga_lembrada_em"]
+        sem_resposta = lembrada is not None and agora - lembrada >= depois and (ultima is None or ultima <= lembrada)
+        if fechou or sem_resposta:
+            vaga.receber_ficha(con, c, dict(c["ficha"]), agora, parcial=True)
+            n += 1
+    return n
+
+
 # ── o vigia (D6) ────────────────────────────────────────────────────────────
 
 HORA_DO_VIGIA = "23:40"
@@ -646,6 +1079,8 @@ def fechar_dia(con, agora: datetime) -> dict:
     for c in conversas:
         ok = (c["curriculo"] or c["situacao"] in ("com_link", "encerrada", "curriculo_recebido")
               or c["ia_confirmou"] is True or c["link_em"] is not None)
+        if c["trabalhe"] and c["conduzida_por"] == "olivia":
+            ok = bool(c["curriculo"])   # #1525: a conversa de vaga dela so termina bem com ficha ou curriculo
         (bem if ok else sem).append(c["id"])
         con.execute("UPDATE atendimento.conversas SET saida = %s WHERE id = %s", ("bem" if ok else "sem_saida", c["id"]))
     recusadas = [r["conversa_id"] for r in con.execute(
@@ -654,11 +1089,15 @@ def fechar_dia(con, agora: datetime) -> dict:
         (RECUSADA + "%", desde)).fetchall()]
     n_recusadas = con.execute("SELECT count(*) AS n FROM atendimento.enviadas WHERE resumo LIKE %s AND enviada_em > %s",
                               (RECUSADA + "%", desde)).fetchone()["n"]
+    # #1525: as fichas que foram a Fran incompletas (a pessoa parou de responder)
+    incompletas = con.execute("""SELECT count(*) AS n FROM atendimento.candidaturas
+                                  WHERE tipo_arquivo = 'ficha' AND ficha ? 'faltou' AND recebida_em > %s""",
+                              (desde,)).fetchone()["n"]
     numeros = {"conversas": len(conversas), "bem": len(bem), "sem_saida": sem, "recusadas": recusadas,
-               "n_recusadas": n_recusadas, "avisou": False}
+               "n_recusadas": n_recusadas, "incompletas": incompletas, "avisou": False}
     if sem or n_recusadas:
         from .vigia import _avisar
-        texto = resumo_do_dia(len(conversas), len(bem), sem, n_recusadas, recusadas)
+        texto = resumo_do_dia(len(conversas), len(bem), sem, n_recusadas, recusadas, incompletas)
         _avisar(con, "olivia_resumo", [texto])
         numeros["avisou"] = True
     local = agora.astimezone(motor.FUSO).date().isoformat()
@@ -673,10 +1112,13 @@ def _ids(ids: list) -> str:
     return mostra + (" e mais %d" % (len(ids) - 8) if len(ids) > 8 else "")
 
 
-def resumo_do_dia(n: int, bem: int, sem: list, n_recusadas: int, recusadas: list) -> str:
+def resumo_do_dia(n: int, bem: int, sem: list, n_recusadas: int, recusadas: list, incompletas: int = 0) -> str:
     partes = ["Hoje a OlivIA falou em %d conversa%s: %d terminaram bem" % (n, "" if n == 1 else "s", bem)]
     partes.append("%d sem saída%s" % (len(sem), (" (%s)" % _ids(sem)) if sem else ""))
     partes.append("%d frase%s recusada%s%s" % (n_recusadas, "" if n_recusadas == 1 else "s",
                                                "" if n_recusadas == 1 else "s",
                                                (" (%s)" % _ids(recusadas)) if recusadas else ""))
+    if incompletas:
+        partes.append("%d ficha%s incompleta%s" % (incompletas, "" if incompletas == 1 else "s",
+                                                   "" if incompletas == 1 else "s"))
     return ", ".join(partes) + "."

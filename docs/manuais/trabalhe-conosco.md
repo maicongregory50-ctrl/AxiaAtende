@@ -2,6 +2,13 @@
 
 **Chamado:** #1098 · **Spec:** `docs/specs/2026-10-22-trabalhe-conosco-vaga-e-pre-triagem.md`
 · **Foto como currículo e a OlivIA:** #1520 (`docs/manuais/olivia.md`)
+· **A ficha de contato e a OlivIA conduzindo a vaga:** #1525 (`docs/specs/2026-11-16-olivia-conduz-a-vaga-ficha-e-curriculo.md`)
+
+> **Dois jeitos de a conversa da vaga acontecer.** Com a chave `olivia.conduz_vaga` **ligada** (#1525), a
+> OlivIA conduz a conversa inteira de quem chega pela vaga, com as palavras dela, e aceita a **ficha de
+> contato** na vaga que permite (seção 6). Com a chave **desligada**, ou se a IA não responder, vale o
+> fluxo fixo descrito nas seções 3 a 5, com os textos aprovados, que pede PDF ou foto. O fluxo fixo é a
+> reserva: nada dele foi apagado.
 
 ## 1. Para que serve
 
@@ -62,7 +69,9 @@ a chave `OLIVIA_FALA` ligada; a foto dentro da conversa da vaga vale sempre.
    **PDF de uma página** (*curriculo-foto.pdf*) na mensagem de sempre, com "Sem pré-triagem (foto: sem
    triagem)"; os botões Triagem certa/errada dessa mensagem são do modelo aprovado e podem ser ignorados.
 
-**O dono:** na tela **Destinos**, cartão *Trabalhe conosco*: **Desligar pré-triagem** e **Fechar vaga**.
+**O dono:** na tela **Destinos**, cartão *Trabalhe conosco*: **Desligar pré-triagem** e **Fechar vaga**,
+e o modo de cada vaga, **Ficha ou currículo** ou **Currículo obrigatório**, com o botão de trocar
+(*Aceitar ficha* / *Exigir currículo*; #1525). A contagem diz "N currículos, M fichas".
 Na tabela dos motivos, a pessoa de *Trabalhe conosco* é quem recebe os currículos.
 
 ## 4. O que significa cada sinal
@@ -94,9 +103,60 @@ fila, tentando uma vez por hora, e não se perdem.
 - **Não faz pré-triagem do currículo em foto** (#1520): a Fran olha a foto.
 - **Não responde ao candidato o resultado:** o retorno é da Fran.
 - **Não aceita Word ou texto como currículo:** só PDF ou foto (a foto passou a valer em 13/11/2026, #1520).
+  Quem não tem currículo, na vaga que aceita, deixa a **ficha de contato** (seção 6, #1525).
 - **Não inventa resposta:** a cada pergunta escolhe um texto aprovado pelo dono; o que não está na
   lista volta para a pergunta da vaga.
 - **Não guarda o currículo para sempre:** em 12 meses o arquivo é apagado, com o nome e o número;
   ficam a data, a vaga e o retorno da Fran.
 - **Não tem tela de candidatos:** a lista é o WhatsApp da Fran.
 - **Não abre vaga nova nem muda requisitos ou textos:** isso é chamado.
+
+## 6. A ficha de contato (#1525)
+
+**Para que serve.** Quem quer trabalhar na Renascer e não tem currículo deixa de ficar sem saída: a OlivIA
+faz cinco perguntas simples e a Fran recebe uma ficha de contato. Quem tem currículo continua mandando o
+PDF ou a foto.
+
+**Quem usa e quando.** O candidato, a qualquer hora, pelo WhatsApp. A Fran recebe a ficha como recebe o
+currículo. Quem cadastra a vaga escolhe, na tela Destinos, se ela aceita ficha.
+
+**O caminho comum.**
+1. A pessoa chega pelo anúncio ou pelo menu. A OlivIA diz qual é a vaga e pergunta se ela tem currículo.
+2. Tem: manda o PDF ou a foto, e a Fran recebe.
+3. Não tem, e a vaga aceita ficha: a OlivIA avisa que as respostas vão à equipe de seleção e ficam
+   guardadas por 12 meses, e pergunta o nome, a cidade, no que já trabalhou, quando pode começar e se tem
+   como chegar a Cunha Porã todos os dias.
+4. Respondidas as cinco, a Fran recebe a ficha.
+5. Recebida a ficha ou o currículo, a OlivIA diz que a pessoa pode vir conhecer a empresa. Se ela quiser,
+   a Fran é avisada e combina o dia.
+6. Se a pessoa parar no meio, ou nem começar, recebe uma mensagem, uma vez só, nas primeiras 24 horas
+   (duas horas depois da última mensagem dela). Sem resposta em quatro horas, ou fechadas as 24 horas, a
+   Fran recebe o que houver da ficha, desde que a pessoa tenha dito o nome.
+
+**Sinais.**
+- Na mensagem à Fran, **"Ficha de contato"** no lugar do currículo: uma página em PDF
+  (*ficha-de-contato.pdf*) com a vaga, o número e as cinco respostas como a pessoa deu, e só o botão
+  **Conversar**. Fora das 24 horas da Fran, a página vem na mensagem de sempre, com "Ficha: <nome>" e
+  "Sem pré-triagem (ficha: sem triagem)"; os botões Triagem certa/errada dessa mensagem são do modelo
+  aprovado e podem ser ignorados.
+- **"Incompleta: faltou ..."** quer dizer que a pessoa parou de responder: o que falta não foi perguntado
+  de novo, e a Fran tem o número para chamar.
+- **"Respondeu em espanhol"**: as respostas estão como a pessoa escreveu ou falou.
+- **"Quer visitar a empresa"**: a pessoa aceitou o convite; o dia é combinado pela Fran. Se ela aceitou
+  depois de a ficha ter ido, a Fran recebe uma linha à parte: *"O candidato ... quer visitar a empresa.
+  Combine o dia com ele."*
+- Ficha não tem pré-triagem: não há "Triagem certa" nem "Triagem errada" a avaliar.
+- Na tela Destinos, cada vaga mostra **Ficha ou currículo** ou **Currículo obrigatório**.
+- No resumo diário ao dono, "N fichas incompletas".
+
+**O que NÃO faz.** Não pergunta idade, estado civil, nacionalidade, filhos nem saúde. Não aceita ficha em
+vaga de currículo obrigatório: ali, sem arquivo, não há candidatura, e a OlivIA oferece a vaga que aceita
+ficha, se houver. Não insiste: a mensagem de volta é uma só por conversa, e só nas primeiras 24 horas;
+depois, o contato é abandonado. Não marca dia nem horário de visita. Não fala de salário nem de valor. Não
+avalia o candidato: a ficha vai à Fran como foi respondida. A ficha é apagada em 12 meses, como o currículo.
+Com a chave desligada no servidor, a conversa de vaga volta aos textos fixos de antes, que pedem PDF ou
+foto; a ficha que já tinha nome ainda chega à Fran.
+
+**Pré-requisito.** A vaga cadastrada e aberta, com o modo escolhido na tela Destinos, e a pessoa de
+*Trabalhe conosco* (a Fran) na tabela dos motivos. A chave liga e desliga pelo `scripts\olivia.py` (manual
+`olivia.md`, seção 6).

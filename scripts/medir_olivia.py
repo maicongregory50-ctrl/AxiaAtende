@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ler_conversa import conectar  # noqa: E402
 
 BASE_CHAO = (4, 30)   # 13/11/2026: 4 curriculos em 30 conversas de vaga de chao de fabrica (spec, O universo medido)
+BASE_VAGA = (11, 38)  # #1525, 16/11/2026: 11 curriculos em 38 conversas de vaga desde 12/11 (spec, O universo medido)
 
 
 def medir(con, desde: datetime) -> dict:
@@ -61,8 +62,24 @@ def medir(con, desde: datetime) -> dict:
                            WHERE c.trabalhe AND c.iniciada_em >= %s
                              AND (v.titulo ILIKE '%%produ%%' OR v.titulo ILIKE '%%empilhadeira%%')""",
                        (desde, desde)).fetchone()
+    # #1525: a conversa da vaga conduzida por ela. A ficha conta pelo envio a Fran (`enviadas`, "ficha N para a
+    # fran" / "ficha incompleta N ..."): o papel de leitura nao le `candidaturas.ficha`, de proposito.
+    vaga = con.execute("""SELECT count(*) AS conversas,
+                                 count(*) FILTER (WHERE c.situacao = 'curriculo_recebido') AS com_candidatura,
+                                 count(*) FILTER (WHERE c.vaga_lembrada_em IS NOT NULL) AS tocadas,
+                                 count(*) FILTER (WHERE c.vaga_lembrada_em IS NOT NULL AND c.ultimo_toque_em > c.vaga_lembrada_em)
+                                     AS responderam_ao_toque
+                            FROM atendimento.conversas c
+                           WHERE c.trabalhe AND c.iniciada_em >= %s""", (desde,)).fetchone()
+    envios = con.execute("""SELECT count(*) FILTER (WHERE resumo ~ '^ficha [0-9]+ para a fran') AS fichas,
+                                   count(*) FILTER (WHERE resumo ~ '^ficha incompleta [0-9]+ para a fran') AS incompletas,
+                                   count(*) FILTER (WHERE resumo ~ '^curriculo [0-9]+ para a fran') AS curriculos
+                              FROM atendimento.enviadas WHERE enviada_em >= %s""", (desde,)).fetchone()
+    visita = con.execute("""SELECT count(*) AS n FROM atendimento.candidaturas
+                             WHERE quer_visita AND recebida_em >= %s""", (desde,)).fetchone()["n"]
     return {"conversas": dict(c), "falas": falas, "recusadas": [dict(r) for r in recusadas], "audios": dict(audios),
-            "custo": [dict(r) for r in custo], "chao": dict(chao)}
+            "custo": [dict(r) for r in custo], "chao": dict(chao),
+            "vaga": dict(vaga, **dict(envios), quer_visita=visita)}
 
 
 def main() -> int:
@@ -95,6 +112,15 @@ def main() -> int:
     print("vaga de chão de fábrica: %d currículos (%d em foto) em %d conversas = %.0f%%; linha de base 13/11: %d de %d = %.0f%%"
           % (ch["curriculos"], ch["em_foto"], ch["conversas"], taxa * 100, BASE_CHAO[0], BASE_CHAO[1],
              100 * BASE_CHAO[0] / BASE_CHAO[1]))
+    v = m["vaga"]
+    chegaram = v["fichas"] + v["incompletas"] + v["curriculos"]
+    print("conversas de vaga (#1525): %d; à Fran: %d fichas completas, %d incompletas, %d currículos = %d "
+          "(%.0f%%); linha de base 16/11: %d de %d = %.0f%%"
+          % (v["conversas"], v["fichas"], v["incompletas"], v["curriculos"], chegaram,
+             100 * chegaram / v["conversas"] if v["conversas"] else 0, BASE_VAGA[0], BASE_VAGA[1],
+             100 * BASE_VAGA[0] / BASE_VAGA[1]))
+    print("toques únicos: %d mandados, %d com resposta depois; quer visitar a empresa: %d"
+          % (v["tocadas"], v["responderam_ao_toque"], v["quer_visita"]))
     return 0
 
 

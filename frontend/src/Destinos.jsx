@@ -131,11 +131,16 @@ export default function Destinos() {
             </div>
           </Secao>
 
-          <Secao titulo="Trabalhe conosco" ajuda="Quem chega pelo anúncio da vaga, ou toca Trabalhe conosco, vê os requisitos e manda o currículo em PDF. Cada currículo vai sozinho ao WhatsApp de quem está em Trabalhe conosco, com a pré-triagem da IA. Manual: trabalhe-conosco.">
+          <Secao titulo="Trabalhe conosco" ajuda="Quem chega pelo anúncio da vaga, ou toca Trabalhe conosco, manda o currículo em PDF ou foto; na vaga que aceita ficha, quem não tem currículo responde cinco perguntas à OlivIA. Cada currículo ou ficha vai sozinho ao WhatsApp de quem está em Trabalhe conosco, com a pré-triagem da IA. Manual: trabalhe-conosco.">
             {(d.vagas || []).filter((v) => v.aberta).map((v) => (
               <div key={v.id} className="linha-ajuste">
                 <span className="estado ok">Vaga aberta</span>
-                <span>{v.titulo} <span className="leve">· {v.curriculos} currículo{v.curriculos === 1 ? '' : 's'}</span></span>
+                <span>{v.titulo} <span className="leve">· {v.curriculos} currículo{v.curriculos === 1 ? '' : 's'}{v.fichas ? `, ${v.fichas} ficha${v.fichas === 1 ? '' : 's'}` : ''}</span></span>
+                <span className="estado ok">{v.modo === 'ficha_ou_curriculo' ? 'Ficha ou currículo' : 'Currículo obrigatório'}</span>
+                <button className="pequeno"
+                        onClick={() => fazer('PUT', `/vagas/${v.id}/modo`, { modo: v.modo === 'ficha_ou_curriculo' ? 'curriculo' : 'ficha_ou_curriculo' }, v.modo === 'ficha_ou_curriculo' ? 'A vaga passou a pedir currículo.' : 'A vaga passou a aceitar ficha.')}>
+                  {v.modo === 'ficha_ou_curriculo' ? 'Exigir currículo' : 'Aceitar ficha'}
+                </button>
                 <span className={'estado ' + (v.triagem_ligada ? 'ok' : 'off')}>{v.triagem_ligada ? 'Pré-triagem ligada' : 'Pré-triagem desligada'}</span>
                 <button className={(v.triagem_ligada ? 'perigo' : 'primario') + ' pequeno'}
                         onClick={() => fazer('PUT', `/vagas/${v.id}/triagem`, { ligada: !v.triagem_ligada }, v.triagem_ligada ? 'Pré-triagem desligada.' : 'Pré-triagem ligada.')}>

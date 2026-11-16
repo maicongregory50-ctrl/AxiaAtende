@@ -274,6 +274,120 @@ def receber_arquivo(con, saida: Saida, e, conversa, agora: datetime, tipo: str =
     return c["id"]
 
 
+# ── a ficha de contato (#1525): a candidatura sem arquivo ────────────────────
+
+SEM_TRIAGEM_FICHA = "ficha: sem triagem"
+CAMPOS_FICHA = (("nome", "Nome"), ("cidade", "Cidade onde mora"), ("experiencia", "Já trabalhou com"),
+                ("quando_comeca", "Pode começar"), ("como_chega", "Como chega a Cunha Porã"))
+FALTOU = {"nome": "o nome", "cidade": "a cidade", "experiencia": "no que já trabalhou",
+          "quando_comeca": "quando pode começar", "como_chega": "como chega a Cunha Porã"}
+
+
+def receber_ficha(con, conversa, ficha: dict, agora: datetime, parcial: bool = False) -> int:
+    """A ficha de contato vira candidatura (D5): `tipo_arquivo = 'ficha'`, os campos em `ficha` (com a
+    lingua, e `faltou` quando PARCIAL), sem arquivo e sem pre-triagem. Uma por conversa: havendo
+    candidatura (ficha ou curriculo) nesta conversa, devolve a dela. Fecha a conversa como
+    `curriculo_recebido`; doze meses, como o curriculo. Quem chama e a OlivIA (`anotar_ficha`) ou a parcial."""
+    import json
+    ja = con.execute("SELECT id FROM atendimento.candidaturas WHERE conversa_id = %s ORDER BY id LIMIT 1",
+                     (conversa["id"],)).fetchone()
+    if ja:
+        return ja["id"]
+    dados = {k: " ".join(str((ficha or {}).get(k) or "").split())[:200] for k, _ in CAMPOS_FICHA}
+    dados["lingua"] = "es" if ((ficha or {}).get("lingua") or conversa.get("lingua")) == "es" else "pt"
+    if parcial:
+        dados["faltou"] = [k for k, _ in CAMPOS_FICHA if not dados[k]]
+    c = con.execute("""INSERT INTO atendimento.candidaturas
+                      (vaga_id, conversa_id, bsuid, wa_id, nome_perfil, texto, pdf_nome, recebida_em, apagar_em,
+                       tipo_arquivo, triagem_em, triagem_erro, ficha)
+                   VALUES (%s, %s, %s, %s, %s, %s, '', %s, %s, 'ficha', %s, %s, %s::jsonb) RETURNING id""",
+                    (conversa["vaga_id"], conversa["id"], conversa["bsuid"], conversa["wa_id"],
+                     conversa["nome_perfil"] or "", o_que_escreveu(con, conversa), agora, agora + DOZE_MESES,
+                     agora, SEM_TRIAGEM_FICHA, json.dumps(dados))).fetchone()
+    _fechar(con, conversa, "curriculo_recebido")
+    print("vaga: ficha%s da conversa %d virou a candidatura %d"
+          % (" PARCIAL" if parcial else "", conversa["id"], c["id"]), flush=True)
+    return c["id"]
+
+
+def _nome_da_ficha(c) -> str:
+    return ((c["ficha"] or {}).get("nome") or c["nome_perfil"] or "sem nome").strip()
+
+
+def _linhas_da_ficha(con, c) -> list[str]:
+    """O que a Fran le, na pagina e na legenda: a vaga, as respostas como a pessoa deu, e as marcas."""
+    vaga = _vaga(con, c["vaga_id"])
+    f = c["ficha"] or {}
+    linhas = ["Vaga: %s" % (vaga["titulo"] if vaga else "Banco de currículos"),
+              "Número: %s" % numero_bonito(c["wa_id"])]
+    for k, rotulo in CAMPOS_FICHA:
+        linhas.append("%s: %s" % (rotulo, (f.get(k) or "").strip() or "—"))
+    if f.get("faltou"):
+        nomes = [FALTOU[k] for k, _ in CAMPOS_FICHA if k in f["faltou"]]
+        e = " e ".join([", ".join(nomes[:-1]), nomes[-1]]) if len(nomes) > 1 else (nomes[0] if nomes else "")
+        linhas.append("Incompleta: faltou %s (a pessoa parou de responder)" % e)
+    if f.get("lingua") == "es":
+        linhas.append("Respondeu em espanhol")
+    if c["quer_visita"]:
+        linhas.append("Quer visitar a empresa")
+    return linhas
+
+
+def legenda_da_ficha(con, c) -> str:
+    return _cortar(" · ".join(["Ficha de contato (sem currículo, sem pré-triagem)"] + _linhas_da_ficha(con, c)), CORPO_ATE)
+
+
+def _pdf_texto(t: str) -> bytes:
+    b = t.encode("cp1252", errors="replace")
+    return b.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
+
+
+def pdf_da_ficha(con, c) -> bytes:
+    """A ficha numa pagina A4 (molde de `pdf_da_foto`, sem biblioteca nova): Helvetica com WinAnsiEncoding,
+    entao o acento sai certo; o que nao cabe em cp1252 (emoji) vira "?"."""
+    import textwrap
+    linhas = [(16, "Ficha de contato"), (10, "Trabalhe conosco · Sementes Renascer · recebida em %s"
+                                          % c["recebida_em"].astimezone(_fuso()).strftime("%d/%m/%Y %H:%M")), (11, "")]
+    for linha in _linhas_da_ficha(con, c):
+        for i, parte in enumerate(textwrap.wrap(linha, 88) or [""]):
+            linhas.append((11, ("    " if i else "") + parte))
+    corpo = b"BT 50 790 Td"
+    for tamanho, t in linhas:
+        corpo += b" /F1 %d Tf 0 -%d Td (%s) Tj" % (tamanho, tamanho + 8, _pdf_texto(t))
+    corpo += b" ET"
+    objetos = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        b"<< /Length %d >>\nstream\n" % len(corpo) + corpo + b"\nendstream",
+    ]
+    pdf = b"%PDF-1.4\n"
+    posicoes = []
+    for n, o in enumerate(objetos, 1):
+        posicoes.append(len(pdf))
+        pdf += b"%d 0 obj\n" % n + o + b"\nendobj\n"
+    xref = len(pdf)
+    pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objetos) + 1)
+    pdf += b"".join(b"%010d 00000 n \n" % x for x in posicoes)
+    pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objetos) + 1, xref)
+    return pdf
+
+
+def avisar_visita(con, c) -> None:
+    """D7: a pessoa aceitou a visita DEPOIS de a candidatura ter ido a Fran: uma linha a ela, pelo caminho
+    dos avisos (o porteiro manda como texto na janela, ou pela reabertura)."""
+    d = quem_atende(con)
+    if not d:
+        return
+    vaga = _vaga(con, c["vaga_id"])
+    sobre = "%s (%s), da %s" % (_nome_da_ficha(c) if c["tipo_arquivo"] == "ficha" else
+                               (c["nome_perfil"] or "sem nome").strip(),
+                               numero_bonito(c["wa_id"]), vaga["titulo"] if vaga else "banco de currículos")
+    con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre)
+                   VALUES ('vaga_visita', %s, %s, %s)""", (d["nome"], d["whatsapp"], sobre.replace("|", "/")))
+
+
 def _pedir_de_novo(con, saida, pessoa, conversa, vaga) -> None:
     """Fora da lista: o pedido do PDF de novo, curto (nunca "tente de novo" nem os requisitos outra
     vez); a pergunta do menu ainda sem resposta volta inteira."""
@@ -494,6 +608,8 @@ def variaveis(con, c) -> list[str]:
     if c["texto"]:
         resumo = "%s · Escreveu: %s" % (resumo, c["texto"])
     nome = _cortar((c["nome_perfil"] or "sem nome no perfil").strip(), 60)
+    if c.get("tipo_arquivo") == "ficha":   # #1525: o nome que a pessoa deu na ficha
+        nome = _cortar("Ficha: " + _nome_da_ficha(c), 60)
     vs = [_uma_linha(x) for x in (
         vaga["titulo"] if vaga else "Banco de currículos",
         "%s (%s)" % (nome, numero_bonito(c["wa_id"])),
@@ -580,7 +696,13 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
             _triar(con, ia, c)
             c = con.execute("SELECT * FROM atendimento.candidaturas WHERE id = %s", (c["id"],)).fetchone()
         vs = variaveis(con, c)
-        pdf = (bytes(c["pdf"]), c["pdf_nome"] or "curriculo.pdf")
+        ficha = c["tipo_arquivo"] == "ficha"
+        if ficha:
+            # #1525: a ficha vai como a foto -- uma pagina em PDF, sem os botoes da triagem (nao houve)
+            pagina = pdf_da_ficha(con, c)
+            pdf = (pagina, "ficha-de-contato.pdf")
+        else:
+            pdf = (bytes(c["pdf"]), c["pdf_nome"] or "curriculo.pdf")
         foto = c["tipo_arquivo"] == "imagem"
         pdf_modelo = None
         if foto:
@@ -593,7 +715,19 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
                                ultima_mensagem_de(con, d["whatsapp"])) if u]
         ultima = max(ultimas) if ultimas else None
         try:
-            if foto and ultima is not None and agora - ultima < timedelta(hours=24):
+            if ficha and ultima is not None and agora - ultima < timedelta(hours=24):
+                w = saida.documento(d["whatsapp"], pdf[0], pdf[1], legenda_da_ficha(con, c),
+                                    [Opcao("vaga:falar:%d" % c["id"], "Conversar")])
+                tipo = "documento"
+            elif ficha:
+                m = modelo_do_uso(con, "curriculo")
+                if not m:
+                    raise RuntimeError("nenhum modelo cadastrado para o curriculo")
+                w = saida.modelo(d["whatsapp"], m["nome"], m["idioma"], vs,
+                                 botoes=["vaga:certa:%d" % c["id"], "vaga:errada:%d" % c["id"]],
+                                 url=codigo_candidato(segredo, c["id"]), documento=pdf)
+                tipo = "modelo"
+            elif foto and ultima is not None and agora - ultima < timedelta(hours=24):
                 # dentro da janela: a foto como imagem, sem os botoes da triagem (nao houve triagem)
                 w = saida.imagem(d["whatsapp"], pdf[0], legenda_da_foto(con, c),
                                  opcoes=[Opcao("vaga:falar:%d" % c["id"], "Conversar")])
@@ -624,6 +758,10 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
                     (d["whatsapp"], w, agora, agora, c["id"]))
         con.execute("""INSERT INTO atendimento.enviadas (wamid, conversa_id, para, tipo, resumo)
                        VALUES (%s, %s, %s, %s, %s)""", (w, c["conversa_id"], d["whatsapp"], tipo,
+                                                        # #1525: a medicao le a ficha (e a incompleta) por aqui
+                                                        ("ficha%s %d para a fran" % (
+                                                            " incompleta" if (c["ficha"] or {}).get("faltou") else "",
+                                                            c["id"])) if ficha else
                                                         "curriculo %d para a fran" % c["id"]))
         mandadas += 1
     return mandadas
@@ -742,8 +880,14 @@ def retorno_da_fran(con, saida: Saida, e, agora: datetime) -> bool:
 
 def limpar(con, agora: datetime) -> int:
     """Vencidos os 12 meses: o PDF, o texto, a triagem, o nome e o numero saem; ficam a vaga, as
-    datas, a situacao e o retorno da Fran."""
+    datas, a situacao e o retorno da Fran. #1525: a ficha tambem, e o rascunho dela na conversa; o
+    rascunho que nunca virou candidatura sai com 12 meses da conversa."""
+    con.execute("""UPDATE atendimento.conversas SET ficha = NULL
+                    WHERE ficha IS NOT NULL
+                      AND (iniciada_em < %s OR id IN (SELECT conversa_id FROM atendimento.candidaturas
+                                                       WHERE apagar_em < %s AND apagada_em IS NULL))""",
+                (agora - DOZE_MESES, agora))
     return con.execute("""UPDATE atendimento.candidaturas
                              SET pdf = NULL, texto = '', triagem = NULL, nome_perfil = '', wa_id = NULL,
-                                 bsuid = NULL, pdf_nome = '', apagada_em = %s
+                                 bsuid = NULL, pdf_nome = '', ficha = NULL, apagada_em = %s
                            WHERE apagar_em < %s AND apagada_em IS NULL""", (agora, agora)).rowcount
