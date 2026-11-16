@@ -11,6 +11,15 @@ instrução e normalmente não tem currículo, então uma mini-entrevista bem si
 de contato para a Fran; para operador o currículo é indispensável; para agrônomo é outro nível de
 diálogo.
 
+**O objetivo, nas palavras do dono (emenda de 16/11/2026, depois de ler a spec):** nas vagas em que se
+aceita ficha, candidato é difícil; a empresa fica em zona rural, e dos que mandam ficha poucos vêm. A
+mão de obra da região já é escassa e tende a apertar. Então a OlivIA não deve só esperar: *"o objetivo
+dela, a proatividade dela, é conseguir trazer o máximo possível de ficha, sem ser chato, sem ser
+xarope. A gente já estabeleceu um limite de retorno e depois abandona o contato. Ela teria que fazer a
+vez da pessoa humana que estaria do lado de cá e dizer: não quer mandar sua ficha? Quer vir conhecer?"*
+O degrau seguinte, que ele já nomeou e é chamado próprio: munir a OlivIA com o que cada função faz de
+verdade, para tirar dúvida e vender a vaga.
+
 **O que existe hoje.**
 - Quem chega pela vaga (anúncio, nó "Trabalhe conosco", ou de volta em 30 dias) cai no fluxo fixo,
   `backend/vaga.py: tratar`, que vem **antes** da OlivIA em `motor.tratar` (`motor.py:743`). Textos de
@@ -33,6 +42,9 @@ diálogo.
 | D3 | Como ela sabe o que cada vaga pede | **Um campo no cadastro da vaga, dois modos:** *ficha ou currículo* (Auxiliar de produção) e *currículo obrigatório* (Operador de empilhadeira; a Comercial, se reabrir). O operador sem currículo ouve isso com clareza e recebe a oferta da ficha para a vaga de Auxiliar, se aberta. A conversa técnica do agrônomo é chamado próprio |
 | D4 | A ficha pela metade | **Um lembrete único, só dentro da janela de 24 h**; sem resposta, a parcial vai à Fran marcada como incompleta |
 | D5 | A forma | **Caminho B:** a OlivIA conduz toda conversa de vaga; a ficha é uma candidatura sem arquivo e chega à Fran pelo caminho do currículo. Contra A (só a vaga de ficha) e C (perguntas editáveis por vaga) |
+| D6 | Quem ficou em silêncio | **Emenda de 16/11/2026.** O toque único da D4 vale para **toda conversa de vaga sem candidatura**, e não só para a ficha começada: quem não respondeu nada recebe, uma vez, dentro das 24 h, o convite ("Não quer deixar a sua ficha? São cinco perguntas rápidas"). Um toque por conversa; depois, o contato é abandonado |
+| D7 | Vir conhecer a empresa | **Emenda de 16/11/2026.** É **oferta no fim**, não sexta pergunta: recebida a ficha ou o currículo, a OlivIA diz que a pessoa pode vir conhecer a empresa. Se ela quiser, a Fran recebe a candidatura marcada "quer visitar" e combina o dia. A OlivIA não agenda |
+| D8 | Os benefícios | **Emenda de 16/11/2026.** O que o cadastro da vaga diz de benefícios entra no que ela pode falar. O texto do cadastro é ajustado para não trazer a palavra que o filtro de saída recusa |
 
 ## Os fios que encostam
 
@@ -49,12 +61,13 @@ diálogo.
   tela Destinos (`rotas_telas.py:468`); `leitura.py:205`.
 - `atendimento.conversas`. Hoje `motor`, `vaga` (`trabalhe`, `vaga_id`, `vaga_declarou`, situação) e
   `olivia` (`conduzida_por`, `saida`). A etapa acrescenta o **rascunho da ficha** (`ficha`), a língua da
-  conversa (`lingua`) e a hora do lembrete (`ficha_lembrada_em`). `vaga_id` ganha um escritor: a
+  conversa (`lingua`) e a hora do toque único (`vaga_lembrada_em`). Em `candidaturas`, além da ficha,
+  a marca `quer_visita` (D7), escrita pela ferramenta `marcar_visita`. `vaga_id` ganha um escritor: a
   ferramenta `escolher_vaga`.
 - `atendimento.vagas`. Hoje a tela Destinos (`fechar`, `triagem`) e as migrações. A etapa acrescenta
   `modo` e a rota que o troca.
 - `atendimento.enviadas`. A OlivIA grava `olivia: fala`, `olivia: recusada`, `olivia: ferramenta ...`. A
-  etapa acrescenta `olivia: aviso da ficha` e `olivia: lembrete da ficha`.
+  etapa acrescenta `olivia: aviso da ficha` e `olivia: toque da vaga` (o toque único, D4 e D6).
 - **O papel de leitura da sessão (`axiaatende_ro`)** tem `SELECT` por coluna em `candidaturas` (migração
   025). A coluna nova `ficha` **não** entra no `GRANT`: é o mesmo cuidado da coluna do arquivo.
 
@@ -93,8 +106,13 @@ vagas abriram:
 - **Não medido:** o conteúdo de `candidaturas` (quantas em foto, quantas triadas). O papel de leitura
   não vê a tabela inteira, de propósito.
 
-**A medida de sucesso:** candidaturas (ficha ou currículo) sobre conversas de vaga, contra **11 de 38**,
-uma semana depois de ligar. **O fracasso silencioso:** a OlivIA dizer que anotou ou encaminhou sem que
+- **O texto de benefícios das duas vagas abertas** é o mesmo: *"salário atrativo, plano de saúde Unimed,
+  vale-alimentação, auxílio-combustível e auxílio-educação"*. A palavra "salário" está em
+  `olivia.PALAVRAS_FORA`: dita por ela, a frase inteira é recusada (D8).
+
+**A medida de sucesso:** o número de fichas e currículos que chegam à Fran, e a razão sobre as conversas
+de vaga, contra **11 de 38**, uma semana depois de ligar. Ao lado, quantos toques únicos saíram e
+quantos trouxeram resposta: é o que diz se a proatividade ajuda ou só incomoda. **O fracasso silencioso:** a OlivIA dizer que anotou ou encaminhou sem que
 nada tenha chegado à Fran.
 
 ## Conformidade com o Manual legal
@@ -144,6 +162,7 @@ Auxiliar de produção em `ficha_ou_curriculo`. A tela Destinos mostra e troca o
 | as cinco do #1520 | sempre | como hoje |
 | `escolher_vaga` | conversa de vaga, com vaga aberta | marca a vaga da conversa (lista fechada das abertas) |
 | `comecar_ficha` | a vaga da conversa é `ficha_ou_curriculo`, e o aviso ainda não foi mandado | manda o **aviso de cadastro** (texto do dono, em português ou espanhol) e registra `olivia: aviso da ficha` |
+| `marcar_visita` | já existe candidatura nesta conversa | grava que a pessoa quer vir conhecer a empresa (D7) |
 | `anotar_ficha` | depois do aviso | grava no rascunho um ou mais dos cinco campos (`nome`, `cidade`, `experiencia`, `quando_comeca`, `como_chega`, texto de até 200 letras) e a `lingua` (`pt` ou `es`). Com os cinco preenchidos, **o código** cria a candidatura e devolve "ficha completa e encaminhada" |
 
 Na vaga `curriculo`, `comecar_ficha` e `anotar_ficha` não existem na lista: sem arquivo não há
@@ -156,12 +175,31 @@ laço de hoje, como uma página (`vaga.pdf_da_ficha`, no molde de `pdf_da_foto`)
 a pessoa deu, "respondeu em espanhol" quando for o caso, e **"incompleta: faltou X e Y"** quando parcial.
 Sem botões de triagem (não houve); com o botão de conversar. Doze meses, como o currículo.
 
-**5. A ficha pela metade (D4).** Na rotina do minuto: rascunho com ao menos o nome, incompleto, sem
-candidatura, com a última mensagem da pessoa há 2 h ou mais e a janela de 24 h aberta, e sem lembrete
-ainda → **um** lembrete de cadastro ("Faltou só ... para eu passar a sua ficha à equipe", na língua da
-conversa). Quatro horas depois do lembrete sem resposta, ou quando a janela fechar, a parcial vira
-candidatura e vai à Fran. Rascunho sem nome não vira candidatura; conta como "sem saída" no vigia. Os
-dois tempos são ajustes (`olivia.ficha_lembrete_h`, `olivia.ficha_parcial_h`).
+**5. O toque único (D4 e D6).** Na rotina do minuto: conversa de vaga conduzida por ela, **sem
+candidatura**, com a última mensagem da pessoa há 2 h ou mais, a janela de 24 h aberta, e sem toque
+ainda (`vaga_lembrada_em` nulo) → **uma** mensagem de cadastro, na língua da conversa, e nunca outra
+naquela conversa. Qual delas, pelo estado:
+- ficha começada: *"Faltou só ... para eu passar a sua ficha à equipe."*
+- nada respondido, e a vaga aceita ficha (ou não há vaga escolhida e existe vaga de ficha aberta): o
+  convite, *"Não quer deixar a sua ficha? São cinco perguntas rápidas."*
+- vaga de currículo obrigatório: *"Ainda dá tempo de mandar o seu currículo. Pode ser uma foto."*
+
+Os três textos são do dono, em português e em espanhol. Fora da janela de 24 h nada sai: ali só modelo
+pago da Meta alcançaria a pessoa, e esta etapa não usa. Quatro horas depois do toque sem resposta, ou
+quando a janela fechar, a ficha **parcial** (com ao menos o nome) vira candidatura e vai à Fran; rascunho
+sem nome não vira candidatura e conta como "sem saída" no vigia. Os dois tempos são ajustes
+(`olivia.vaga_toque_h`, `olivia.ficha_parcial_h`).
+
+**5b. Vir conhecer a empresa (D7).** Com a candidatura gravada (ficha ou currículo), a OlivIA oferece a
+visita com as palavras dela, uma vez. A ferramenta `marcar_visita` só é oferecida quando já existe
+candidatura na conversa, e grava `candidaturas.quer_visita`. A página que vai à Fran traz **"Quer
+visitar a empresa"**; se a resposta chegar depois de a candidatura ter ido, a Fran recebe uma linha
+avisando. A OlivIA não combina dia nem horário: diz que a equipe chama.
+
+**5c. Os benefícios (D8).** O bloco das vagas na instrução passa a trazer `vagas.beneficios`. A migração
+reescreve o texto das vagas abertas sem "salário atrativo" (fica *"plano de saúde Unimed,
+vale-alimentação, auxílio-combustível e auxílio-educação"*; o dono confirma o texto antes de ligar). O
+filtro de saída não muda: valor e a palavra "salário" continuam recusados.
 
 **6. A trava contra o "anotei" falso.** Código, não instrução: a fala que afirma ter anotado,
 encaminhado ou passado à equipe, numa conversa de vaga sem candidatura gravada nesta mensagem nem antes,
@@ -186,7 +224,12 @@ estado; o rascunho e a candidatura em ficha; a página à Fran; o lembrete únic
 promessa; a língua; a chave; o apagamento de 12 meses cobrindo a ficha; o vigia contando ficha e
 incompleta; inventário e política; manuais; a medição de uma semana.
 
-**Fora:** a conversa técnica do agrônomo (terceiro modo); perguntas da ficha editáveis por vaga; os
+**Dentro, pela emenda:** o toque único para toda conversa de vaga sem candidatura (D6); a oferta da
+visita e a marca "quer visitar" (D7); os benefícios do cadastro no que ela pode dizer (D8).
+
+**Fora:** o que cada função faz de verdade, para tirar dúvida e vender a vaga (o degrau seguinte que o
+dono nomeou: documento curto por vaga a partir das descrições de função, chamado próprio); agendar a
+visita pela OlivIA; mensagem fora da janela de 24 h; a conversa técnica do agrônomo (terceiro modo); perguntas da ficha editáveis por vaga; os
 textos longos do fluxo fixo (#1524); o defeito da vaga trocada no caminho de reserva (#1522); pré-triagem
 da ficha por IA; o candidato reconhecido como cliente.
 
@@ -226,18 +269,23 @@ entra no `trabalhe-conosco.md`, seção nova "A ficha de contato".
       guardadas por 12 meses, e pergunta o nome, a cidade, no que já trabalhou, quando pode começar e
       se tem como chegar a Cunha Porã todos os dias.
    4. Respondidas as cinco, a Fran recebe a ficha.
-   5. Se a pessoa parar no meio, recebe um lembrete, uma vez só. Sem resposta, a Fran recebe o que há.
+   5. Recebida a ficha ou o currículo, a OlivIA diz que a pessoa pode vir conhecer a empresa. Se ela
+      quiser, a Fran é avisada e combina o dia.
+   6. Se a pessoa parar no meio, ou nem começar, recebe uma mensagem, uma vez só, nas primeiras 24
+      horas. Sem resposta, a Fran recebe o que houver da ficha.
 4. **Sinais.**
    - Na mensagem à Fran, **"Ficha de contato"** no lugar do currículo. **"Incompleta: faltou ..."** quer
      dizer que a pessoa parou de responder: o que falta não foi perguntado de novo, e ela tem o número
      para chamar.
    - **"Respondeu em espanhol"**: as respostas estão como a pessoa escreveu ou falou.
+   - **"Quer visitar a empresa"**: a pessoa aceitou o convite; o dia é combinado pela Fran.
    - Ficha não tem pré-triagem: não há "Triagem certa" nem "Triagem errada".
    - Na tela Destinos, cada vaga mostra **Ficha ou currículo** ou **Currículo obrigatório**.
    - No resumo diário ao dono, "N fichas incompletas".
 5. **O que NÃO faz.** Não pergunta idade, estado civil, nacionalidade, filhos nem saúde. Não aceita
    ficha em vaga de currículo obrigatório: ali, sem arquivo, não há candidatura, e a OlivIA oferece a
-   vaga que aceita ficha, se houver. Não insiste: o lembrete é um só, e só nas primeiras 24 horas. Não
+   vaga que aceita ficha, se houver. Não insiste: a mensagem de volta é uma só por conversa, e só nas primeiras 24 horas; depois, o contato
+   é abandonado. Não marca dia nem horário de visita. Não fala de salário nem de valor. Não
    avalia o candidato: a ficha vai à Fran como foi respondida. Com a chave desligada no servidor, a
    conversa de vaga volta aos textos fixos de antes, que pedem PDF ou foto.
 
