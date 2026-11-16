@@ -2,7 +2,7 @@
 **Data:** 2026-11-14
 **Chamado:** #1520
 **Spec de origem:** docs/specs/2026-11-14-a-olivia-anonima-fala.md
-**Status:** EM EXECUÇÃO (passos 1 a 13 feitos em 16/11/2026; 14 em diante, na janela do dono)
+**Status:** EM EXECUÇÃO (passos 1 a 13 feitos em 16/11/2026; **etapa B, o áudio, acrescentada em 16/11/2026: B1 a B8, antes do passo 14**; 14 em diante, na janela do dono)
 **Executável pelo agente:** não -- o base da empresa é texto do dono, o modelo novo da Meta e os restarts são da janela dele; o código é escrito em sessão de execução com ele por perto
 
 > Ordem por dependência: migração → base → agente (desligado) → ponto de entrada → foto → vigia → tela → testes → documentos → ligar. **A chave `OLIVIA_FALA` nasce `false` e só vira `true` no passo 14**: até lá tudo o que sobe é inerte, e a bateria de hoje tem de passar igual.
@@ -146,17 +146,90 @@
 13. **Commit** citando `#1520` (código, migração, testes, manuais, FONTES.md e base rascunho) e **push**; o
     AxiaSecurity em commit próprio citando `#1520`.
 
+### Etapa B — o áudio de quem é de fora (D10, emenda de 16/11/2026)
+
+> Decisão do dono em 16/11/2026, lendo os atendimentos do fim de semana: *"Precisamos adicionar áudio,
+> já temos a ferramenta. Vamos rodar isso em uma etapa adicional ao 1520."* A spec ganhou a D10 e a
+> seção *Emenda: o áudio (etapa B)*, com o caso, o universo medido (2 áudios de fora em 30 dias, de 1
+> pessoa) e os fios. **Tudo o que a etapa sobe é inerte**: a chave `audio.de_fora` nasce `false`, e só
+> vale com `OLIVIA_FALA` e `audio.transcrever` ligadas. Os passos B1 a B8 vêm **antes** do passo 14.
+
+B1. **Migração 066** — `backend/migracoes/066_audio_de_fora.sql` + `_VOLTA.sql`: `audios.de_fora boolean
+    NOT NULL DEFAULT false`; ajustes `audio.de_fora = false` e `audio.de_fora_por_dia = 6` (`ON CONFLICT
+    DO NOTHING`). — verificação: a bateria aplica no 5437; `\d atendimento.audios` mostra a coluna; os
+    dois ajustes existem. — reversão: a `_VOLTA` (tira a coluna e os dois ajustes; o que já foi
+    transcrito fica como texto em `eventos_meta`).
+
+B2. **A chegada** — `backend/audio.py: receber` ganha o caminho de fora: aceita quando a pessoa **não** é
+    interno, `olivia is not None` (a chave `OLIVIA_FALA`), `olivia.e_de_fora(con, e, agora, envio)`,
+    `audio.transcrever` e `audio.de_fora` ligadas, o modelo presente (`estado["modelo_presente"]` não é
+    `False`) e o número ainda abaixo de `audio.de_fora_por_dia` em 24 h (conta em `audios` por `wa_id`).
+    Grava `de_fora = true`. Em qualquer outro caso devolve `False`, e o motor segue para a linha fixa de
+    hoje. `backend/motor.py:818`: a chamada passa `olivia` e `envio`. `backend/vaga.py:400`: o `else`
+    (Word, áudio, figurinha, vídeo) **não** responde `so_pdf` ao áudio que `audio.receber` aceita: devolve
+    o áudio ao motor, que o enfileira (hoje `vaga.tratar` vem antes e responderia "PDF ou foto"). O
+    interno continua exatamente como está. — verificação: B6 (a), (b), (e). — reversão: revert.
+
+B3. **A fila** — `audio.transcrever_um`: ordena `de_fora, id` (o áudio da casa passa na frente). Para
+    `de_fora`, o transcritor é chamado sem língua fixa (`Whisper.__call__(caminho, maximo, lingua=None)`:
+    detecção automática; o da casa continua `"pt"`). Erro, acima de `audio.maximo_s` ou texto vazio em
+    áudio `de_fora`: o evento sintético entra mesmo assim, com o corpo `MARCA + NAO_OUVI` (constante
+    nova, `"[não foi possível ouvir o áudio]"`), para a pessoa não ficar sem resposta; no áudio da casa,
+    o comportamento de hoje (linha no log, nada entra). `uso_ia` anota como hoje (função `audio`, local).
+    — verificação: B6 (c), (d). — reversão: revert.
+
+B4. **O que a OlivIA sabe do áudio** — `backend/olivia.py: instrucao`: regra nova, *"Mensagem que começa
+    com (áudio) é a transcrição do que a pessoa FALOU: pode ter palavra trocada; responda ao sentido, e
+    se não der para entender peça em uma frase que ela escreva. `[não foi possível ouvir o áudio]`: diga
+    que não conseguiu ouvir e peça para escrever ou mandar de novo, curto."* `_o_que_chegou` já devolve
+    `[mandou um áudio]` para o evento original, e o texto transcrito entra como a mensagem atual. O
+    cabeçalho do `olivia.py` e o do `audio.py` (*"audio de FORA ... continua 'nao leio isso'"*) passam a
+    dizer a D10. — verificação: B6 (a), (c). — reversão: revert.
+
+B5. **A chave na mão** — `scripts/audio.py`: `ligar-fora`, `desligar-fora`, e o `mostrar` passa a dizer as
+    três (`audio.transcrever`, `audio.de_fora`, `audio.de_fora_por_dia`). `audio.saude` (o `/saude` do
+    recepcionista) ganha `de_fora` (ligada ou não) e `pendentes_de_fora`. — verificação: teste do script
+    no banco de teste; `/saude` mostra os dois campos. — reversão: revert.
+
+B6. **Testes** — `tests/test_audio.py` e `tests/test_olivia.py`, com o transcritor falso de hoje:
+    (a) **Gabriel**: de fora, chaves ligadas, áudio → nenhuma resposta na hora, linha em `audios` com
+    `de_fora`; transcrito "queria ver se tem vaga pra empilhadeira" → evento sintético → a OlivIA fala;
+    (b) **chave desligada** (`audio.de_fora = false`, ou `OLIVIA_FALA=false`, ou sem modelo): a linha fixa
+    de hoje, nada em `audios`;
+    (c) **não ouviu**: erro e áudio acima do máximo, de fora → o evento entra com `NAO_OUVI`, e a OlivIA
+    pede para escrever; o mesmo erro em áudio da casa não gera evento;
+    (d) **a casa na frente**: um áudio de fora mais antigo e um da casa na fila → o da casa sai primeiro;
+    (e) **teto**: o 7º áudio do mesmo número em 24 h recebe a linha fixa;
+    (f) **áudio na conversa de vaga em curso**: é enfileirado, e não recebe "PDF ou foto";
+    (g) **quem não muda**: interno, cliente da carteira e consultor; `test_audio` de hoje passa igual.
+    — verificação: `pytest tests/test_audio.py tests/test_olivia.py` e a bateria inteira, **sozinha** no
+    5437. — reversão: apagar.
+
+B7. **Inventário, política e manuais** — `C:\AxiaSecurity\docs\governanca\inventario-agentes.md`: a linha
+    da transcrição local (#1238) passa a dizer "da casa e, com `audio.de_fora`, de quem a OlivIA atende", e
+    a linha da OlivIA ganha "ouve áudio transcrito na máquina". `politica-uso-ia.md`: a regra do #1520 em
+    *Pode sozinho* ganha *"inclusive o que a pessoa falou em áudio, transcrito na máquina (D10,
+    16/11/2026)"*. `docs/manuais/olivia.md` (o áudio no caminho comum, o que acontece quando ela não
+    ouve, a chave), `recepcao.md` (o "não leio áudio" sai para quem a OlivIA atende, com a chave ligada).
+    — verificação: `python scripts/conferir_inventario_agentes.py --politica` passa. — reversão: revert.
+
+B8. **Commit** citando `#1520` (066, código, testes, manuais; spec e plano já emendados) e **push**; o
+    AxiaSecurity em commit próprio.
+
 14. **Ligar, na janela do dono**: (a) corrigir a base e commitar; (b) `Restart-Service
-    axiaatende-backend` (aplica a 065 e o modelo da Meta) e `Restart-Service axiaatende-recepcionista`
+    axiaatende-backend` (aplica a 065, a 066 e o modelo da Meta) e `Restart-Service axiaatende-recepcionista`
     com `OLIVIA_FALA=false` ainda: bateria viva, nada muda para quem escreve; (c) conferir a tela
     Conversas e Custos; (d) `OLIVIA_FALA=true` no `.env.recepcionista` + `Restart-Service
-    axiaatende-recepcionista`. — verificação: `127.0.0.1:8008/saude` diz `olivia: ligada`.
+    axiaatende-recepcionista`; (e) depois da primeira conversa em texto lida (passo 15), `python
+    scripts\audio.py ligar-fora`, sem restart. — verificação: `127.0.0.1:8008/saude` diz `olivia: ligada`
+    e, depois do (e), `audio.de_fora: true`.
 
 15. **Prova real**: a primeira conversa de fora depois de ligar, lida com `python -X utf8
     scripts/ler_conversa.py --numero N` — a OlivIA falou, a fala está em `enviadas`, `uso_ia` anotou, e
     a conversa fechou `bem` ou está marcada. E uma prova dirigida: um número de fora (não da casa, não
-    cliente) manda "hola, quiero trabajar" e uma foto de currículo. — verificação: a conversa inteira,
-    colada no chamado.
+    cliente) manda "hola, quiero trabajar" e uma foto de currículo; **depois do 14 (e), o mesmo número
+    manda um áudio em português e um em espanhol**, e a conversa mostra o `(áudio)` transcrito e a
+    resposta dela. — verificação: a conversa inteira, colada no chamado.
 
 16. **Uma semana depois**: `scripts/medir_olivia.py` (só leitura, pelo papel de leitura): conversas
     conduzidas, `bem`/`sem_saida`, recusadas, custo em `uso_ia`, e a conversão da vaga de chão de fábrica
@@ -182,9 +255,11 @@
   em janela elevada: `python -m backend.modelos_meta --propor --so olivia_resumo`
   (corrigido na execução: o backend NÃO cria modelo na Meta ao subir).
 - **A prova dirigida** de um número de fora (passo 15) e a leitura da medição da semana (passo 16).
+- **Ligar o áudio de fora** (etapa B), depois de a OlivIA estar falando em texto, sem restart e sem
+  elevação além da do script: `python scripts\audio.py ligar-fora`. Desligar: `desligar-fora`.
 
 ```pos-entrega
-dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende-recepcionista com OLIVIA_FALA=false; conferir Conversas e Custos; OLIVIA_FALA=true e Restart-Service axiaatende-recepcionista; prova de um número de fora
+dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende-recepcionista com OLIVIA_FALA=false; conferir Conversas e Custos; OLIVIA_FALA=true e Restart-Service axiaatende-recepcionista; prova de um número de fora; python scripts\audio.py ligar-fora e a prova do áudio
 ```
 
 ## O que a execução mudou (16/11/2026)
@@ -220,6 +295,15 @@ dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende
   segura; a chave `false` zera na hora.
 - **Injeção bem-sucedida:** o pior caso é uma frase educada e inútil, porque a chamada não tem dado de
   cliente nem ferramenta que o toque (D2); o filtro de saída grava `recusada` e o vigia avisa.
+- **Etapa B, a CPU:** a transcrição é uma fila só, um áudio por vez. O da casa passa na frente (B3), e o
+  teto por número (B2) e o de duração seguram quem mandar muitos. `desligar-fora` zera na hora.
+- **Etapa B, a transcrição errada:** o Whisper troca palavra em fala com ruído ou sotaque. A OlivIA é
+  avisada de que é transcrição (B4) e pergunta quando não entende; ela continua sem ferramenta que
+  toque dado, então o pior caso é o mesmo de um texto mal escrito.
+- **Etapa B, o `NAO_OUVI` fora da OlivIA:** na conversa de vaga em curso, quem responde o texto é o
+  fluxo da vaga (vem antes dela). O evento `(áudio) [não foi possível ouvir o áudio]` cai no
+  classificador da vaga, que pede o currículo de novo. É resposta, e não silêncio; o teste (f) cobre o
+  caminho feliz, e a execução confere este.
 - **A OlivIA "fluente e errada" sobre a empresa:** só pode afirmar o que está na base; é por isso que
   a base é texto do dono e o passo 2 vem antes de ligar.
 
@@ -233,7 +317,8 @@ Decisões que NÃO se reabrem (D1 a D9 da spec): texto próprio ao anônimo, cer
 ausência de ferramenta (não pela frase), toda conversa de fora, base da empresa (fontes vigentes, cada afirmação com fonte, sem número de produto até o #857) + menu + vagas como o que ela
 sabe, foto como currículo sem triagem, vigia nos dois lugares com aviso só quando há o que dizer,
 caminho B (agente com cinco ferramentas), Sonnet na conversa pela API paga, chave `OLIVIA_FALA` nasce
-`false`. A ordem dos passos é por dependência e a chave só liga no passo 14. O que vai para a tela
+`false`. **Etapa B (D10, 16/11/2026): o áudio de quem é de fora, passos B1 a B8, antes do passo 14; a
+chave `audio.de_fora` nasce `false`.** A ordem dos passos é por dependência e a chave só liga no passo 14. O que vai para a tela
 durante a execução está no `PADRAO-TRABALHO.md` §1: decisão do dono, incidente que merece chamado
 próprio, e passo que depende da mão dele. Pare em "O que só você pode fazer". A bateria do AxiaAtende
 roda **sozinha** no banco 5437 (duas rodadas ao mesmo tempo derrubam o schema uma da outra) e leva

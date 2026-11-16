@@ -55,6 +55,7 @@ precisamos fazer tudo, mas tem que ir construindo até lá"*.
 | D7 | A forma | **Caminho B: agente com ferramentas, lista fechada por degrau** (contra A, "uma chamada por mensagem com JSON de ações", e C, "A agora, B depois") |
 | D8 | Modelo | **Sonnet na conversa**; Haiku continua na classificação e na pré-triagem. Pela API paga, nunca pela assinatura: é serviço ao público (regra do projeto) |
 | D9 | Reversibilidade | Uma chave no `.env` do recepcionista desliga a voz e tudo volta ao menu de hoje, na hora. A base e a foto como currículo ficam, porque não dependem dela |
+| D10 | Áudio de quem é de fora | **Emenda de 16/11/2026**: *"Precisamos adicionar áudio, já temos a ferramenta. Vamos rodar isso em uma etapa adicional ao 1520."* O áudio do anônimo é transcrito na máquina, pela mesma transcrição da equipe (#1238), e a OlivIA responde ao que a pessoa falou. Revoga, para quem ela atende, o *"áudio de FORA continua 'não leio isso'"* do #1238. Ver *Emenda: o áudio (etapa B)* |
 
 ## Os fios que encostam
 
@@ -257,6 +258,44 @@ conversa, medido em `uso_ia`. Nenhum dado de cliente entra na chamada.
 foto; a foto vai à Fran sem pré-triagem"; a conversa de vaga é conduzida pela OlivIA); `recepcao.md`
 (quem escreve texto solto não recebe mais só "Entendi que você quer X": conversa; o "não consigo abrir
 arquivo" deixa de existir para quem é de fora); `custos.md` (a função `conversa` entra na soma).
+
+## Emenda: o áudio (etapa B), 16/11/2026
+
+**O caso.** Gabriel (554991159143), 16/11 às 08:09 e 08:10, mandou dois áudios pelo anúncio das vagas e
+recebeu duas vezes a linha fixa de quem não lê áudio (log do recepcionista, linhas 1050 e 1051: *"audio
+de 554991159143 ... nao e texto nem botao: linha curta"*). A linha não aparece em `enviadas` nem no
+`ler_conversa.py`, porque ele não tinha conversa aberta (o limite conhecido do #1028, `motor.py:463`).
+Depois escreveu o que queria.
+
+**O universo medido** (16/11/2026, papel de leitura, 30 dias): **10 áudios de 2 números**: 8 da casa
+(1 número; todos transcritos, média de 11 s, maior de 20 s, nenhum erro) e **2 de fora, de 1 pessoa**
+(os dois do caso). `audio.transcrever` está ligada, `audio.maximo_s` = 180. O áudio de fora é raro
+hoje; a decisão do dono é por quem ele é (o público do chão de fábrica), não pelo volume.
+
+**Os fios que encostam.**
+- `atendimento.audios`: hoje só `audio.receber` escreve, só para interno. A etapa acrescenta o áudio de
+  fora (coluna `de_fora`). **Quem lê:** `audio.transcrever_um` (a fila), `audio.limpar` (o `.ogg` sai em
+  7 dias, igual para os dois) e `audio.saude`.
+- `atendimento.eventos_meta`: a transcrição entra como evento sintético de texto, `"(áudio) " + texto`,
+  e é tratada como qualquer texto da pessoa. Para quem é de fora, esse texto chega à OlivIA (ou à
+  conversa de vaga em curso, que vem antes dela em `motor.tratar`).
+- A fila é uma só e roda na CPU, um áudio por vez: o da casa passa na frente do de fora.
+- O que sai da máquina: o **som não sai** (modelo local). O **texto transcrito** de um desconhecido passa
+  a entrar na chamada da API, como o texto que ele digita já entra.
+
+**Decisão.** Uma chave própria, `audio.de_fora` (ajuste no banco, nasce `false`, liga e desliga sem
+restart por `scripts/audio.py`), que só vale com `OLIVIA_FALA` e `audio.transcrever` ligadas. Teto por
+número em 24 h (`audio.de_fora_por_dia`, padrão 6) e o mesmo teto de duração de hoje. A língua é
+detectada (português ou espanhol). Sem resposta imediata: a resposta vem com a transcrição. Quando a
+transcrição falha, passa do teto ou sai vazia, a OlivIA recebe a marca de que não ouviu e pede para a
+pessoa escrever ou mandar de novo. Chave desligada, modelo ausente ou teto estourado: a linha fixa de
+hoje.
+
+**Fora desta emenda:** áudio do cliente da carteira e do consultor (caminhos próprios); responder em
+áudio; guardar o som além dos 7 dias.
+
+**ROLLBACK:** `python scripts\audio.py desligar-fora`: na hora, sem restart, o áudio de fora volta à
+linha fixa. Desfazer o código: revert e `066_VOLTA.sql`.
 
 ## Próximo passo
 /writing-plans
