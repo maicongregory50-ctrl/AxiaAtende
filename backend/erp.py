@@ -360,9 +360,71 @@ def chamado_anexo(cfg, token: str, anexo_id: int) -> bytes:
         raise ErpIndisponivel("o ERP não respondeu ao baixar o anexo") from None
 
 
-def chamado_resposta(cfg, token: str, demanda_id: int, numero: str, texto: str) -> None:
-    _whatsapp(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/resposta" % int(demanda_id),
-              {"numero": numero, "texto": texto}, token)
+def chamado_resposta(cfg, token: str, demanda_id: int, numero: str, texto: str,
+                     anexo_ids: list[int] | None = None) -> int | None:
+    """O comentario do autor. #1528: com `anexo_ids`, os arquivos da rajada vao ligados a ele, na mesma
+    transacao do ERP. Devolve o evento gravado (a confirmacao a pessoa so sai com ele)."""
+    corpo = {"numero": numero, "texto": texto}
+    if anexo_ids:
+        corpo["anexo_ids"] = [int(i) for i in anexo_ids]
+    r = _whatsapp(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/resposta" % int(demanda_id), corpo, token)
+    return (r or {}).get("evento_id") if isinstance(r, dict) else None
+
+
+class ArquivoRecusado(ErpRecusou):
+    """#1528: o ERP leu o arquivo e disse nao, com o motivo da lista fechada e a frase para a pessoa."""
+
+    def __init__(self, motivo: str, texto: str):
+        super().__init__("%s: %s" % (motivo, texto))
+        self.motivo, self.texto = motivo, texto
+
+
+class SemAntivirus(ErpIndisponivel):
+    """#1528: o ERP nao conseguiu passar o arquivo pelo antivirus (falha fechada). O defeito e NOSSO, nao
+    do arquivo: a copia fica no transito e se tenta de novo (D4, regra 3)."""
+
+    def __init__(self, texto: str):
+        super().__init__("antivirus_indisponivel: %s" % texto)
+        self.motivo, self.texto = "antivirus_indisponivel", texto
+
+
+def chamado_arquivo(cfg, token: str, demanda_id: int, numero: str, caminho: str, nome: str) -> dict:
+    """#1528: o arquivo que a pessoa devolveu vai a POST /demandas/whatsapp/{id}/arquivo (multipart). O ERP
+    aplica as regras do conteudo e o antivirus e guarda SEM ligar: devolve {anexo_id, ...}. Recusa:
+    `ArquivoRecusado`; antivirus fora: `SemAntivirus`; ERP fora: `ErpIndisponivel`."""
+    import uuid as _uuid
+    from pathlib import Path as _Path
+    dados = _Path(caminho).read_bytes()
+    limite = _uuid.uuid4().hex
+    nome_limpo = "".join(c for c in (nome or "arquivo") if c.isprintable() and c not in '"\\')[:200] or "arquivo"
+    crlf = "\r\n"
+    corpo = b"".join([
+        ("--" + limite + crlf + 'Content-Disposition: form-data; name="numero"' + crlf + crlf + numero + crlf).encode(),
+        ("--" + limite + crlf + 'Content-Disposition: form-data; name="file"; filename="' + nome_limpo + '"' + crlf
+         + "Content-Type: application/octet-stream" + crlf + crlf).encode("utf-8"),
+        dados, (crlf + "--" + limite + "--" + crlf).encode()])
+    url = cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/arquivo" % int(demanda_id)
+    pedido = urllib.request.Request(url, data=corpo, method="POST")
+    pedido.add_header("Accept", "application/json")
+    pedido.add_header("Content-Type", "multipart/form-data; boundary=" + limite)
+    pedido.add_header("Authorization", "Bearer " + token)
+    try:
+        with urllib.request.urlopen(pedido, timeout=150) as r:   # noqa: S310 -- URL da config; o antivirus leva ate 60 s
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            d = json.loads(e.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            d = None
+        if isinstance(d, dict) and d.get("motivo"):
+            if d["motivo"] == "antivirus_indisponivel":
+                raise SemAntivirus(str(d.get("texto") or "")) from None
+            raise ArquivoRecusado(str(d["motivo"]), str(d.get("texto") or "")[:300]) from None
+        if e.code in (400, 403, 404, 422):
+            raise ErpRecusou("o ERP recusou o arquivo (%d)" % e.code) from None
+        raise ErpIndisponivel("o ERP respondeu %d ao arquivo" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu ao arquivo") from None
 
 
 def chamado_validar(cfg, token: str, demanda_id: int, numero: str, resultado: str, motivo: str | None) -> None:

@@ -22,7 +22,9 @@ foi gravado) fica no chamado, no sistema, e não vem ao celular.
    **Chamado 1217 · Trocar unidade do pedido**.
 2. Se ela termina com *"Só aviso, não precisa responder"*, não precisa fazer nada.
 3. Se é **uma pergunta**, ela termina com *"Para responder, deslize esta mensagem para o lado"*.
-   Deslize (é o **Responder** do WhatsApp) e escreva. Volta **"Anotado no chamado 1217. ✓"**.
+   Deslize (é o **Responder** do WhatsApp) e escreva. Volta **"Anotado no chamado 1217. ✓"**. Se a
+   pergunta pede um documento, deslize e mande o arquivo pelo clipe (seção **Devolver um arquivo**, logo
+   abaixo).
 4. Se é **a entrega** ("já está no ar"), teste e toque:
    - **Ficou bom**: o chamado fecha, em seu nome;
    - **Não ficou bom**: escreva em uma linha o que falta. O chamado volta para ajuste.
@@ -35,6 +37,23 @@ foi gravado) fica no chamado, no sistema, e não vem ao celular.
    - **Ver os assuntos** (ou **Outro chamado**): aparece a lista dos seus assuntos abertos;
    - **Outro assunto**: segue o atendimento de sempre (o menu da casa, a foto do campo).
    Enquanto o roteador estiver desligado, vale o de antes: o sistema sempre pergunta.
+
+### Devolver um arquivo (#1528)
+
+Quando um chamado pede um documento seu, você devolve o arquivo pelo próprio WhatsApp, e ele entra no
+chamado. Vale enquanto a **pergunta** do chamado estiver sem resposta.
+
+1. Deslize a mensagem do chamado para o lado, toque no clipe e escolha o arquivo.
+2. Tem mais de um? Mande os outros em seguida, sem deslizar de novo. Você tem 5 minutos entre um e outro.
+3. Se quiser explicar alguma coisa, escreva logo depois: o texto vai junto dos arquivos, no mesmo
+   comentário, e encerra a espera na hora.
+4. Volta **"Anotado no chamado N: 3 arquivos. ✓"**.
+5. Mandou sem deslizar? O sistema pergunta **"É para o Chamado N?"**. Toque em **Sim**. Em **Outro
+   assunto**, o arquivo segue o atendimento de sempre (a logo do cliente, por exemplo).
+
+Aceita PDF, Word (.docx), Excel (.xlsx) e foto, até 10 MB cada, 10 de uma vez e 20 por dia. Quem confere
+o arquivo é o sistema da empresa: ele abre o arquivo para ver se é mesmo do tipo dito e passa pelo
+antivírus antes de guardar.
 
 ## 4. O que significa cada sinal
 
@@ -49,21 +68,44 @@ foi gravado) fica no chamado, no sistema, e não vem ao celular.
 - **Um documento (PDF ou Word) com a legenda "Chamado N"** logo depois da mensagem (#1381): é o arquivo
   que a equipe mandou junto da pergunta ou da entrega, um roteiro ou um manual, por exemplo. Toque para
   abrir. Fora das 24 horas, ele espera junto com a mensagem e chega quando você tocar em **Ver**.
+- **"Anotado no chamado N: 3 arquivos. ✓"** (#1528): os arquivos que você devolveu estão no chamado. Se
+  algum não entrou, a linha *"Entraram: ..."* diz quais entraram.
+- **"Não aceitei 'nome': ..."**: aquele arquivo não entrou, e a frase diz por quê (arquivo com macro,
+  passou de 10 MB, tipo de arquivo não aceito, o antivírus acusou o arquivo...). Os outros entraram.
+- **"...o nosso verificador de segurança está fora do ar..."**: o problema é do servidor, não do seu
+  arquivo. Ele ficou guardado e entra sozinho quando o verificador voltar; o suporte já foi avisado. Não
+  mande de novo. Se passar uma hora, chega *"O verificador não voltou..."*: aí sim, mande mais tarde.
+- **"Este chamado não espera resposta"**: ele já foi respondido ou era só aviso; o arquivo não entrou.
+- **Silêncio por até 5 minutos** depois do último arquivo é normal: o sistema espera para ver se vem mais
+  um. Escrever um texto encerra a espera na hora.
+- **No WhatsApp do dono, "Volta com arquivo: está recusando por falta de antivírus..."**: o Defender não
+  respondeu no servidor e há arquivo esperando (um aviso por hora enquanto durar, e *"o antivírus
+  voltou"* quando voltar). **"Arquivo recusado por ameaça: ..."**: o antivírus acusou um arquivo mandado
+  por alguém da equipe; vale conferir o celular da pessoa.
 - **Sem o "Bom dia" de volta.** Se você escreve "Bom dia" e havia mensagem esperando, chegam só as
   mensagens, sem o menu da casa.
 
 Na tela **Envios**, a tabela *Chamados no WhatsApp* mostra cada mensagem: → o que saiu, ← o que voltou.
 "esperando" é o que ainda não saiu (a pessoa não escreveu, ou a junção dos minutos); "esperando o Ver"
 é o que espera o toque na reabertura; "no chamado" é a resposta que já entrou no ERP; "erro" diz por
-quê (por exemplo, o número não é o de quem abriu o chamado).
+quê (por exemplo, o número não é o de quem abriu o chamado). O arquivo devolvido (#1528) aparece como ←
+**Arquivo**: "no antivírus" (indo ao sistema), "aceito, esperando a rajada", "no chamado" ou "recusado"
+com o motivo.
 
 ## 5. O que esta função NÃO faz
 
 - Não abre chamado novo pelo WhatsApp: para isso, continue usando o sistema.
-- Não lê foto ou arquivo como resposta de chamado: só texto, os botões e, para a equipe, o **áudio**
-  transcrito na máquina (#1238, quando a transcrição estiver ligada). O arquivo só vai **da equipe para
-  você** (#1381), e só junto de uma pergunta ou de uma entrega.
-- O documento que chega pelo WhatsApp não aparece na caixa do sistema: guarde-o no celular.
+- Aceita como resposta texto, os botões, o **áudio** da equipe transcrito na máquina (#1238, quando a
+  transcrição estiver ligada) e, desde o #1528, **o arquivo devolvido a uma pergunta**: PDF, Word (.docx),
+  Excel (.xlsx) e foto, até 10 MB, 10 de uma vez e 20 por dia. Não aceita arquivo com macro, os formatos
+  antigos (.doc, .xls), compactado, vídeo nem áudio como anexo, nem arquivo em chamado que já foi
+  respondido.
+- Quem manda foto de campo: a foto só vai ao chamado se você deslizar a mensagem dele; sem deslizar,
+  continua sendo foto de campo.
+- **Nenhum robô lê o arquivo**: quem abre é a pessoa que trata o chamado. No sistema, ele aparece no
+  comentário, para baixar. O documento que a equipe manda a você (#1381) continua sem aparecer na caixa
+  do sistema: guarde-o no celular.
+- Arquivo que entrou no chamado errado não sai sozinho: quem trata o chamado o remove.
 - Não manda aviso fora de hora por conta própria: o que é só aviso espera você escrever para a empresa.
 - Não avisa cada etapa do chamado, nem manda a pergunta do agente de suporte sem o dono (#1269): isso
   fica no chamado, no sistema.
@@ -90,3 +132,18 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
   O recepcionista manda o documento logo depois do texto e antes do "ficou bom?". Se o documento falhar,
   o texto já saiu: o erro fica na mensagem ("anexo: ...") e no log. A chave `pendencias.anexo_ligado`
   desliga só o documento; o texto continua saindo.
+- **A volta com arquivo (#1528).** A chave `pendencias.arquivo_volta` (nasce desligada) liga e desliga, sem
+  restart: desligada, o arquivo segue os caminhos de hoje (o que já estava no caminho termina). Os tetos:
+  `pendencias.rajada_minutos` (5), `pendencias.rajada_teto` (10), `pendencias.arquivo_dia_teto` (20). O
+  recepcionista baixa para `envios_pasta\chamados_volta` (o trânsito) e as telas levam cada arquivo ao ERP
+  (`POST /demandas/whatsapp/{id}/arquivo`); a cópia sai do trânsito assim que o ERP responde. Fechada a
+  rajada, as telas gravam **um** comentário com os arquivos, e só com o evento de volta o recepcionista
+  manda o "Anotado". ERP fora: o arquivo espera até 24 h; sem antivírus: até 1 h. O `/saude` das telas
+  mostra `arquivo_volta` (ligada, em trânsito, o último "sem antivírus").
+- **Ao receber "recusando por falta de antivírus"**, nesta ordem (as verificações S1 a S3 do plano do
+  #1528): (1) o Defender está ligado? `Get-MpComputerStatus | Select AntivirusEnabled,
+  RealTimeProtectionEnabled, AntivirusSignatureLastUpdated`; (2) alguma exclusão ou política mudou? em
+  janela elevada, `$p = Get-MpPreference; $p.ExclusionPath; $p.ExclusionExtension; $p.ExclusionProcess`;
+  (3) a conta do serviço do ERP ainda consegue chamar o verificador? `& "$env:ProgramFiles\Windows
+  Defender\MpCmdRun.exe" -Scan -ScanType 3 -File <um arquivo limpo> -DisableRemediation; $LASTEXITCODE`
+  deve dar `0`. Enquanto não voltar, nenhum arquivo entra, e é assim que tem de ser.

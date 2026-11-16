@@ -130,8 +130,168 @@ def baixar_anexos(cfg, token: str, linhas: list[dict], baixar=erp.chamado_anexo)
                         "media_type": a.get("media_type") or "application/pdf"}
 
 
+# ── #1528: a volta com arquivo -- os arquivos que a pessoa devolveu vao ao ERP, e a rajada vira comentario ──
+
+ESPERA_ANTIVIRUS = timedelta(hours=1)    # sem antivirus por mais que isso, o arquivo sai do transito
+ESPERA_ERP = timedelta(hours=24)         # o ERP fora por mais que isso: a pessoa e avisada
+AVISO_A_CADA = timedelta(hours=1)        # o aviso "sem antivirus" ao suporte: um por hora enquanto durar
+
+
+def _hora(quando: datetime) -> str:
+    from .vigia import _hora as h
+    return h(quando)
+
+
+def _marcar(con, mid: int, estado: str, mais: dict) -> None:
+    con.execute("UPDATE atendimento.pendencias_mensagens SET estado = %s, arquivo = arquivo || %s WHERE id = %s",
+                (estado, Jsonb(mais), mid))
+
+
+def _apagar_copia(a: dict) -> None:
+    if a.get("caminho"):
+        Path(a["caminho"]).unlink(missing_ok=True)
+
+
+def _gravar_ajuste(con, chave: str, valor) -> None:
+    con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES (%s, %s)
+                   ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = now()""",
+                (chave, Jsonb(valor)))
+
+
+def _avisar(con, tipo: str, texto: str) -> None:
+    from .vigia import _avisar as av
+    av(con, tipo, [texto])
+
+
+def levar_arquivos(cfg, token: str, agora: datetime, enviar=erp.chamado_arquivo,
+                   responder=erp.chamado_resposta) -> dict:
+    """1. cada arquivo no transito vai a POST /demandas/whatsapp/{id}/arquivo; 2. cada rajada fechada, sem
+    arquivo esperando o ERP, vira UM comentario com os anexos (a confirmacao a pessoa so nasce do evento
+    que o ERP devolve: o fracasso silencioso da spec, item 7). Roda mesmo com a chave desligada: o que ja
+    estava no caminho termina (ROLLBACK_PLAN 2)."""
+    aceitos = recusados = sem_av = comentarios = 0
+    with conexao(cfg) as con:
+        transito = [dict(r) for r in con.execute(
+            """SELECT m.id, m.arquivo, m.criado_em, p.referencia, p.para_whatsapp
+                 FROM atendimento.pendencias_mensagens m JOIN atendimento.pendencias p ON p.id = m.pendencia_id
+                WHERE m.estado = 'arquivo_a_validar' AND p.tipo = 'chamado' ORDER BY m.id""").fetchall()]
+        fora_desde = _ajuste(con, "pendencias.antivirus_fora_desde")
+    voltou = 0
+    for m in transito:
+        a = dict(m["arquivo"] or {})
+        if not a.get("caminho") or not Path(a["caminho"]).is_file():
+            with conexao(cfg) as con:
+                _marcar(con, m["id"], "arquivo_recusado", {"motivo": "sumiu", "texto": "o arquivo se perdeu no caminho"})
+            recusados += 1
+            continue
+        try:
+            r = enviar(cfg, token, int(m["referencia"]), m["para_whatsapp"], a["caminho"], a.get("nome") or "arquivo")
+        except erp.SemAntivirus as x:
+            sem_av += 1
+            desde = a.get("av_desde") or agora.isoformat()
+            with conexao(cfg) as con:
+                if agora - datetime.fromisoformat(desde) > ESPERA_ANTIVIRUS:
+                    _apagar_copia(a)
+                    _marcar(con, m["id"], "arquivo_recusado", {"motivo": "antivirus_expirou", "texto": x.texto})
+                else:
+                    con.execute("UPDATE atendimento.pendencias_mensagens SET arquivo = arquivo || %s WHERE id = %s",
+                                (Jsonb({"av_desde": desde, "texto": x.texto}), m["id"]))
+                if not fora_desde:
+                    fora_desde = agora.isoformat()
+                    _gravar_ajuste(con, "pendencias.antivirus_fora_desde", fora_desde)
+                ultimo = _ajuste(con, "pendencias.antivirus_aviso_em")
+                if not ultimo or agora - datetime.fromisoformat(ultimo) >= AVISO_A_CADA:
+                    _avisar(con, "arquivo_sem_antivirus",
+                            "está recusando por falta de antivírus: o Defender não respondeu no servidor. Chamado %s, "
+                            "de %s, %s. Os arquivos estão esperando." % (m["referencia"], a.get("quem") or "...%s"
+                                                                         % m["para_whatsapp"][-4:], _hora(agora)))
+                    _gravar_ajuste(con, "pendencias.antivirus_aviso_em", agora.isoformat())
+            continue
+        except erp.ArquivoRecusado as x:
+            _apagar_copia(a)
+            with conexao(cfg) as con:
+                _marcar(con, m["id"], "arquivo_recusado", {"motivo": x.motivo, "texto": x.texto})
+                if x.motivo == "ameaca":
+                    _avisar(con, "arquivo_ameaca", "'%s', de %s (%s), chamado %s." % (
+                        a.get("nome"), a.get("quem") or "quem mandou", m["para_whatsapp"], m["referencia"]))
+            recusados += 1
+            continue
+        except erp.ErpRecusou as x:
+            _apagar_copia(a)
+            with conexao(cfg) as con:
+                _marcar(con, m["id"], "arquivo_recusado", {"motivo": "erp", "texto": str(x)[:200]})
+            recusados += 1
+            continue
+        except erp.ErpIndisponivel as x:
+            print("pendencias: arquivo da mensagem %d: %s" % (m["id"], x), flush=True)
+            if agora - m["criado_em"] > ESPERA_ERP:
+                _apagar_copia(a)
+                with conexao(cfg) as con:
+                    _marcar(con, m["id"], "arquivo_recusado", {"motivo": "erp_fora",
+                                                              "texto": "o sistema esteve fora do ar; mande de novo"})
+            continue
+        _apagar_copia(a)
+        with conexao(cfg) as con:
+            _marcar(con, m["id"], "arquivo_validado", {"anexo_id": int(r["anexo_id"]), "caminho": None})
+        aceitos += 1
+        voltou += 1 if a.get("av_desde") or fora_desde else 0
+    if fora_desde and voltou and not sem_av:
+        with conexao(cfg) as con:
+            _avisar(con, "arquivo_sem_antivirus", "o antivírus voltou; %d %s." % (
+                voltou, "arquivo entrou" if voltou == 1 else "arquivos entraram"))
+            con.execute("DELETE FROM atendimento.ajustes WHERE chave IN ('pendencias.antivirus_fora_desde', "
+                        "'pendencias.antivirus_aviso_em')")
+
+    with conexao(cfg) as con:
+        cabecas = [dict(r) for r in con.execute(
+            """SELECT c.id, c.texto, c.pendencia_id, c.criado_em, p.referencia, p.para_whatsapp
+                 FROM atendimento.pendencias_mensagens c JOIN atendimento.pendencias p ON p.id = c.pendencia_id
+                WHERE c.estado = 'rajada' AND c.entregar_apos <= %s
+                  AND NOT EXISTS (SELECT 1 FROM atendimento.pendencias_mensagens a
+                                   WHERE a.rajada_id = c.id AND a.estado IN ('arquivo_a_validar', 'escolher'))
+                ORDER BY c.id""", (agora,)).fetchall()]
+    for c in cabecas:
+        with conexao(cfg) as con:
+            validos = [dict(r) for r in con.execute(
+                """SELECT id, arquivo FROM atendimento.pendencias_mensagens
+                    WHERE rajada_id = %s AND estado = 'arquivo_validado' ORDER BY id""", (c["id"],)).fetchall()]
+        texto = (c["texto"] or "").strip()
+        if not validos and not texto:
+            with conexao(cfg) as con:
+                con.execute("UPDATE atendimento.pendencias_mensagens SET estado = 'descartada' WHERE id = %s", (c["id"],))
+            continue
+        erro = None
+        try:
+            ev = responder(cfg, token, int(c["referencia"]), c["para_whatsapp"], texto,
+                           [int(v["arquivo"]["anexo_id"]) for v in validos])
+        except erp.ErpRecusou as x:
+            erro = str(x)[:300]
+        except erp.ErpIndisponivel as x:
+            print("pendencias: rajada %d: %s" % (c["id"], x), flush=True)
+            if agora - c["criado_em"] <= ESPERA_ERP:
+                continue
+            erro = "o ERP ficou fora do ar por mais de 24 h"
+        with conexao(cfg) as con:
+            with con.transaction():
+                if erro:
+                    con.execute("""UPDATE atendimento.pendencias_mensagens SET estado = 'confirmar', erro = %s,
+                                          arquivo = %s WHERE id = %s""", (erro, Jsonb({"erro": erro}), c["id"]))
+                    con.execute("UPDATE atendimento.pendencias_mensagens SET estado = 'erro', erro = %s WHERE id = ANY(%s)",
+                                (erro, [v["id"] for v in validos]))
+                    continue
+                con.execute("""UPDATE atendimento.pendencias_mensagens SET estado = 'confirmar', entregue_em = %s,
+                                      arquivo = %s WHERE id = %s""", (agora, Jsonb({"evento_id": ev}), c["id"]))
+                con.execute("UPDATE atendimento.pendencias_mensagens SET estado = 'entregue', entregue_em = %s WHERE id = ANY(%s)",
+                            (agora, [v["id"] for v in validos]))
+                con.execute("""UPDATE atendimento.pendencias SET espera = CASE WHEN espera = 'resposta' THEN NULL ELSE espera END,
+                                      ultima_em = %s WHERE id = %s""", (agora, c["pendencia_id"]))
+        comentarios += 1
+    return {"aceitos": aceitos, "recusados": recusados, "sem_antivirus": sem_av, "comentarios": comentarios}
+
+
 def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=erp.chamado_resposta,
-          validar=erp.chamado_validar, agora: datetime | None = None, baixar=erp.chamado_anexo) -> dict:
+          validar=erp.chamado_validar, agora: datetime | None = None, baixar=erp.chamado_anexo,
+          enviar_arquivo=erp.chamado_arquivo) -> dict:
     agora = agora or datetime.now(timezone.utc)
     if not cfg.erp_segredo:
         return {"erro": "a ligação com o ERP não está ligada"}
@@ -177,6 +337,8 @@ def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=
                             WHERE id = %s""", ("erro" if erro else "entregue", agora, erro or "", m["id"]))
         entregues += erro is None
 
+    arquivos = levar_arquivos(cfg, token, agora, enviar_arquivo, responder)   # #1528
+
     fechadas = 0
     try:
         demandas = estado(cfg, token, esperando) if esperando else []
@@ -184,7 +346,7 @@ def volta(cfg, trazer=erp.chamados_saida, estado=erp.chamados_estado, responder=
             fechadas = conferir(con, demandas, agora)
     except erp.ErpIndisponivel as e:
         print("pendencias: estado: %s" % e, flush=True)
-    return {"novas": novas, "entregues": entregues, "fechadas": fechadas}
+    return {"novas": novas, "entregues": entregues, "fechadas": fechadas, "arquivos": arquivos}
 
 
 # ── #1276: o aviso de aprovação ──────────────────────────────────────────────────────────────────

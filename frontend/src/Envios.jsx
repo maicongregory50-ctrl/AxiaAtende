@@ -31,10 +31,13 @@ const ESTADO_CHAMADO = {
   esperando: ['esperando', 'a'], guardada: ['esperando o Ver', 'a'], enviada: ['enviada', 'v'],
   escolher: ['confirmando o chamado', 'a'], a_entregar: ['indo ao chamado', 'a'], entregue: ['no chamado', 'v'],
   descartada: ['descartada', ''], erro: ['erro', 'r'],
+  // #1528: a volta com arquivo
+  arquivo_a_validar: ['no antivírus', 'a'], arquivo_validado: ['aceito, esperando a rajada', 'a'],
+  arquivo_recusado: ['recusado', 'r'], rajada: ['juntando arquivos', 'a'], confirmar: ['confirmando', 'a'],
 }
 const CLASSE_CHAMADO = {
   informativo: 'Aviso', pergunta: 'Pergunta', entrega: 'Entrega', resposta: 'Resposta',
-  validacao: 'Ficou bom / Não ficou bom',
+  validacao: 'Ficou bom / Não ficou bom', arquivo: 'Arquivo',
 }
 
 // #1199 (dono, 29/10/2026): "precisamos melhorar os filtros e ordenar as colunas; nao existe filtro por
@@ -229,7 +232,8 @@ export default function Envios() {
                   <td>{CLASSE_CHAMADO[c.classe] || c.classe}{c.resultado === 'nao_ficou_bom' ? ': não ficou bom' : ''}
                     <div className="leve">{c.texto}</div></td>
                   <td><span className={'selo ' + (ESTADO_CHAMADO[c.estado] || ['', ''])[1]}>{(ESTADO_CHAMADO[c.estado] || [c.estado])[0]}</span>
-                    {c.estado === 'erro' && <span className="leve"> {c.erro}</span>}</td>
+                    {c.estado === 'erro' && <span className="leve"> {c.erro}</span>}
+                    {c.estado === 'arquivo_recusado' && c.motivo && <span className="leve"> {c.motivo}</span>}</td>
                   <td>{quando(c.em || c.criado_em)}</td>
                 </tr>
               ))}

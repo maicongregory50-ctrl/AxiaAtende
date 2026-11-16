@@ -70,6 +70,10 @@ class Saida:
         (#1381): o Word que vai junto da resposta do chamado; o padrao e o PDF de sempre."""
         raise NotImplementedError
 
+    def tamanho_da_midia(self, media_id: str) -> int | None:
+        """#1528: o tamanho que a Meta declara, antes de baixar (o teto de 10 MB). None = nao disse."""
+        return None
+
     def baixar(self, media_id: str, destino) -> str:
         """#970: baixa a midia que a pessoa mandou (o id vem no aviso da Meta) para `destino`
         (Path), com o mesmo token. Devolve o caminho gravado. A URL da Meta vale 5 minutos."""
@@ -183,6 +187,10 @@ class SaidaMeta(Saida):
         nome = arquivo.rsplit("\\", 1)[-1].rsplit("/", 1)[-1] if isinstance(arquivo, str) else ""
         return self._guardado(w, "imagem", legenda=" — ".join(x for x in (legenda, nome) if x),
                               opcoes=[{"titulo": o.titulo} for o in opcoes] if opcoes else None)
+
+    def tamanho_da_midia(self, media_id):
+        t = getattr(self._wa.get_media_url(media_id), "file_size", None)
+        return int(t) if t else None
 
     def baixar(self, media_id, destino):
         from pathlib import Path

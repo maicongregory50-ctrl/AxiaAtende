@@ -171,8 +171,28 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
         except Exception as erro:  # noqa: BLE001 -- a saude diz o que houve, sem cair
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente,
                                  "erro": type(erro).__name__}, status_code=503)
+        arquivo_volta = None
+        if "068_arquivo_volta.sql" in mudancas:
+            try:
+                with conexao(cfg) as con:
+                    arquivo_volta = _arquivo_volta(con)
+            except Exception as erro:  # noqa: BLE001 -- a saude nao cai por causa de um bloco
+                arquivo_volta = {"erro": type(erro).__name__}
         return {"de_pe": True, "ambiente": cfg.ambiente, "mudancas": mudancas,
-                "responde": cfg.responde}
+                "responde": cfg.responde, "arquivo_volta": arquivo_volta}
+
+    def _arquivo_volta(con) -> dict:
+        """#1528: a volta com arquivo -- a chave, o que esta no transito e o ultimo "sem antivirus"."""
+        def aj(chave):
+            r = con.execute("SELECT valor FROM atendimento.ajustes WHERE chave = %s", (chave,)).fetchone()
+            return None if r is None else r["valor"]
+        transito = con.execute("""SELECT count(*) AS n FROM atendimento.pendencias_mensagens
+                                   WHERE estado = 'arquivo_a_validar'""").fetchone()["n"]
+        ultimo = con.execute("""SELECT max(criado_em) AS em FROM atendimento.pendencias_mensagens
+                                 WHERE classe = 'arquivo' AND arquivo ? 'av_desde'""").fetchone()["em"]
+        return {"ligada": aj("pendencias.arquivo_volta") is True, "em_transito": transito,
+                "antivirus_fora_desde": aj("pendencias.antivirus_fora_desde"),
+                "ultimo_antivirus_indisponivel": ultimo.isoformat() if ultimo else None}
 
     # ── login (copia do AxiaMarketing) ───────────────────────────────────────
 

@@ -38,6 +38,9 @@ class SaidaFalsa(Saida):
         self.enviadas.append(("contato", para, nome, [whatsapp]))
         return self._id()
 
+    def tamanho_da_midia(self, media_id):
+        return getattr(self, "tamanhos", {}).get(media_id)
+
     def baixar(self, media_id, destino):
         from pathlib import Path
         if getattr(self, "baixar_falha", False):
