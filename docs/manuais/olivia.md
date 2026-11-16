@@ -37,9 +37,13 @@ autenticado são os próximos degraus, em chamados próprios.
    longo demais, mudo), ela diz que não conseguiu ouvir e pede para escrever ou mandar de novo. O áudio
    da equipe passa na frente na fila, e cada número tem um teto de 6 áudios em 24 h; acima disso, ou com
    a chave desligada, vale a linha fixa de quem não lê áudio.
-5. Se a conversa **travar** (a pessoa repete a mensagem, diz *"não é isso"*, ou ela falou três vezes sem
-   a conversa andar), ela muda de abordagem; se travar de novo, manda o **menu** e para de falar naquela
-   conversa: dali em diante, é o menu de sempre.
+5. Se a conversa **travar**, ela muda de abordagem. Se a pessoa **repetir a mensagem ou disser *"não é
+   isso"*** de novo depois disso, ela manda o **menu** e para de falar naquela conversa: dali em diante, é o
+   menu de sempre. Cinco respostas dela sem a conversa andar (sem toque, currículo ou opção escolhida) só a
+   fazem mudar de abordagem, **nunca** mandam o menu (dono, 16/11/2026: o candidato que ia mandar o
+   currículo à noite recebeu o menu no meio de uma conversa boa).
+   Ela escreve **curto**: no máximo duas frases por mensagem, uma pergunta por vez. Quando a pessoa manda
+   o currículo sem dizer a vaga, ela pergunta qual antes de encaminhar, e encaminha o arquivo que já veio.
 6. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
    e a data entre colchetes (a OlivIA não as repete à pessoa). A OlivIA relê o arquivo sozinha quando
    ele muda: **não precisa reiniciar nada**. O inventário das fontes, com o que entrou e por quê, está em

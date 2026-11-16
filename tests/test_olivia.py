@@ -148,6 +148,13 @@ def test_c_pedido_de_email_vira_a_opcao_do_setor_e_o_email_inventado_e_recusado(
     assert s.ultima[0] == "contato" and conversa(ligada)["situacao"] == "com_link"
 
 
+def test_c_o_botao_da_folha_diz_o_nome_da_opcao(ligada):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"ferramentas": [("oferecer_opcao_do_menu", {"chave": "trabalhe"})]}]
+    passo(ligada, s, texto("w1", "quero falar com alguém sobre as vagas"), ia=ia)
+    assert s.ultima[2] == "Posso te passar para Trabalhe conosco?"
+
+
 def test_c_oferecer_um_no_com_opcoes_manda_a_pergunta_dele(ligada):
     s, ia = SaidaFalsa(), IAFalsa()
     ia.conversa = [{"texto": "Você é produtor ou revenda?", "ferramentas": [("oferecer_opcao_do_menu", {"chave": "comercial"})]}]
@@ -199,14 +206,32 @@ def test_e_a_mesma_mensagem_duas_vezes_marca_e_na_segunda_travada_vai_ao_menu(li
     assert len(ia.chamadas) == n and ia.perguntas[-1] == "quero falar com alguém"
 
 
-def test_e_tres_falas_sem_avanco_tambem_travam(ligada):
+def test_e_cinco_falas_sem_avanco_so_marcam_e_nunca_mandam_o_menu(ligada):
+    """Caminho A (dono, 16/11/2026): o caso do Gleison -- a conversa ia bem, so com texto, e na quinta
+    resposta ele recebeu o menu inteiro. A contagem agora so avisa a OlivIA; o menu vem so no forte."""
     s, ia = SaidaFalsa(), IAFalsa()
-    for i in range(3):
+    for i in range(5):
         ia.conversa = [{"texto": "Resposta %d." % i}]
         passo(ligada, s, texto("w%d" % i, "pergunta %d" % i), ia=ia, agora=AGORA + timedelta(minutes=i))
-    ia.conversa = [{"texto": "Vamos por partes."}]
-    passo(ligada, s, texto("w9", "outra pergunta"), ia=ia, agora=AGORA + timedelta(minutes=5))
-    assert ia.chamadas[-1]["extra"] == O.TRAVOU_MARCA
+        assert ia.chamadas[-1]["extra"] == ""
+    for i in (5, 6):
+        ia.conversa = [{"texto": "Combinado."}]
+        passo(ligada, s, texto("w%d" % i, "mensagem %d" % i), ia=ia, agora=AGORA + timedelta(minutes=i))
+        assert ia.chamadas[-1]["extra"] == O.TRAVOU_MARCA                # a marca, e ela segue falando
+    assert s.ultima[2] == "Combinado." and conversa(ligada)["conduzida_por"] == "olivia"
+    assert not [x for x in s.enviadas if x[0] == "lista"]
+
+
+def test_e_contagem_e_depois_nao_e_isso_ainda_e_so_marca(ligada):
+    """A primeira marca veio da contagem; o primeiro "nao e isso" marca de novo, e so o segundo forte
+    manda o menu."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    for i in range(6):
+        ia.conversa = [{"texto": "Resposta %d." % i}]
+        passo(ligada, s, texto("w%d" % i, "pergunta %d" % i), ia=ia, agora=AGORA + timedelta(minutes=i))
+    ia.conversa = [{"texto": "Desculpe, me diga em uma frase."}]
+    passo(ligada, s, texto("w7", "não é isso"), ia=ia, agora=AGORA + timedelta(minutes=7))
+    assert s.ultima[0] == "lista" and conversa(ligada)["conduzida_por"] == "menu"
 
 
 # ── (f) quem NAO passa por ela ──────────────────────────────────────────────
@@ -576,3 +601,28 @@ def test_a_instrucao_diz_as_palavras_que_o_filtro_recusa_e_o_que_dizer_no_lugar(
         assert "\"%s\"" % p in sistema
     assert "a equipe passa no contato com o candidato" in sistema
     assert O.frase_permitida("El salario lo informa el equipo")[0] is False   # em espanhol tambem
+
+
+def test_curriculo_sem_vaga_ela_pergunta_e_encaminha_o_arquivo_de_antes(ligada):
+    """16/11/2026, Gabriel Fante: o PDF sem a vaga foi ao banco e ela pediu para mandar de novo (o mesmo
+    arquivo seria recusado). Agora ela pergunta a vaga e encaminha o arquivo que ele ja mandou."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"ferramentas": [("ler_arquivo_recebido", {})]}, {"texto": "Recebi! É para qual vaga?"}]
+    passo(ligada, s, doc("w1"), ia=ia, nome="Gabriel Fante")
+    assert candidaturas(ligada) == [] and s.ultima[2] == "Recebi! É para qual vaga?"
+    ia.conversa = [{"ferramentas": [("encaminhar_curriculo", {"vaga_id": 3})]},
+                   {"texto": "Encaminhei para a vaga de operador."}]
+    passo(ligada, s, texto("w2", "operador de empilhadeira"), ia=ia, nome="Gabriel Fante")
+    c = candidaturas(ligada)
+    assert len(c) == 1 and c[0]["vaga_id"] == 3 and c[0]["wamid"] == "w1" and c[0]["tipo_arquivo"] == "pdf"
+    # e o mesmo arquivo nao vira segunda candidatura
+    ia.conversa = [{"ferramentas": [("encaminhar_curriculo", {"vaga_id": 2})]}, {"texto": "Ok."}]
+    passo(ligada, s, texto("w3", "e para a de auxiliar tambem"), ia=ia, nome="Gabriel Fante")
+    assert len(candidaturas(ligada)) == 1
+    assert "não mandou PDF nem foto" in ia.chamadas[-1]["mensagens"][-1]["content"][0]["content"]
+
+
+def test_a_instrucao_pede_mensagens_curtas(ligada):
+    with conexao(ligada) as con:
+        sistema = O.instrucao(con)
+    assert "no máximo duas frases curtas" in sistema and "Nunca peça para mandar o mesmo arquivo" in sistema

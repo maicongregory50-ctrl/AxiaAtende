@@ -290,6 +290,21 @@ dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende
   `<wamid>:transcrito`; o histórico da OlivIA e o "travou" o excluem pelas duas chaves (sem isso, o texto
   falado entrava duas vezes e toda mensagem de áudio parecia "repetida").
 
+### A prova de 16/11/2026 e os ajustes (antes da medição da semana)
+
+- **O "salário" na resposta dela** (conversa 327, 10:28): a regra 3 dizia "nunca prometa salário", e a
+  palavra sozinha é recusada pelo filtro. A instrução passou a dizer as palavras e o que dizer no lugar
+  ("esses detalhes a equipe passa no contato com o candidato"); a frase recusada vai ao log (343572f).
+- **O "travou" por contagem, decisão do dono (caminho A):** o Gleison (conversa 328, 10:56) recebeu o menu
+  inteiro no meio de uma conversa boa, porque três respostas dela sem toque contavam como "não andou". A
+  contagem subiu para 5 e só **marca** a instrução; o menu vem só no sinal **forte** (repetir a mensagem ou
+  "não é isso") e só na segunda vez travada. Muda a regra do gatilho de erro repetido da spec.
+- **Mensagens curtas:** no máximo duas frases curtas, uma pergunta por vez (o dono: "é muito texto").
+- **Currículo sem a vaga dita** (Gabriel Fante, 11:03): ela encaminhava ao banco e pedia para mandar de novo,
+  e o mesmo arquivo seria recusado. Agora pergunta a vaga antes, e `encaminhar_curriculo` pega o PDF ou a
+  foto que a pessoa mandou nas últimas 24 h e que ainda não virou candidatura.
+- **O botão da folha** dizia "Posso te passar para: Faça parte do nosso time?"; agora o nome da opção.
+
 ## Riscos de execução identificados
 
 - **Passos 1 a 13 interrompidos no meio:** nada muda em produção, a chave está `false` e o
