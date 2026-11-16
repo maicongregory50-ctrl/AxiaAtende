@@ -566,3 +566,13 @@ def test_b_saude_e_o_script_mostram_a_chave(ligada, com_modelo, capsys, monkeypa
     script.main()
     with conexao(ligada) as con:
         assert A.de_fora_ligado(con) is False
+
+
+def test_a_instrucao_diz_as_palavras_que_o_filtro_recusa_e_o_que_dizer_no_lugar(ligada):
+    """Prova de 16/11/2026: a resposta sobre a vaga foi recusada pela palavra salario."""
+    with conexao(ligada) as con:
+        sistema = O.instrucao(con)
+    for p in O.PALAVRAS_FORA_ESCRITAS:
+        assert "\"%s\"" % p in sistema
+    assert "a equipe passa no contato com o candidato" in sistema
+    assert O.frase_permitida("El salario lo informa el equipo")[0] is False   # em espanhol tambem
