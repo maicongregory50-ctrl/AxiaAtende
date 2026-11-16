@@ -163,10 +163,14 @@
 16. **Commit** citando `#1525` (067, código, testes, manuais, `docs/olivia/funcoes/LEIAME.md`), nomeando
     os arquivos (`git commit -- a b`), e **push**; o AxiaSecurity em commit próprio.
 
-17. **A ida: o pedido à Fran (D9)** — um chamado endereçado a ela, pela skill:
-    `python C:\SuporteAxia\skills\demanda\demanda.py abrir --sistema axiaatende --tipo tarefa
-    --destinatario <id do usuário da Fran> --titulo "Descricoes de funcao das vagas abertas"
-    --descricao @pedido.txt`. O texto, **mostrado ao dono antes de sair**: *"Fran, estamos ensinando a
+17. **A ida: o pedido à Fran (D9)** — **corrigido em 16/11/2026**: o chamado no WhatsApp só conversa
+    com o **autor** do chamado (`C:\AxiaGestao\backend\services\demandas_whatsapp_service.py`, `saida` e
+    `autor_do_numero`); `--destinatario` **não** leva nada ao WhatsApp. Então, em dois atos, pela skill:
+    (a) abrir o chamado **em nome dela**: `set AXIA_EM_NOME_DE=<id do usuário da Fran>` e
+    `python C:\SuporteAxia\skills\demanda\demanda.py abrir --sistema axiaatende --tipo tarefa --titulo
+    "Descricoes de funcao das vagas abertas" --descricao @descricao.txt` (e limpar a variável logo
+    depois); (b) a pergunta, que é o que chega ao WhatsApp: `comentar N --pergunta --ok-do-dono "<o que
+    ele disse>" --motivo @pedido.txt`. O texto da pergunta, **mostrado ao dono antes de sair**: *"Fran, estamos ensinando a
     OlivIA a explicar ao candidato o que cada função faz. Você consegue nos mandar as descrições de
     função de Auxiliar de produção e de Operador de empilhadeira? Pode ser o arquivo que você já tem.
     Em breve vai dar para devolver o arquivo aqui mesmo pelo WhatsApp; por enquanto, diga só se tem e

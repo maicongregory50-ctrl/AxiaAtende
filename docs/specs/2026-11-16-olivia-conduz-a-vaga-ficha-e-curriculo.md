@@ -208,8 +208,12 @@ filtro de saída não muda: valor e a palavra "salário" continuam recusados.
   vagas na instrução inclui o arquivo da vaga **quando ele existe**, relido quando muda, sem restart.
   Sem arquivo, nada entra, e a OlivIA continua dizendo só o que o cadastro da vaga diz. Nesta etapa a
   pasta nasce vazia.
-- **A ida.** Um chamado endereçado à Fran, que chega ao WhatsApp dela (#1222), pedindo as descrições de
-  função das vagas abertas. O texto do pedido é aprovado pelo dono antes de sair. Pré-requisito: o
+- **A ida.** O chamado no WhatsApp só conversa com **quem abriu o chamado** (lido em 16/11/2026 em
+  `C:\AxiaGestao\backend\services\demandas_whatsapp_service.py`: a saída vai ao WhatsApp do autor, e a
+  resposta só vale do número dele). Por isso o pedido é um chamado aberto **em nome da Fran**, e a
+  pergunta feita nele (`comentar --pergunta`, com o ok do dono) é o que chega ao WhatsApp dela (#1222),
+  pedindo as descrições de função das vagas abertas. Chamado "endereçado" a ela por destinatário **não**
+  chega ao WhatsApp. O texto do pedido é aprovado pelo dono antes de sair. Pré-requisito: o
   usuário dela no AxiaGestão com o WhatsApp preenchido.
 - **O que não é desta etapa:** receber os arquivos de volta pelo WhatsApp (**#1528**) e escrever o
   resumo de cada função (conteúdo, depois que os arquivos chegarem; o dono corrige antes de valer).
