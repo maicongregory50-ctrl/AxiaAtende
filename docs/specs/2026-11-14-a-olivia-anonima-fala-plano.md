@@ -282,6 +282,13 @@ dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende
 - **O vigia** conta também a conversa em que ela falou e que travou e voltou ao menu
   (`conduzida_por = 'menu'`), porque é justamente uma candidata a "sem saída".
 - **Banco de dev 5437** estava parado; a sessão o subiu com `pg_ctl` (só o de dev) para a bateria.
+- **Etapa B (16/11/2026), B2:** em vez de mexer no `else` de `vaga.tratar`, o motor chama
+  `audio.receber(..., so_de_fora=True)` **antes** de `vaga.tratar`: o áudio de fora aceito vai à fila e a
+  conversa de vaga nem o vê; o transcrito volta como texto e a vaga o trata como qualquer texto. O
+  interno continua só na chamada de sempre. `scripts/audio.py`: o `mostrar` do plano é o `ver` que já existia.
+- **Etapa B, achado:** o evento sintético da transcrição tem o mesmo id de mensagem do áudio e a chave
+  `<wamid>:transcrito`; o histórico da OlivIA e o "travou" o excluem pelas duas chaves (sem isso, o texto
+  falado entrava duas vezes e toda mensagem de áudio parecia "repetida").
 
 ## Riscos de execução identificados
 

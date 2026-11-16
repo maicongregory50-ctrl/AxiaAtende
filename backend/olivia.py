@@ -30,6 +30,10 @@ A CHAVE (D9): `OLIVIA_FALA` no .env.recepcionista. Desligada, este modulo nao e 
 FALHA NUNCA TRAVA O ATENDIMENTO: sem IA, sem resposta, erro antes da primeira fala -> `False`, e o
 chamador segue o caminho de hoje (a conversa que ela abriria e desfeita junto).
 
+O AUDIO (D10, etapa B, 16/11/2026): com `audio.de_fora` ligada, o audio de quem ela atende e transcrito
+na maquina (backend/audio.py) e chega aqui como texto que comeca com "(audio)"; quando nao deu para
+ouvir, `[nao foi possivel ouvir o audio]`, e ela pede para a pessoa escrever ou mandar de novo.
+
 O VIGIA (D6): `fechar_dia`, as 23:40, da a cada conversa dela `saida = bem | sem_saida`, e so manda o
 resumo ao dono quando ha sem saida ou frase recusada. Dia limpo: nada.
 """
@@ -186,7 +190,11 @@ def instrucao(con) -> str:
         "uma linha o que a base diz e ofereça a opção do menu daquele setor. Na dúvida sobre o que ela quer, "
         "pergunte em uma frase.\n"
         "8. Quando a conversa terminar (a pessoa agradeceu e não precisa de mais nada), use encerrar.\n"
-        "9. Não repita o que já disse. Não use listas longas nem markdown pesado: é WhatsApp.\n\n"
+        "9. Não repita o que já disse. Não use listas longas nem markdown pesado: é WhatsApp.\n"
+        "10. Mensagem que começa com (áudio) é a transcrição do que a pessoa FALOU: pode ter palavra trocada; "
+        "responda ao sentido, e se não der para entender peça em uma frase que ela escreva. Se vier "
+        "[não foi possível ouvir o áudio], diga que não conseguiu ouvir e peça para escrever ou mandar de "
+        "novo, curto.\n\n"
         "BASE DA EMPRESA (o que você pode afirmar; cada linha traz a fonte entre colchetes, que você NÃO "
         "repete para a pessoa):\n<base>\n" + (base() or "(vazia: afirme só o que o menu e as vagas dizem)")
         + "\n</base>\n\nOPÇÕES DO MENU (chave: caminho (descrição)); use a chave em oferecer_opcao_do_menu, "
@@ -249,15 +257,22 @@ def _o_que_chegou(msg: dict) -> str:
     return ""
 
 
+def _chaves_da_atual(wamid: str) -> list[str]:
+    """A mensagem atual em eventos_meta: o aviso dela e, no audio transcrito (#1520, etapa B), o evento
+    sintetico, que tem o MESMO id de mensagem e a chave `<wamid>:transcrito`."""
+    base = wamid[:-len(':transcrito')] if wamid.endswith(':transcrito') else wamid
+    return [base, base + ':transcrito']
+
+
 def historico(con, pessoa, agora: datetime, wamid_atual: str) -> list[dict]:
     """As mensagens da pessoa (sem a atual) e as nossas a ela nas ultimas 24 h, na ordem, em turnos."""
     desde = agora - HISTORICO
     itens = []
     for ev in con.execute("""SELECT id, recebido_em AS em, corpo FROM atendimento.eventos_meta
-                              WHERE tipo = 'mensagem' AND chave_meta <> %s AND recebido_em > %s
+                              WHERE tipo = 'mensagem' AND chave_meta <> ALL(%s) AND recebido_em > %s
                                 AND (bsuid = %s OR corpo->'msg'->>'from' = %s)
                               ORDER BY id DESC LIMIT %s""",
-                          (wamid_atual, desde, pessoa.bsuid, pessoa.wa_id or "", HISTORICO_ATE)).fetchall():
+                          (_chaves_da_atual(wamid_atual), desde, pessoa.bsuid, pessoa.wa_id or "", HISTORICO_ATE)).fetchall():
         t = _o_que_chegou((ev["corpo"] or {}).get("msg") or {})
         if t.strip():
             itens.append((ev["em"], 0, ev["id"], "user", t))
@@ -315,10 +330,10 @@ def travou(con, conversa, e) -> bool:
         return True
     if t:
         anterior = con.execute("""SELECT corpo->'msg'->'text'->>'body' AS texto FROM atendimento.eventos_meta
-                                   WHERE tipo = 'mensagem' AND chave_meta <> %s AND processado_em IS NOT NULL
+                                   WHERE tipo = 'mensagem' AND chave_meta <> ALL(%s) AND processado_em IS NOT NULL
                                      AND (bsuid = %s OR corpo->'msg'->>'from' = %s)
                                    ORDER BY id DESC LIMIT 1""",
-                               (e.wamid, e.pessoa.bsuid, e.pessoa.wa_id or "")).fetchone()
+                               (_chaves_da_atual(e.wamid), e.pessoa.bsuid, e.pessoa.wa_id or "")).fetchone()
         if anterior and _sem_acento(anterior["texto"] or "").strip(" .!?") == t:
             return True
     if con.execute("SELECT 1 FROM atendimento.candidaturas WHERE conversa_id = %s LIMIT 1", (conversa["id"],)).fetchone():

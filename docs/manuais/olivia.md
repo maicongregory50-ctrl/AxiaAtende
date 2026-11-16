@@ -31,10 +31,16 @@ autenticado são os próximos degraus, em chamados próprios.
 3. Currículo (PDF ou foto): ela confere o que é, encaminha à Fran (para a vaga que a pessoa disse, ou ao
    banco de currículos) e diz que a equipe vai analisar, sem prometer retorno nem prazo. A foto vai **sem
    pré-triagem**: a Fran olha.
-4. Se a conversa **travar** (a pessoa repete a mensagem, diz *"não é isso"*, ou ela falou três vezes sem
+4. **Áudio** (etapa B, D10, 16/11/2026), com a chave `audio.de_fora` ligada: a pessoa fala, e nada chega
+   na hora; o áudio é transcrito **aqui no servidor** (o som não sai da máquina, em português ou espanhol)
+   e a OlivIA responde ao que a pessoa falou, alguns segundos depois. Se não deu para ouvir (áudio ruim,
+   longo demais, mudo), ela diz que não conseguiu ouvir e pede para escrever ou mandar de novo. O áudio
+   da equipe passa na frente na fila, e cada número tem um teto de 6 áudios em 24 h; acima disso, ou com
+   a chave desligada, vale a linha fixa de quem não lê áudio.
+5. Se a conversa **travar** (a pessoa repete a mensagem, diz *"não é isso"*, ou ela falou três vezes sem
    a conversa andar), ela muda de abordagem; se travar de novo, manda o **menu** e para de falar naquela
    conversa: dali em diante, é o menu de sempre.
-5. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
+6. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
    e a data entre colchetes (a OlivIA não as repete à pessoa). A OlivIA relê o arquivo sozinha quando
    ele muda: **não precisa reiniciar nada**. O inventário das fontes, com o que entrou e por quê, está em
    `C:\AxiaAtende\docs\olivia\FONTES.md`.
@@ -50,6 +56,8 @@ autenticado são os próximos degraus, em chamados próprios.
 | **Frase recusada** | ela tentou dizer algo com número de 5 dígitos ou mais, valor, link, e-mail, ou as palavras *salário, remuneração, contrato, prazo de resposta*. O sistema mandou no lugar *"Me conte em uma linha o que você precisa…"* e contou no resumo |
 | Na tela **Custos**, **OlivIA · conversa com quem é de fora** (Claude Sonnet 5.5) e **OlivIA · leitura do arquivo recebido** (Haiku) | o custo dela, por chamada, desde a primeira conversa |
 | No `/saude` do recepcionista (`http://127.0.0.1:8008/saude`), **"olivia": "ligada"** | a voz dela está ligada no servidor |
+| No `/saude`, em `audio`: **"de_fora": true** e **"pendentes_de_fora"** | o áudio de quem é de fora está ligado, e quantos esperam a transcrição |
+| Uma mensagem dela começando a conversa depois de um áudio, e na conversa **(áudio) …** | o que a pessoa falou, transcrito; é o texto a que ela respondeu |
 
 ## 5. O que NÃO faz
 
@@ -60,8 +68,8 @@ autenticado são os próximos degraus, em chamados próprios.
   desta mensagem, oferecer uma opção do menu, encaminhar o currículo, encerrar.
 - **Não promete prazo, valor, salário nem vaga**, e não escreve telefone, e-mail ou link.
 - **Não faz pré-triagem de currículo em foto**: a Fran olha.
-- **Não responde áudio, figurinha ou localização de quem é de fora**: esses continuam com a linha curta
-  de sempre.
+- **Não responde figurinha nem localização**, e o **áudio só com a chave `audio.de_fora` ligada**; fora
+  disso, a linha curta de sempre. **Não responde em áudio.**
 - **Não lê o catálogo do ERP** nem números de produto (dose, janela, massa): esses ficam fora da base até
   o #857 reconciliar a base técnica.
 
@@ -82,3 +90,14 @@ Restart-Service axiaatende-recepcionista
 Desligada, tudo volta ao menu de hoje, na hora, e nada se perde. A foto como currículo e a base continuam,
 porque não dependem dela. Para religar, `OLIVIA_FALA=true` e o mesmo restart. Conferir em
 `http://127.0.0.1:8008/saude`: `"olivia": "ligada"` ou `"desligada"`.
+
+**O áudio de fora** tem chave própria, que liga e desliga **sem restart** (janela elevada, em produção):
+
+```
+cd C:\AxiaAtende
+$env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
+.\.venv\Scripts\python.exe scripts\audio.py ligar-fora
+```
+
+`desligar-fora` volta à linha fixa na hora; `ver` mostra as três chaves (a transcrição, o áudio de fora e
+o teto por número). Ele só vale com `OLIVIA_FALA=true` e a transcrição ligada.

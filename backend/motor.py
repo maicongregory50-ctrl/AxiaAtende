@@ -740,6 +740,12 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # vem antes tambem: o PDF do candidato nao e logo, e a foto dele nao e material de campo.
     if vaga.retorno_da_fran(con, saida, e, agora):
         return
+    # #1520 (etapa B, D10): o AUDIO de quem a OlivIA atende, com `audio.de_fora` ligada, vai a fila da
+    # transcricao ANTES da conversa de vaga -- o candidato que fala nao recebe "PDF ou foto"; a resposta
+    # vem com o texto transcrito. Interno, chave desligada ou teto: False, e segue o de sempre.
+    if (e.audio is not None and campo is not None and olivia is not None
+            and audio.receber(con, saida, e, agora, campo.pasta, olivia, envio, so_de_fora=True)):
+        return
     if vaga.tratar(con, saida, ia, e, agora):
         return
     # #1222 (prova de 03/11/2026): quem tinha chamado esperando resposta E um cliente aberto escrevia sem
@@ -815,7 +821,7 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         return
     # #1238: o audio de quem e da casa, com `audio.transcrever` ligado: baixado e na fila da transcricao,
     # sem resposta agora (ela vem com o texto). De fora, chave desligada ou download falho: o de sempre.
-    if e.audio is not None and campo is not None and audio.receber(con, saida, e, agora, campo.pasta):
+    if e.audio is not None and campo is not None and audio.receber(con, saida, e, agora, campo.pasta, olivia, envio):
         return
     if not e.texto and not e.toque:
         # quem e da equipe com o canal de campo ligado nao recebe esta linha: o que ele manda e

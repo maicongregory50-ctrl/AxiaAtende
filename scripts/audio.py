@@ -5,6 +5,10 @@ conferir"). Em producao, janela elevada:
     cd C:\\AxiaAtende
     $env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
     .\\.venv\\Scripts\\python.exe scripts\\audio.py ver|ligar|desligar
+    .\\.venv\\Scripts\\python.exe scripts\\audio.py ligar-fora|desligar-fora
+
+`ligar-fora` / `desligar-fora` (#1520, D10): o audio de quem a OlivIA atende (a chave `audio.de_fora`, que
+nasce desligada). So vale com `OLIVIA_FALA=true` e a transcricao ligada; liga e desliga SEM restart.
 
 O ensaio nao toca no banco e roda em qualquer ambiente:
 
@@ -63,8 +67,9 @@ def refazer(cfg) -> int:
 def main() -> int:
     args = sys.argv[1:] or ["ver"]
     acao = args[0]
-    if acao not in ("ver", "ligar", "desligar", "ensaiar", "refazer") or (acao == "ensaiar" and len(args) < 2):
-        print("uso: audio.py ver|ligar|desligar|refazer | ensaiar <arquivo>")
+    if acao not in ("ver", "ligar", "desligar", "ligar-fora", "desligar-fora", "ensaiar", "refazer") \
+            or (acao == "ensaiar" and len(args) < 2):
+        print("uso: audio.py ver|ligar|desligar|ligar-fora|desligar-fora|refazer | ensaiar <arquivo>")
         return 2
     cfg = config.carregar()
     if acao == "ensaiar":
@@ -73,8 +78,9 @@ def main() -> int:
         return refazer(cfg)
     with conexao(cfg) as con:
         if acao != "ver":
+            chave = "audio.de_fora" if acao.endswith("-fora") else "audio.transcrever"
             con.execute("""UPDATE atendimento.ajustes SET valor = %s::jsonb, atualizado_em = now()
-                            WHERE chave = 'audio.transcrever'""", ("true" if acao == "ligar" else "false",))
+                            WHERE chave = %s""", ("true" if acao.startswith("ligar") else "false", chave))
         s = audio.saude(cfg, con)
         n = con.execute("""SELECT count(*) FILTER (WHERE transcrito_em IS NOT NULL) AS transcritos,
                                   count(*) FILTER (WHERE erro <> '') AS com_erro,
@@ -87,6 +93,10 @@ def main() -> int:
     except ImportError:
         biblioteca = "NAO instalado"
     print("transcricao de audio: %s (ambiente %s)" % ("LIGADA" if s["ligado"] else "desligada", cfg.ambiente))
+    with conexao(cfg) as con:
+        por_dia = audio.de_fora_por_dia(con)
+    print("audio de fora (#1520): %s; teto por numero em 24 h: %d; na fila de fora: %d (vale so com OLIVIA_FALA=true)"
+          % ("LIGADO" if s["de_fora"] else "desligado", por_dia, s["pendentes_de_fora"]))
     print("modelo: %s" % (pasta or "NAO ACHEI em %s" % cfg.audio_modelo_pasta))
     print("faster-whisper: %s" % biblioteca)
     print("na fila: %d; transcritos: %d (%.0f min); com erro: %d"

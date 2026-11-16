@@ -17,13 +17,13 @@ DE_FORA = "5549988881111"
 
 
 @pytest.fixture
-def ligada(cfg):
-    return replace(cfg, responde=True, olivia_fala=True)
+def ligada(cfg, tmp_path):
+    return replace(cfg, responde=True, olivia_fala=True, campo_pasta=tmp_path / "campo")
 
 
 @pytest.fixture
-def desligada(cfg):
-    return replace(cfg, responde=True)
+def desligada(cfg, tmp_path):
+    return replace(cfg, responde=True, campo_pasta=tmp_path / "campo")
 
 
 def passo(cfg, s, mensagem, ia=None, agora=AGORA, numero=DE_FORA, bsuid="BR.fora.1", nome="Deivid Betancourt",
@@ -392,3 +392,177 @@ def test_a_recepcao_marca_olivia_falou_e_filtra_sem_saida(ligada):
         assert sorted((l["olivia"], l["saida"]) for l in d["linhas"]) == [(False, None), (True, "sem_saida")]
         so = t.get("/api/recepcao", params={"dias": 7, "situacao": "sem_saida"}).json()["linhas"]
         assert [l["olivia"] for l in so] == [True]
+
+
+# ── etapa B: o audio de quem e de fora (D10, 16/11/2026) ─────────────────────
+
+from backend import audio as A                       # noqa: E402
+from backend.motor import NAO_ABRO_ARQUIVO           # noqa: E402
+
+
+def audio_msg(wamid, numero=DE_FORA):
+    return {"from": numero, "id": wamid, "timestamp": "1760040000", "type": "audio",
+            "audio": {"id": "midia-" + wamid, "mime_type": "audio/ogg; codecs=opus", "voice": True}}
+
+
+class Ouvido:
+    """O transcritor falso: `texto` (ou uma excecao em `falha`), e a lingua pedida em cada audio."""
+    modelo = "falso"
+
+    def __init__(self, texto="queria ver se tem vaga pra empilhadeira", duracao=9.0, falha=None):
+        self.texto, self.duracao, self.falha, self.ouvidos = texto, duracao, falha, []
+
+    def __call__(self, caminho, maximo, lingua="pt"):
+        self.ouvidos.append((caminho.name, lingua))
+        if self.falha:
+            raise self.falha
+        if self.duracao > maximo:
+            return None, self.duracao
+        return self.texto, self.duracao
+
+
+def chaves_do_audio(cfg, de_fora=True, transcrever=True, por_dia=None):
+    with conexao(cfg) as con:
+        con.execute("UPDATE atendimento.ajustes SET valor = %s::jsonb WHERE chave = 'audio.transcrever'",
+                    ("true" if transcrever else "false",))
+        con.execute("UPDATE atendimento.ajustes SET valor = %s::jsonb WHERE chave = 'audio.de_fora'",
+                    ("true" if de_fora else "false",))
+        if por_dia is not None:
+            con.execute("UPDATE atendimento.ajustes SET valor = %s::jsonb WHERE chave = 'audio.de_fora_por_dia'",
+                        (str(por_dia),))
+
+
+def linhas_de_audio(cfg):
+    with conexao(cfg) as con:
+        return [dict(r) for r in con.execute("SELECT * FROM atendimento.audios ORDER BY id").fetchall()]
+
+
+@pytest.fixture
+def com_modelo():
+    antes = A.estado["modelo_presente"]
+    A.estado["modelo_presente"] = None
+    yield
+    A.estado["modelo_presente"] = antes
+
+
+def test_b_a_gabriel_fala_e_a_olivia_responde_ao_que_ele_falou(ligada, com_modelo):
+    chaves_do_audio(ligada)
+    s, ia = SaidaFalsa(), IAFalsa()
+    passo(ligada, s, audio_msg("wa1"), ia=ia, nome="Gabriel")
+    assert s.enviadas == [] and not getattr(ia, "chamadas", [])           # nada na hora
+    a = linhas_de_audio(ligada)
+    assert len(a) == 1 and a[0]["de_fora"] and a[0]["arquivo"]
+    ouvido = Ouvido()
+    assert A.transcrever_um(ligada, ouvido)
+    assert ouvido.ouvidos[0][1] is None                                   # lingua detectada
+    ia.conversa = [{"texto": "Temos sim, a de operador de empilhadeira. Pode mandar o currículo por aqui."}]
+    R.processar_pendentes(ligada, s, ia, agora=AGORA)
+    assert s.ultima[2].startswith("Temos sim")
+    assert ia.chamadas[-1]["mensagens"][-1]["content"] == "(áudio) queria ver se tem vaga pra empilhadeira"
+    assert "(áudio) é a transcrição" in ia.chamadas[-1]["sistema"]
+
+
+@pytest.mark.parametrize("caso", ["de_fora_desligada", "olivia_desligada", "sem_modelo", "transcricao_desligada"])
+def test_b_b_chave_desligada_e_a_linha_fixa_de_hoje(cfg, tmp_path, com_modelo, caso):
+    c = replace(cfg, responde=True, olivia_fala=caso != "olivia_desligada", campo_pasta=tmp_path / "campo")
+    chaves_do_audio(c, de_fora=caso != "de_fora_desligada", transcrever=caso != "transcricao_desligada")
+    if caso == "sem_modelo":
+        A.estado["modelo_presente"] = False
+    s = SaidaFalsa()
+    passo(c, s, audio_msg("wa1"), ia=IAFalsa())
+    assert s.ultima[2] == NAO_ABRO_ARQUIVO and linhas_de_audio(c) == []
+
+
+@pytest.mark.parametrize("ouvido", [Ouvido(falha=RuntimeError("audio corrompido")), Ouvido(duracao=999),
+                                    Ouvido(texto="")])
+def test_b_c_nao_ouviu_a_olivia_pede_para_escrever(ligada, com_modelo, ouvido):
+    chaves_do_audio(ligada)
+    s, ia = SaidaFalsa(), IAFalsa()
+    passo(ligada, s, audio_msg("wa1"), ia=ia)
+    assert A.transcrever_um(ligada, ouvido)
+    ia.conversa = [{"texto": "Não consegui ouvir o áudio. Pode escrever ou mandar de novo?"}]
+    R.processar_pendentes(ligada, s, ia, agora=AGORA)
+    assert ia.chamadas[-1]["mensagens"][-1]["content"] == A.MARCA + A.NAO_OUVI
+    assert s.ultima[2].startswith("Não consegui ouvir")
+
+
+def test_b_c_o_mesmo_erro_no_audio_da_casa_nao_gera_evento(ligada, com_modelo):
+    chaves_do_audio(ligada)
+    s = SaidaFalsa()
+    passo(ligada, s, audio_msg("wa1", numero=fran(ligada)), numero=fran(ligada), bsuid="BR.fran", nome="Fran")
+    assert linhas_de_audio(ligada)[0]["de_fora"] is False
+    assert A.transcrever_um(ligada, Ouvido(falha=RuntimeError("audio corrompido")))
+    with conexao(ligada) as con:
+        assert not con.execute("SELECT 1 FROM atendimento.eventos_meta WHERE chave_meta LIKE '%:transcrito'").fetchone()
+
+
+def test_b_d_o_audio_da_casa_passa_na_frente(ligada, com_modelo):
+    chaves_do_audio(ligada)
+    s = SaidaFalsa()
+    passo(ligada, s, audio_msg("wa-fora"), ia=IAFalsa())
+    passo(ligada, s, audio_msg("wa-casa", numero=fran(ligada)), numero=fran(ligada), bsuid="BR.fran", nome="Fran")
+    ouvido = Ouvido()
+    A.transcrever_um(ligada, ouvido)
+    A.transcrever_um(ligada, ouvido)
+    assert ouvido.ouvidos == [("wa-casa.ogg", "pt"), ("wa-fora.ogg", None)]
+
+
+def test_b_e_o_setimo_audio_em_24h_recebe_a_linha_fixa(ligada, com_modelo):
+    chaves_do_audio(ligada)
+    s = SaidaFalsa()
+    for i in range(6):
+        passo(ligada, s, audio_msg("wa%d" % i), ia=IAFalsa())
+    assert len(linhas_de_audio(ligada)) == 6 and s.enviadas == []
+    passo(ligada, s, audio_msg("wa7"), ia=IAFalsa())
+    assert s.ultima[2] == NAO_ABRO_ARQUIVO and len(linhas_de_audio(ligada)) == 6
+
+
+def test_b_f_audio_na_conversa_de_vaga_vai_a_fila_e_nao_recebe_pdf_ou_foto(ligada, com_modelo):
+    chaves_do_audio(ligada)
+    s = SaidaFalsa()
+    passo(ligada, s, toque("w1", "menu:trabalhe", numero=DE_FORA), ia=IAFalsa())
+    passo(ligada, s, toque("w2", "vaga:escolher:2", numero=DE_FORA), ia=IAFalsa())
+    n = len(s.enviadas)
+    passo(ligada, s, audio_msg("wa1"), ia=IAFalsa())
+    assert len(s.enviadas) == n and linhas_de_audio(ligada)[0]["de_fora"]
+    # o texto transcrito volta a conversa da vaga, que responde como a qualquer texto
+    A.transcrever_um(ligada, Ouvido(texto="eu moro em Cunha Porã"))
+    R.processar_pendentes(ligada, s, IAFalsa(resposta="regiao"), agora=AGORA)
+    assert len(s.enviadas) == n + 1 and "PDF ou em foto" not in s.ultima[2]
+
+
+class _EnvioFalsoTodos:
+    def convidado_recente(self, con, wa_id, agora):
+        return {"erp_codigo": 1}
+
+
+def test_b_g_consultor_e_cliente_da_carteira_nao_entram(ligada, com_modelo):
+    chaves_do_audio(ligada)
+    with conexao(ligada) as con:
+        con.execute("INSERT INTO atendimento.clientes_consultores (wa_id, comercial_id, nome) VALUES (%s, 42, 'X')",
+                    (DE_FORA,))
+    with conexao(ligada) as con:
+        assert not A.aceita_de_fora(con, _entrada(DE_FORA), AGORA, O.Olivia())
+        assert not A.aceita_de_fora(con, _entrada("5549900000000"), AGORA, O.Olivia(), _EnvioFalsoTodos())
+        assert A.aceita_de_fora(con, _entrada("5549900000000"), AGORA, O.Olivia())
+
+
+def test_b_saude_e_o_script_mostram_a_chave(ligada, com_modelo, capsys, monkeypatch):
+    chaves_do_audio(ligada, de_fora=False)
+    import importlib.util
+    from pathlib import Path
+    caminho = Path(__file__).resolve().parents[1] / "scripts" / "audio.py"
+    spec = importlib.util.spec_from_file_location("script_audio", caminho)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    monkeypatch.setattr(script.config, "carregar", lambda *a, **k: ligada)
+    monkeypatch.setattr("sys.argv", ["audio.py", "ligar-fora"])
+    assert script.main() == 0
+    assert "audio de fora (#1520): LIGADO" in capsys.readouterr().out
+    with conexao(ligada) as con:
+        s = A.saude(ligada, con)
+        assert s["de_fora"] is True and s["pendentes_de_fora"] == 0
+    monkeypatch.setattr("sys.argv", ["audio.py", "desligar-fora"])
+    script.main()
+    with conexao(ligada) as con:
+        assert A.de_fora_ligado(con) is False

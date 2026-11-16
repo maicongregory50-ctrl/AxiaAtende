@@ -11,10 +11,18 @@ O CAMINHO:
    qualquer texto da pessoa (o roteador inclusive). Nada no motor muda para isso.
 3. O `.ogg` some 7 dias depois de transcrito (`limpar`, na rotina do minuto); o texto fica no banco.
 
-O QUE NAO FAZ: nada sai da maquina (o modelo e local, pela conta LocalService do recepcionista); audio de
-FORA (cliente, candidato) continua "nao leio isso" -- transcrever dado de cliente e decisao a parte. Sem
-modelo no disco, sem a biblioteca, chave desligada, erro ou audio acima de `audio.maximo_s`: o
-comportamento de hoje (ignorado, linha no log), e a linha em `audios` guarda o `erro`.
+O AUDIO DE FORA (#1520, D10, dono 16/11/2026: "Precisamos adicionar audio, ja temos a ferramenta"): o de
+quem a OlivIA atende (nao e da casa, nem cliente da carteira, nem consultor) entra na MESMA fila, marcado
+`de_fora`, so com as tres chaves ligadas -- `OLIVIA_FALA`, `audio.transcrever` e `audio.de_fora` (nasce
+`false`) -- o modelo presente e o numero abaixo de `audio.de_fora_por_dia` em 24 h. A lingua e detectada
+(portugues ou espanhol); o da casa passa na frente. Quando a transcricao do de fora falha, passa do teto de
+duracao ou sai vazia, o evento entra com `NAO_OUVI`, para a pessoa nao ficar sem resposta. Fora disso, o
+de fora continua com a linha fixa de quem nao le audio. O cliente da carteira e o consultor ficam de fora.
+
+O QUE NAO FAZ: o SOM nunca sai da maquina (o modelo e local, pela conta LocalService do recepcionista); o
+TEXTO transcrito de quem e de fora entra na chamada da OlivIA, como o texto que ele digita. Sem modelo no
+disco, sem a biblioteca, chave desligada, erro ou audio acima de `audio.maximo_s`, no audio DA CASA: o
+comportamento de sempre (ignorado, linha no log), e a linha em `audios` guarda o `erro`.
 """
 from __future__ import annotations
 
@@ -29,7 +37,9 @@ from .banco import conexao
 MODELO = "faster-whisper-large-v3-turbo"
 GUARDAR = timedelta(days=7)
 MARCA = "(áudio) "
+NAO_OUVI = "[não foi possível ouvir o áudio]"   # #1520: o de fora que nao deu para transcrever
 ESPERA_S = 3.0
+DE_FORA_POR_DIA = 6
 
 # O que o /saude mostra. Zera a cada subida do recepcionista.
 estado = {"modelo_presente": None, "ultimo_transcrito_em": None, "ultimo_erro": None}
@@ -42,6 +52,18 @@ def _ajuste(con, chave, padrao):
 
 def ligado(con) -> bool:
     return _ajuste(con, "audio.transcrever", False) is True
+
+
+def de_fora_ligado(con) -> bool:
+    """#1520: a chave do audio de quem e de fora (`audio.de_fora`, nasce false)."""
+    return _ajuste(con, "audio.de_fora", False) is True
+
+
+def de_fora_por_dia(con) -> int:
+    try:
+        return int(_ajuste(con, "audio.de_fora_por_dia", DE_FORA_POR_DIA) or DE_FORA_POR_DIA)
+    except (TypeError, ValueError):
+        return DE_FORA_POR_DIA
 
 
 def maximo_s(con) -> int:
@@ -78,9 +100,10 @@ class Whisper:
         from faster_whisper import WhisperModel   # so aqui: sem a biblioteca, o laco loga e dorme
         self._m = WhisperModel(str(pasta), device="cpu", compute_type="int8")
 
-    def __call__(self, caminho: Path, maximo: int):
-        """(texto, duracao_s); texto None quando o audio passa de `maximo` segundos (nada e transcrito)."""
-        segmentos, info = self._m.transcribe(decodificar(caminho), language="pt", vad_filter=True)
+    def __call__(self, caminho: Path, maximo: int, lingua: str | None = "pt"):
+        """(texto, duracao_s); texto None quando o audio passa de `maximo` segundos (nada e transcrito).
+        `lingua` None (#1520, o audio de fora): o modelo detecta (portugues ou espanhol)."""
+        segmentos, info = self._m.transcribe(decodificar(caminho), language=lingua, vad_filter=True)
         if info.duration > maximo:
             return None, info.duration
         return " ".join(s.text.strip() for s in segmentos).strip(), info.duration
@@ -109,11 +132,37 @@ def _nome_seguro(texto: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", texto or "")[:120] or "sem_nome"
 
 
-def receber(con, saida, e, agora: datetime, pasta: Path) -> bool:
-    """O audio de interno com a chave ligada: baixado e na fila. True = tomado (nada mais responde agora).
-    False = o caminho de hoje (de fora, chave desligada, ou o download falhou -- a linha guarda o erro)."""
+def aceita_de_fora(con, e, agora: datetime, olivia=None, envio=None) -> bool:
+    """#1520 (B2): o audio de quem a OlivIA atende entra na fila? As tres chaves, o modelo nao ausente e o
+    teto por numero em 24 h. Qualquer outro caso: False, e o motor segue para a linha fixa de hoje."""
+    if olivia is None or not ligado(con) or not de_fora_ligado(con) or estado["modelo_presente"] is False:
+        return False
+    from . import olivia as olivia_mod
+    if not olivia_mod.e_de_fora(con, e, agora, envio):
+        return False
+    n = con.execute("""SELECT count(*) AS n FROM atendimento.audios
+                        WHERE de_fora AND wa_id = %s AND recebido_em > %s""",
+                    (e.pessoa.wa_id, agora - timedelta(hours=24))).fetchone()["n"]
+    if n >= de_fora_por_dia(con):
+        print("audio: %s passou do teto de %d audios de fora em 24 h: a linha fixa" % (e.pessoa.wa_id, n), flush=True)
+        return False
+    return True
+
+
+def receber(con, saida, e, agora: datetime, pasta: Path, olivia=None, envio=None, so_de_fora: bool = False) -> bool:
+    """O audio de interno com a chave ligada -- ou, desde o #1520, o de quem a OlivIA atende com
+    `audio.de_fora` ligada: baixado e na fila. True = tomado (nada mais responde agora). False = o
+    caminho de hoje (chave desligada, teto, ou o download falhou -- a linha guarda o erro).
+    `so_de_fora`: a chamada que o motor faz ANTES da conversa de vaga (o audio do candidato nao recebe
+    "PDF ou foto"); o interno continua so na chamada de sempre."""
     a = getattr(e, "audio", None)
-    if a is None or not ligado(con) or not internos.e_interno(con, e.pessoa.wa_id):
+    if a is None or not ligado(con):
+        return False
+    interno = internos.e_interno(con, e.pessoa.wa_id)
+    if interno and so_de_fora:
+        return False
+    de_fora = not interno
+    if de_fora and not aceita_de_fora(con, e, agora, olivia, envio):
         return False
     if con.execute("SELECT 1 FROM atendimento.audios WHERE wamid = %s", (e.wamid,)).fetchone():
         return True   # o mesmo aviso de novo
@@ -122,10 +171,11 @@ def receber(con, saida, e, agora: datetime, pasta: Path) -> bool:
         saida.baixar(a.id, Path(pasta) / relativo)
     except Exception as falha:   # noqa: BLE001 -- o audio fica em eventos_meta; a linha diz o erro
         relativo, erro = None, ("%s: %s" % (type(falha).__name__, falha))[:300]
-    con.execute("""INSERT INTO atendimento.audios (wamid, wa_id, bsuid, arquivo, mime, recebido_em, erro)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (wamid) DO NOTHING""",
-                (e.wamid, e.pessoa.wa_id, e.pessoa.bsuid, relativo, (a.mime or "")[:100], agora, erro))
-    print("audio: %s de %s: %s" % (e.wamid, e.pessoa.wa_id, relativo or ("falhou -- " + erro)), flush=True)
+    con.execute("""INSERT INTO atendimento.audios (wamid, wa_id, bsuid, arquivo, mime, recebido_em, erro, de_fora)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (wamid) DO NOTHING""",
+                (e.wamid, e.pessoa.wa_id, e.pessoa.bsuid, relativo, (a.mime or "")[:100], agora, erro, de_fora))
+    print("audio: %s de %s%s: %s" % (e.wamid, e.pessoa.wa_id, " (de fora)" if de_fora else "",
+                                     relativo or ("falhou -- " + erro)), flush=True)
     return relativo is not None
 
 
@@ -149,15 +199,19 @@ def _evento_sintetico(con, linha, texto: str) -> None:
 def transcrever_um(cfg, transcritor, agora: datetime | None = None) -> bool:
     """O proximo audio da fila. True = havia um (transcrito ou com erro); False = fila vazia."""
     with conexao(cfg) as con:
+        # #1520 (B3): o da casa passa na frente do de fora (false vem antes de true)
         linha = con.execute("""SELECT * FROM atendimento.audios
                                 WHERE transcrito_em IS NULL AND erro = '' AND arquivo IS NOT NULL
-                                ORDER BY id LIMIT 1""").fetchone()
+                                ORDER BY de_fora, id LIMIT 1""").fetchone()
         maximo = maximo_s(con)
     if linha is None:
         return False
     texto, duracao, erro = None, None, ""
+    de_fora = bool(linha.get("de_fora"))
     try:   # FORA de transacao: a CPU trabalha segundos, e o banco nao fica preso por isso
-        texto, duracao = transcritor(Path(cfg.campo_pasta) / linha["arquivo"], maximo)
+        caminho = Path(cfg.campo_pasta) / linha["arquivo"]
+        # o de fora sem lingua fixa (detectada: portugues ou espanhol); o da casa, "pt" como sempre
+        texto, duracao = transcritor(caminho, maximo, lingua=None) if de_fora else transcritor(caminho, maximo)
         if texto is None:
             erro = "acima do maximo (%d s)" % maximo
     except Exception as falha:   # noqa: BLE001 -- um audio ruim nao trava a fila
@@ -169,11 +223,15 @@ def transcrever_um(cfg, transcritor, agora: datetime | None = None) -> bool:
                         (erro, duracao, linha["id"]))
             estado["ultimo_erro"] = "%s %s" % (momento.isoformat(), erro[:120])
             print("audio: %s: %s" % (linha["wamid"], erro), flush=True)
+            if de_fora:   # #1520: a pessoa de fora nao fica sem resposta -- a OlivIA diz que nao ouviu
+                _evento_sintetico(con, linha, NAO_OUVI)
             return True
         con.execute("UPDATE atendimento.audios SET transcrito_em = %s, texto = %s, duracao_s = %s WHERE id = %s",
                     (momento, texto, duracao, linha["id"]))
         if texto:
             _evento_sintetico(con, linha, texto)
+        elif de_fora:
+            _evento_sintetico(con, linha, NAO_OUVI)
         # o custo e zero; a duracao e o que mede a CPU (#1223, tela Custos)
         con.execute("""INSERT INTO atendimento.uso_ia (origem, servico, funcao, modelo, entrada, saida)
                        VALUES ('axiaatende', 'local', 'audio', %s, %s, %s)""",
@@ -239,10 +297,14 @@ def laco(cfg, parar, transcritor=None, espera: float = ESPERA_S) -> None:
 
 def saude(cfg, con) -> dict:
     r = con.execute("""SELECT count(*) FILTER (WHERE transcrito_em IS NULL AND erro = '' AND arquivo IS NOT NULL) AS pendentes,
+                              count(*) FILTER (WHERE transcrito_em IS NULL AND erro = '' AND arquivo IS NOT NULL
+                                               AND de_fora) AS pendentes_de_fora,
                               max(transcrito_em) AS ultimo FROM atendimento.audios""").fetchone()
     presente = estado["modelo_presente"]
     if presente is None:
         presente = achar_modelo(cfg.audio_modelo_pasta, cfg.ambiente) is not None
     return {"ligado": ligado(con), "modelo_presente": presente, "pendentes": r["pendentes"],
             "ultimo_transcrito_em": r["ultimo"].isoformat() if r["ultimo"] else None,
-            "ultimo_erro": estado["ultimo_erro"]}
+            "ultimo_erro": estado["ultimo_erro"],
+            # #1520: o audio de quem e de fora (a chave e a fila dele)
+            "de_fora": de_fora_ligado(con), "pendentes_de_fora": r["pendentes_de_fora"]}
