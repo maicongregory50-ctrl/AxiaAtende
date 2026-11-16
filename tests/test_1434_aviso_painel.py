@@ -61,6 +61,7 @@ def test_a_volta_da_063_desfaz_e_a_ida_refaz(painel):
     _volta(painel)
     raiz = Path(migracoes.__file__).parent / "migracoes"
     with conexao(painel) as con:
+        con.execute((raiz / "065_olivia_fala_VOLTA.sql").read_text(encoding="utf-8"))   # #1520: a 065 reescreve os mesmos CHECKs
         con.execute((raiz / "063_aviso_painel_VOLTA.sql").read_text(encoding="utf-8"))
         assert not con.execute("SELECT 1 FROM atendimento.ajustes WHERE chave = 'painel_para'").fetchone()
         con.execute((raiz / "063_aviso_painel.sql").read_text(encoding="utf-8"))
