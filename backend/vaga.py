@@ -9,8 +9,9 @@ fica marcada (`conversas.trabalhe`) e termina como `curriculo_recebido` ou `sem_
 leem esses dois valores, e e de proposito.
 
 AS REGRAS DO DONO, e o codigo segue so elas:
-- **So PDF, sempre** (decisao 7). Foto, Word, audio ou texto recebem "Precisamos do seu curriculo em
-  PDF", e sem PDF nada vai a Fran.
+- **PDF ou foto** (decisao 7 do #1098, revogada para a foto pela D5 do #1520, 13/11/2026). A foto entra
+  como curriculo SEM pre-triagem e vai a Fran como imagem. Word, audio ou texto recebem "Precisamos do
+  seu curriculo em PDF ou em foto".
 - **A IA so escolhe a chave** de uma resposta aprovada (`respostas_da_vaga`, regra 3 do projeto). A
   pre-triagem e texto da IA, mas vai SO a Fran, nunca ao candidato (decisao 2).
 - **Um curriculo por mensagem** a Fran, com o PDF, a triagem e os botoes "Triagem certa" / "Triagem
@@ -204,25 +205,58 @@ def o_que_escreveu(con, conversa) -> str:
     return " / ".join(p for p in partes if p)[:1000]
 
 
-def _receber_pdf(con, saida: Saida, e, conversa, agora: datetime) -> None:
+def e_imagem(e) -> bool:
+    """#1520 (D5): a foto que a pessoa mandou (o curriculo fotografado)."""
+    return e.midia is not None and e.midia.tipo == "foto"
+
+
+SEM_TRIAGEM_FOTO = "foto: sem triagem"
+EXTENSAO = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+
+
+def baixar_arquivo(saida: Saida, e) -> tuple[bytes, str, str]:
+    """(dados, nome, mime) do PDF ou da foto da mensagem atual, baixados da Meta. Nada fica no disco."""
+    if e_imagem(e):
+        mime = (e.midia.mime or "image/jpeg").split(";")[0].strip().lower()
+        nome = "curriculo-foto" + EXTENSAO.get(mime, ".jpg")
+        media_id = e.midia.id
+    else:
+        mime, nome, media_id = "application/pdf", (e.documento.nome_arquivo or "curriculo.pdf"), e.documento.id
+    with tempfile.TemporaryDirectory() as pasta:
+        dados = Path(saida.baixar(media_id, Path(pasta) / ("arquivo" + Path(nome).suffix))).read_bytes()
+    return dados, nome[:200], mime
+
+
+def receber_arquivo(con, saida: Saida, e, conversa, agora: datetime, tipo: str = "pdf",
+                    responder: bool = True, baixado: tuple | None = None) -> int | None:
+    """O curriculo da mensagem atual vira candidatura. `tipo` 'pdf' ou 'imagem' (#1520, D5: a foto
+    entra como curriculo, nas mesmas colunas, SEM pre-triagem -- vai a Fran como imagem). `responder`:
+    False quando quem fala com a pessoa e a OlivIA. `baixado`: (dados, nome, mime) ja baixados.
+    Devolve o id da candidatura, ou None quando a Meta reenviou o aviso (ja estava guardada)."""
     from .motor import _registrar
     p = e.pessoa
     if con.execute("SELECT 1 FROM atendimento.candidaturas WHERE wamid = %s", (e.wamid,)).fetchone():
-        return   # a Meta reenviou o aviso: o curriculo ja esta guardado
-    with tempfile.TemporaryDirectory() as pasta:
-        arquivo = Path(saida.baixar(e.documento.id, Path(pasta) / "curriculo.pdf"))
-        dados = arquivo.read_bytes()
-    con.execute("""INSERT INTO atendimento.candidaturas
+        return None   # a Meta reenviou o aviso: o curriculo ja esta guardado
+    dados, nome, _ = baixado or baixar_arquivo(saida, e)
+    texto = o_que_escreveu(con, conversa)
+    legenda = ((e.midia.legenda if e_imagem(e) else e.documento.legenda if e.documento else "") or "").strip()
+    if legenda and legenda not in texto:
+        texto = " / ".join(x for x in (texto, legenda) if x)[:1000]
+    foto = tipo == "imagem"
+    c = con.execute("""INSERT INTO atendimento.candidaturas
                       (vaga_id, conversa_id, bsuid, wa_id, nome_perfil, declarou, texto, wamid,
-                       pdf, pdf_nome, pdf_sha256, pdf_bytes, recebida_em, apagar_em)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (conversa["vaga_id"], conversa["id"], p.bsuid, p.wa_id, p.nome or "", conversa["vaga_declarou"],
-                 o_que_escreveu(con, conversa), e.wamid, dados,
-                 (e.documento.nome_arquivo or "curriculo.pdf")[:200], hashlib.sha256(dados).hexdigest(),
-                 len(dados), agora, agora + DOZE_MESES))
-    w = saida.texto(p.para, _texto(con, "recebido"))
-    _registrar(con, conversa["id"], p.para, "texto", "vaga: curriculo recebido", w)
+                       pdf, pdf_nome, pdf_sha256, pdf_bytes, recebida_em, apagar_em, tipo_arquivo,
+                       triagem_em, triagem_erro)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                    (conversa["vaga_id"], conversa["id"], p.bsuid, p.wa_id, p.nome or "", conversa["vaga_declarou"],
+                     texto, e.wamid, dados, nome, hashlib.sha256(dados).hexdigest(), len(dados), agora,
+                     agora + DOZE_MESES, tipo, agora if foto else None,
+                     SEM_TRIAGEM_FOTO if foto else "")).fetchone()
+    if responder:
+        w = saida.texto(p.para, _texto(con, "recebido"))
+        _registrar(con, conversa["id"], p.para, "texto", "vaga: curriculo recebido", w)
     _fechar(con, conversa, "curriculo_recebido")
+    return c["id"]
 
 
 def _pedir_de_novo(con, saida, pessoa, conversa, vaga) -> None:
@@ -356,10 +390,14 @@ def tratar(con, saida: Saida, ia, e, agora: datetime) -> bool:
     elif e.toque:
         return False   # toque de outra coisa (o menu): o caminho de sempre
     elif e_pdf(e.documento):
-        _receber_pdf(con, saida, e, conversa, agora)
+        receber_arquivo(con, saida, e, conversa, agora, "pdf")
+    elif e_imagem(e):
+        # #1520 (D5, dono 13/11/2026): a foto do curriculo entra, sem pre-triagem. Revoga a decisao 7 do
+        # #1098 para a foto. Vale com a voz da OlivIA desligada tambem.
+        receber_arquivo(con, saida, e, conversa, agora, "imagem")
     elif e.texto:
         _responder_texto(con, saida, ia, p, conversa, e.texto)
-    else:   # foto, Word, audio, figurinha: so PDF
+    else:   # Word, audio, figurinha, video: PDF ou foto
         w = saida.texto(p.para, _texto(con, "so_pdf", vaga))
         _registrar(con, conversa["id"], p.para, "texto", "vaga: so pdf (%s)" % (e.tipo or "?"), w)
     return True
@@ -510,12 +548,26 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
             c = con.execute("SELECT * FROM atendimento.candidaturas WHERE id = %s", (c["id"],)).fetchone()
         vs = variaveis(con, c)
         pdf = (bytes(c["pdf"]), c["pdf_nome"] or "curriculo.pdf")
+        foto = c["tipo_arquivo"] == "imagem"
+        pdf_modelo = None
+        if foto:
+            # #1520: fora da janela, o modelo da Fran so leva PDF no cabecalho; a foto (JPEG) vai embrulhada
+            # num PDF de uma pagina, sem conversao nem biblioteca nova. Outro formato espera a janela.
+            embrulho = pdf_da_foto(pdf[0])
+            pdf_modelo = (embrulho, "curriculo-foto.pdf") if embrulho else None
         # o aviso da Meta traz o numero antigo (sem o 9); o cadastro, com o 9: vale o que houver
         ultimas = [u for u in (ultima_mensagem_de(con, wa_id_do_whatsapp(d["whatsapp"])),
                                ultima_mensagem_de(con, d["whatsapp"])) if u]
         ultima = max(ultimas) if ultimas else None
         try:
-            if ultima is not None and agora - ultima < timedelta(hours=24):
+            if foto and ultima is not None and agora - ultima < timedelta(hours=24):
+                # dentro da janela: a foto como imagem, sem os botoes da triagem (nao houve triagem)
+                w = saida.imagem(d["whatsapp"], pdf[0], legenda_da_foto(con, c),
+                                 opcoes=[Opcao("vaga:falar:%d" % c["id"], "Conversar")])
+                tipo = "imagem"
+            elif foto and pdf_modelo is None:
+                raise RuntimeError("foto que nao e JPEG: espera a janela de 24 h de quem recebe")
+            elif ultima is not None and agora - ultima < timedelta(hours=24):
                 w = saida.documento(d["whatsapp"], pdf[0], pdf[1],
                                     corpo_do_modelo(con, vs, sem_botoes=c["declarou"] is None),
                                     [Opcao("vaga:certa:%d" % c["id"], "Triagem certa"),
@@ -528,7 +580,7 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
                     raise RuntimeError("nenhum modelo cadastrado para o curriculo")
                 w = saida.modelo(d["whatsapp"], m["nome"], m["idioma"], vs,
                                  botoes=["vaga:certa:%d" % c["id"], "vaga:errada:%d" % c["id"]],
-                                 url=codigo_candidato(segredo, c["id"]), documento=pdf)
+                                 url=codigo_candidato(segredo, c["id"]), documento=pdf_modelo if foto else pdf)
                 tipo = "modelo"
         except Exception as falha:  # noqa: BLE001 -- fica na fila; tenta de novo em uma hora
             con.execute("""UPDATE atendimento.candidaturas SET fran_erro = %s, fran_tentativa_em = %s
@@ -542,6 +594,70 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
                                                         "curriculo %d para a fran" % c["id"]))
         mandadas += 1
     return mandadas
+
+
+def legenda_da_foto(con, c) -> str:
+    """#1520: a legenda da foto do curriculo a Fran -- a vaga, quem mandou e o que escreveu. Sem triagem."""
+    vaga = _vaga(con, c["vaga_id"])
+    partes = ["Currículo em foto (sem pré-triagem)",
+              "Vaga: %s" % (vaga["titulo"] if vaga else "Banco de currículos"),
+              "Candidato: %s (%s)" % (_cortar((c["nome_perfil"] or "sem nome no perfil").strip(), 60),
+                                      numero_bonito(c["wa_id"]))]
+    if c["texto"]:
+        partes.append("Escreveu: %s" % c["texto"])
+    return _cortar(" · ".join(partes), CORPO_ATE)
+
+
+SOF = (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF)
+
+
+def _tamanho_jpeg(dados: bytes) -> tuple[int, int] | None:
+    """(largura, altura) do JPEG, pelo marcador SOF; None quando nao e JPEG."""
+    if dados[:2] != b"\xff\xd8":
+        return None
+    i = 2
+    while i + 9 < len(dados):
+        if dados[i] != 0xFF:
+            return None
+        marca = dados[i + 1]
+        if marca in (0xD8, 0x01, 0xFF) or 0xD0 <= marca <= 0xD7:
+            i += 1 if marca == 0xFF else 2
+            continue
+        if marca in SOF:
+            altura = int.from_bytes(dados[i + 5:i + 7], "big")
+            largura = int.from_bytes(dados[i + 7:i + 9], "big")
+            return (largura, altura) if largura and altura else None
+        i += 2 + int.from_bytes(dados[i + 2:i + 4], "big")
+    return None
+
+
+def pdf_da_foto(dados: bytes) -> bytes | None:
+    """O JPEG dentro de um PDF de uma pagina do tamanho da foto (o JPEG vai como esta, DCTDecode).
+    None quando a foto nao e JPEG. E so embrulho: nada da imagem e lido alem do tamanho."""
+    t = _tamanho_jpeg(dados or b"")
+    if not t:
+        return None
+    w, h = t
+    conteudo = b"q %d 0 0 %d 0 0 cm /F Do Q" % (w, h)
+    objetos = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] /Resources << /XObject << /F 4 0 R >> >> "
+         b"/Contents 5 0 R >>") % (w, h),
+        (b"<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 "
+         b"/Filter /DCTDecode /Length %d >>\nstream\n") % (w, h, len(dados)) + dados + b"\nendstream",
+        b"<< /Length %d >>\nstream\n" % len(conteudo) + conteudo + b"\nendstream",
+    ]
+    pdf = b"%PDF-1.4\n"
+    posicoes = []
+    for n, o in enumerate(objetos, 1):
+        posicoes.append(len(pdf))
+        pdf += b"%d 0 obj\n" % n + o + b"\nendobj\n"
+    xref = len(pdf)
+    pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objetos) + 1)
+    pdf += b"".join(b"%010d 00000 n \n" % x for x in posicoes)
+    pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objetos) + 1, xref)
+    return pdf
 
 
 # ── a Fran: o retorno sobre a triagem ───────────────────────────────────────

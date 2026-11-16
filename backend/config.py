@@ -105,6 +105,10 @@ class Config:
     # #1223: quem ve a tela Custos (`AXIAATENDE_CUSTOS_LOGINS=maicon` no XML das telas, separados por
     # virgula). Vazio = ninguem: a tela nasce fechada. Nao e segredo, e o login nao e senha.
     custos_logins: tuple = ()
+    # #1520: A VOZ DA OLIVIA (`OLIVIA_FALA=true` no .env.recepcionista). Ligada, quem e de fora conversa com
+    # a OlivIA, com texto proprio (backend/olivia.py); desligada, o menu de sempre. NASCE DESLIGADA, e
+    # desligar e o rollback operacional inteiro (D9): a foto como curriculo e a base nao dependem dela.
+    olivia_fala: bool = False
 
     def dsn(self) -> str:
         partes = ["host=%s" % self.banco_host, "port=%d" % self.banco_porta,
@@ -166,6 +170,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             chave_pedido=segredos.get("AXIAATENDE_CHAVE_PEDIDO", ""),
             erp_segredo=segredos.get("AXIAATENDE_ERP_SEGREDO", ""),
             responde=segredos.get("ATENDE_RESPONDE", "false").lower() == "true",
+            olivia_fala=segredos.get("OLIVIA_FALA", "false").lower() == "true",
             responde_so_para=tuple(n.strip() for n in segredos.get("ATENDE_SO_PARA", "").split(",") if n.strip()),
             # `AXIAATENDE_SAIDA`: `local` (o padrao: as telas so em http://127.0.0.1:8009).
             cookie_seguro=os.environ.get("AXIAATENDE_SAIDA", "local") == "vpn",

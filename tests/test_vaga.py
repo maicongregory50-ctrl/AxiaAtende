@@ -200,13 +200,27 @@ def test_tela_3_escreve_em_vez_de_mandar_e_leva_um_lembrete_so(ligado):
     assert "agrônomo formado em 2019" in candidaturas(ligado)[0]["texto"]   # o texto vai junto
 
 
-@pytest.mark.parametrize("mensagem", [foto("w3"), doc("w3", "curriculo.docx", "application/msword")])
-def test_so_pdf_foto_e_word_nao_servem(ligado, mensagem):
+def test_word_nao_serve(ligado):
     s = SaidaFalsa()
     passo(ligado, s, do_anuncio("w1"))
-    tipo, _, corpo, _ = passo(ligado, s, mensagem)
-    assert tipo == "texto" and corpo.startswith("Precisamos do seu currículo em PDF")
+    tipo, _, corpo, _ = passo(ligado, s, doc("w3", "curriculo.docx", "application/msword"))
+    assert tipo == "texto" and corpo == "Precisamos do seu currículo em PDF ou em foto. Mande aqui mesmo."
     assert not candidaturas(ligado)
+
+
+def test_a_foto_entra_como_curriculo_sem_triagem(ligado):
+    """#1520 (D5, dono 13/11/2026): revoga a decisao 7 do #1098 para a foto."""
+    s = SaidaFalsa()
+    passo(ligado, s, do_anuncio("w1"))
+    _, _, corpo, _ = passo(ligado, s, foto("w3"))
+    assert corpo.startswith("Recebemos o seu currículo ✅")
+    c = candidaturas(ligado)
+    assert len(c) == 1 and c[0]["tipo_arquivo"] == "imagem" and c[0]["triagem_erro"] == V.SEM_TRIAGEM_FOTO
+    ia = IAFalsa()
+    ia.triagem = TRIAGEM
+    _rodar_minuto(ligado, s, ia)
+    assert not getattr(ia, "triados", [])                 # a foto nao vai a pre-triagem
+    assert conversa(ligado)["situacao"] == "curriculo_recebido"
 
 
 def test_o_pdf_repetido_pela_meta_nao_vira_dois(ligado):
@@ -434,7 +448,7 @@ def test_a_volta_da_025_devolve_o_no_a_fran_e_guarda_os_curriculos(ligado):
     with conexao(ligado) as con:
         # a 032 (#1090) mexe no mesmo CHECK de acao do menu, e a 033 (#1142) e a 039 (#1188) no de uso
         # do modelo: as voltas vao na ordem inversa das idas
-        for anterior in ("063_aviso_painel_VOLTA.sql", "060_aviso_integracao_VOLTA.sql", "049_aviso_auditoria_estoque_VOLTA.sql", "045_informativo_so_ola_VOLTA.sql", "044_informativo_sem_link_VOLTA.sql",
+        for anterior in ("065_olivia_fala_VOLTA.sql", "063_aviso_painel_VOLTA.sql", "060_aviso_integracao_VOLTA.sql", "049_aviso_auditoria_estoque_VOLTA.sql", "045_informativo_so_ola_VOLTA.sql", "044_informativo_sem_link_VOLTA.sql",
                          "043_informativo_ao_comprador_VOLTA.sql",
                          "039_porteiro_dos_avisos_VOLTA.sql", "033_fila_por_numero_e_resumo_VOLTA.sql",
                          "032_clientes_do_dia_VOLTA.sql"):

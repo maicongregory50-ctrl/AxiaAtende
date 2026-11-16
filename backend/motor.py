@@ -680,10 +680,11 @@ def portao_do_cliente(con, saida: Saida, ia, e: Entrada, agora: datetime, envio,
 
 
 def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo=None,
-           pular_pendencias: bool = False) -> None:
+           pular_pendencias: bool = False, olivia=None) -> None:
     """Uma mensagem que chegou. `envio` trata as respostas ao convite da carteira (Fase E);
     `campo` (#970) toma a foto ou o video de equipe/representante e as respostas as perguntas dele,
-    antes de qualquer conversa de atendimento abrir."""
+    antes de qualquer conversa de atendimento abrir. `olivia` (#1520): a voz da OlivIA para quem e de
+    fora, so com a chave `OLIVIA_FALA` ligada; None = o menu de sempre."""
     p = e.pessoa
     if e.toque and e.toque.startswith("envio:"):
         if envio is not None:
@@ -702,7 +703,7 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         r = roteador.tocar(con, saida, ia, e, agora, campo)
         if isinstance(r, str):
             tratar(con, saida, ia, replace(e, texto=r, toque=None, contexto=None), agora, envio, campo,
-                   pular_pendencias=True)
+                   pular_pendencias=True, olivia=olivia)
         return
     # #1222: o chamado no WhatsApp, no TOPO da corrente -- a resposta CITADA a uma mensagem de
     # pendencia, os toques `pend:` e o motivo do "Nao ficou bom" nao tem duvida, e nenhum filtro
@@ -712,7 +713,7 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         r = pendencias.tratar(con, saida, e, agora)
         if isinstance(r, str):
             tratar(con, saida, ia, replace(e, texto=r, toque=None, contexto=None), agora, envio, campo,
-                   pular_pendencias=True)
+                   pular_pendencias=True, olivia=olivia)
             return
         if r:
             return
@@ -795,6 +796,17 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # abre conversa.
     if portao_do_cliente(con, saida, ia, e, agora, envio):
         return
+    # #1520: a OLIVIA QUE FALA, com a chave ligada. Depois do portao do cliente (#1189) e de tudo o que e
+    # da casa, e ANTES do "nao e texto nem botao" e da `propor`: e onde ela entra (D3). Texto, PDF ou foto
+    # de quem e de fora; o toque continua no caminho de hoje (os botoes sao dela tambem), a reacao segue
+    # ignorada, e o audio de fora fica com a linha curta. O agradecimento e a resposta automatica depois
+    # do atendimento continuam com as regras de sempre (silencio, "por nada"), antes dela.
+    if (olivia is not None and not e.toque and e.tipo != "reaction"
+            and (e.texto or e.documento is not None or e.midia is not None)):
+        if e.texto and depois_do_atendimento(con, saida, p, e.texto, agora):
+            return
+        if olivia.atender(con, saida, ia, e, agora, envio):
+            return
     # O que nao e texto nem botao (dono, 12/10/2026, depois de um menu as 00:15): a REACAO (o joinha
     # numa mensagem nossa) nao e pedido de nada e nao se responde; figurinha, audio, foto de quem
     # nao e da equipe, localizacao, contato e documento recebem uma linha curta, nunca as
@@ -1157,6 +1169,7 @@ def retomar_paradas(con, saida: Saida, ia, agora: datetime) -> int:
     paradas = con.execute("""SELECT * FROM atendimento.conversas
                               WHERE situacao = 'parou_no_meio' AND retomada_em IS NULL AND iniciada_em > %s
                                 AND origem = 'mensagem'   -- #1204: a que nos abrimos nao tem o que reler
+                                AND conduzida_por = 'menu'   -- #1520: a conversa da OlivIA, ela mesma rele
                               ORDER BY id LIMIT 20""", (agora - timedelta(days=2),)).fetchall()
     if ia is None:
         return 0   # a IA fora nao gasta a tentativa: a conversa espera o minuto em que ela voltar

@@ -39,7 +39,9 @@ class Saida:
     def lista(self, para: str, texto: str, botao: str, opcoes: list[Opcao]) -> str:
         raise NotImplementedError
 
-    def imagem(self, para: str, arquivo: str, legenda: str = "") -> str:
+    def imagem(self, para: str, arquivo, legenda: str = "", opcoes: list[Opcao] | None = None) -> str:
+        """`arquivo`: o caminho, ou os bytes (#1520: a foto do curriculo, que mora no banco). `opcoes`:
+        ate 3 botoes na mesma mensagem (#1520: o "Conversar" da foto do curriculo). So dentro das 24 h."""
         raise NotImplementedError
 
     def contato(self, para: str, nome: str, whatsapp: str, empresa: str = EMPRESA) -> str:
@@ -170,10 +172,17 @@ class SaidaMeta(Saida):
         q = self._wa.get_business_phone_number().quality_rating
         return str(getattr(q, "value", q) or "UNKNOWN").upper()   # o PyWa pode devolver enum
 
-    def imagem(self, para, arquivo, legenda=""):
-        w = self._wa.send_image(to=para, image=arquivo, caption=legenda or None).id
+    def imagem(self, para, arquivo, legenda="", opcoes=None):
+        from pywa.types import Button
+        if opcoes:
+            conferir_botoes(opcoes)
+        extra = {"mime_type": "image/jpeg"} if isinstance(arquivo, bytes) else {}
+        w = self._wa.send_image(to=para, image=arquivo, caption=legenda or None,
+                                buttons=[Button(title=o.titulo, callback_data=o.id) for o in opcoes] if opcoes else None,
+                                **extra).id
         nome = arquivo.rsplit("\\", 1)[-1].rsplit("/", 1)[-1] if isinstance(arquivo, str) else ""
-        return self._guardado(w, "imagem", legenda=" — ".join(x for x in (legenda, nome) if x))
+        return self._guardado(w, "imagem", legenda=" — ".join(x for x in (legenda, nome) if x),
+                              opcoes=[{"titulo": o.titulo} for o in opcoes] if opcoes else None)
 
     def baixar(self, media_id, destino):
         from pathlib import Path

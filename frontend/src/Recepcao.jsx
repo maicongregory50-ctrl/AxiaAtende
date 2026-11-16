@@ -166,6 +166,7 @@ export default function Recepcao() {
           <option value="imagem">Imagem recebida</option><option value="logo">Logo recebida</option>
           <option value="nao">Disse que não foi atendido</option><option value="sim">Disse que foi atendido</option>
           <option value="equipe">Só a equipe</option>
+          <option value="olivia">OlivIA falou</option><option value="sem_saida">OlivIA · sem saída</option>
         </select>
         <select value={quem} onChange={(e) => setQuem(e.target.value)}>
           <option value="">Todos (cadastro e fora dele)</option><option value="cadastro">Só quem está no cadastro</option>
@@ -185,6 +186,9 @@ export default function Recepcao() {
             <div className="cartao"><span>Disseram que foram atendidos</span><b>{d.cartoes.disseram_sim}</b></div>
             <div className="cartao alerta"><span>Disseram que não</span><b>{d.cartoes.disseram_nao}</b></div>
             <div className="cartao"><span>IA acertou / errou</span><b>{d.cartoes.ia_acertou} / {d.cartoes.ia_errou}</b></div>
+            {/* #1520: onde a OlivIA falou, e quantas ela nao levou a lugar nenhum (o vigia das 23:40) */}
+            {d.cartoes.olivia_falou > 0 && <div className="cartao"><span>OlivIA falou</span><b>{d.cartoes.olivia_falou}</b></div>}
+            {d.cartoes.olivia_sem_saida > 0 && <div className="cartao alerta"><span>OlivIA · sem saída</span><b>{d.cartoes.olivia_sem_saida}</b></div>}
             {d.cartoes.campo > 0 && <div className="cartao"><span>Fotos do campo (equipe)</span><b>{d.cartoes.campo}{d.cartoes.campo_catalogadas ? ` · ${d.cartoes.campo_catalogadas} no catálogo` : ''}</b></div>}
           </div>
           <Leitura leitura={d.leitura} />
@@ -206,6 +210,8 @@ export default function Recepcao() {
                     {ESTADO[l.estado][0]}{l.estado === 'pergunta_marcada' ? ' ' + hora(l.pergunta_em) : ''}
                     {l.estado === 'nao' && l.aviso_nao_em ? ' ' + hora(l.aviso_nao_em) : ''}</span>
                     {l.pendente && <> <span className="selo a">{l.pendente}</span></>}
+                    {l.olivia && <> <span className={'selo ' + (l.saida === 'sem_saida' ? 'r' : '')}>
+                      {l.saida === 'sem_saida' ? 'OlivIA falou · sem saída' : 'OlivIA falou'}</span></>}
                     {NOTA[l.satisfacao] && <> <span className={'selo ' + NOTA[l.satisfacao][1]}>{NOTA[l.satisfacao][0]}</span></>}</td>
                 </tr>
               ))}

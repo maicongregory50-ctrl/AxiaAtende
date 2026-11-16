@@ -27,8 +27,11 @@ class SaidaFalsa(Saida):
         self.enviadas.append(("lista", para, texto, [(o.id, o.titulo) for o in opcoes]))
         return self._id()
 
-    def imagem(self, para, arquivo, legenda=""):
-        self.enviadas.append(("imagem", para, arquivo, []))
+    def imagem(self, para, arquivo, legenda="", opcoes=None):
+        if opcoes:
+            conferir_botoes(opcoes)
+        self.enviadas.append(("imagem", para, arquivo, [(o.id, o.titulo) for o in opcoes or []]))
+        self.legendas = getattr(self, "legendas", []) + [legenda]   # #1520: a legenda da foto a Fran
         return self._id()
 
     def contato(self, para, nome, whatsapp, empresa="Sementes Renascer"):
@@ -125,6 +128,30 @@ class IAFalsa:
         if self.falha:
             return None
         return getattr(self, "pendencia", None)
+
+    def conversar(self, sistema, extra, mensagens, ferramentas):
+        """#1520: a OlivIA que fala. `self.conversa` e a lista de turnos, um por chamada, na ordem: cada um
+        {"texto": "...", "ferramentas": [("nome", {entrada}), ...]}. Lista vazia = turno sem fala nem
+        ferramenta (o laco para). `self.chamadas` guarda o que ela viu em cada chamada."""
+        import copy
+        self.chamadas = getattr(self, "chamadas", []) + [{
+            "sistema": sistema, "extra": extra, "mensagens": copy.deepcopy(mensagens),
+            "ferramentas": [f["name"] for f in ferramentas]}]
+        if self.falha:
+            return None
+        turnos = getattr(self, "conversa", [])
+        t = turnos.pop(0) if turnos else {}
+        n = len(self.chamadas)
+        chamadas = [{"id": "fer_%d_%d" % (n, i), "nome": nome, "entrada": dict(entrada)}
+                    for i, (nome, entrada) in enumerate(t.get("ferramentas", []))]
+        conteudo = ([{"type": "text", "text": t["texto"]}] if t.get("texto") else []) + [
+            {"type": "tool_use", "id": c["id"], "name": c["nome"], "input": c["entrada"]} for c in chamadas]
+        return {"texto": t.get("texto", ""), "ferramentas": chamadas, "conteudo": conteudo}
+
+    def descrever_arquivo(self, dados, mime):
+        """#1520: o que `ler_arquivo_recebido` devolve (`self.arquivo`); guarda o mime lido."""
+        self.arquivos_lidos = getattr(self, "arquivos_lidos", []) + [mime]
+        return getattr(self, "arquivo", "É um currículo.")
 
     def classificar(self, texto, opcoes):
         self.perguntas.append(texto)

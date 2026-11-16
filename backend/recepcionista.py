@@ -92,12 +92,15 @@ def aplicar_status(con, st: dict, agora: datetime, envio=None) -> None:
 
 
 def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: datetime | None = None,
-                        campo=None) -> int:
+                        campo=None, olivia=None) -> int:
     """Processa ate LOTE eventos, cada um na sua transacao. Devolve quantos."""
     feitos = 0
     if campo is None:   # #970: o canal de campo; com a chave desligada ele nao faz nada
         from .campo import Campo
         campo = Campo(cfg.campo_pasta, ia)
+    if olivia is None and cfg.olivia_fala:   # #1520: a voz da OlivIA, so com OLIVIA_FALA=true
+        from .olivia import Olivia
+        olivia = Olivia()
     for _ in range(LOTE):
         with conexao(cfg) as con:
             ev = con.execute("""SELECT * FROM atendimento.eventos_meta WHERE processado_em IS NULL
@@ -119,7 +122,7 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
                                 envio_mod.com_nove(n) for n in cfg.responde_so_para}:
                             erro = "escuta (ensaio)"   # o Opa responde a quem nao esta no ensaio
                         else:
-                            motor.tratar(con, saida, ia, entrada, momento, envio, campo)
+                            motor.tratar(con, saida, ia, entrada, momento, envio, campo, olivia=olivia)
             except Exception as falha:  # noqa: BLE001 -- um evento ruim nao trava a fila
                 erro = "%s: %s" % (type(falha).__name__, str(falha)[:300])
             con.execute("UPDATE atendimento.eventos_meta SET processado_em = %s, erro = %s WHERE id = %s",
@@ -180,6 +183,13 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
                 vaga.limpar(con, momento)
     except Exception as falha:  # noqa: BLE001
         print("vaga: %s: %s" % (type(falha).__name__, falha), flush=True)
+    try:   # #1520: o vigia da OlivIA, uma vez por dia as 23:40; dia limpo nao avisa ninguem
+        from . import olivia
+        with conexao(cfg) as con:
+            if olivia.hora_do_vigia(con, momento):
+                olivia.fechar_dia(con, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("olivia: vigia: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #1223: o que a Meta diz ter cobrado (uma vez por dia, depois das 06:00); nunca segura o resto
         from . import custos_meta
         with conexao(cfg) as con:
@@ -293,6 +303,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
         return {"de_pe": True, "ambiente": cfg.ambiente, "responde": cfg.responde,
                 "so_para": len(cfg.responde_so_para),
                 "meta_ligada": saida is not None, "ia_ligada": ia is not None,
+                # #1520: a voz da OlivIA para quem e de fora (OLIVIA_FALA no .env.recepcionista)
+                "olivia": "ligada" if cfg.olivia_fala else "desligada",
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
                 "chegadas": chegadas,
                 # #1028: o que o motor DEIXOU de mandar desde que o servico subiu, para a regra que

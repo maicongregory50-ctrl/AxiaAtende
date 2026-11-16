@@ -209,7 +209,9 @@ def _contatos(con, desde, conversas) -> list[dict]:
                        "pendente": _pendencias_de(con, chave),
                        "pergunta_em": l["pergunta_em"].isoformat() if l and l["pergunta_em"] else None,
                        "aviso_nao_em": l["aviso_nao_em"].isoformat() if l and l["aviso_nao_em"] else None,
-                       "satisfacao": l["satisfacao"] if l else None, "ia": l["ia_confirmou"] if l else None})
+                       "satisfacao": l["satisfacao"] if l else None, "ia": l["ia_confirmou"] if l else None,
+                       # #1520: a marca "OlivIA falou" e o que o vigia das 23:40 viu (bem | sem_saida | None)
+                       "olivia": bool(l and l["olivia_falou"]), "saida": l["saida"] if l else None})
     linhas.sort(key=lambda r: r["quando"], reverse=True)
     return linhas
 
@@ -225,6 +227,9 @@ def rotas(cfg, usuario) -> APIRouter:
         with conexao(cfg) as con:
             conversas = con.execute(
                 """SELECT c.*, d.nome AS destino_nome,
+                          -- #1520: a OlivIA falou nesta conversa (texto proprio a quem e de fora)
+                          (c.conduzida_por = 'olivia' OR EXISTS (SELECT 1 FROM atendimento.enviadas e
+                              WHERE e.conversa_id = c.id AND e.resumo LIKE 'olivia:%%')) AS olivia_falou,
                           (SELECT m.chave FROM atendimento.menu m WHERE m.rotulo = c.caminho[1]
                               AND m.pai_id = (SELECT id FROM atendimento.menu WHERE chave = 'raiz') LIMIT 1) AS motivo
                      FROM atendimento.conversas c
@@ -256,6 +261,10 @@ def rotas(cfg, usuario) -> APIRouter:
             contatos = [r for r in contatos if r["cadastros"] != 1]
         if situacao == "equipe":
             contatos = [r for r in contatos if r["interno"]]
+        elif situacao == "sem_saida":   # #1520: a OlivIA falou e a conversa nao terminou em nada em 24 h
+            contatos = [r for r in contatos if r["saida"] == "sem_saida"]
+        elif situacao == "olivia":
+            contatos = [r for r in contatos if r["olivia"]]
         elif situacao:
             contatos = [r for r in contatos if r["estado"] == situacao]
         estados = [_estado_da_conversa(l) for l in linhas]
@@ -270,6 +279,8 @@ def rotas(cfg, usuario) -> APIRouter:
             "disseram_nao": sum(1 for l in linhas if l["recebeu"] is False),
             "ia_acertou": sum(1 for l in linhas if l["ia_confirmou"] is True),
             "ia_errou": sum(1 for l in linhas if l["ia_confirmou"] is False),
+            "olivia_falou": sum(1 for l in linhas if l["olivia_falou"]),                 # #1520
+            "olivia_sem_saida": sum(1 for l in linhas if l["saida"] == "sem_saida"),
             "estados": {e: estados.count(e) for e in set(estados)},
         }
         return {"cartoes": cartoes, "motivos": motivos, "linhas": contatos, "leitura": leitura}

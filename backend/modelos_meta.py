@@ -72,6 +72,9 @@ EXEMPLOS_AVISO = {
     # #1434: o aviso de classe 1 do painel da casa (texto pronto da revisao do AxiaSecurity)
     "aviso_painel_classe1": ["[CRÍTICO] axiaatende-recepcionista -- visto às 14:02 no painel. "
                              "Feito até agora: reinício pela porta, e não voltou. Chamado #1500."],
+    # #1520: o resumo do vigia da OlivIA (texto pronto, so nos dias em que ha o que dizer)
+    "aviso_olivia_resumo": ["Hoje a OlivIA falou em 14 conversas: 11 terminaram bem, 2 sem saída "
+                            "(#412, #419), 1 frase recusada (#415)."],
 }
 
 

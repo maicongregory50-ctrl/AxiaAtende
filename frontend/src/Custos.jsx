@@ -16,6 +16,8 @@ const FUNCAO = {
   aviso_auditoria_estoque: 'Aviso: auditoria de estoque', aviso_integracao_recusada: 'Aviso: API externa recusando',
   triagem: 'OlivIA · triagem do motivo', campo: 'OlivIA · material de campo', visita: 'OlivIA · registro de visita',
   pendencia: 'OlivIA · de qual chamado é a resposta',
+  conversa: 'OlivIA · conversa com quem é de fora', leitura_arquivo: 'OlivIA · leitura do arquivo recebido',   // #1520
+  aviso_painel_classe1: 'Aviso: painel da casa', aviso_olivia_resumo: 'Aviso: resumo da OlivIA',
   roteador: 'OlivIA · assunto da mensagem da equipe', audio: 'Transcrição de áudio da equipe',
   edicao: 'Edição de imagem', olhar_foto: 'Olhar sobre a foto',
 }
