@@ -44,6 +44,7 @@ verdade, para tirar dúvida e vender a vaga.
 | D5 | A forma | **Caminho B:** a OlivIA conduz toda conversa de vaga; a ficha é uma candidatura sem arquivo e chega à Fran pelo caminho do currículo. Contra A (só a vaga de ficha) e C (perguntas editáveis por vaga) |
 | D6 | Quem ficou em silêncio | **Emenda de 16/11/2026.** O toque único da D4 vale para **toda conversa de vaga sem candidatura**, e não só para a ficha começada: quem não respondeu nada recebe, uma vez, dentro das 24 h, o convite ("Não quer deixar a sua ficha? São cinco perguntas rápidas"). Um toque por conversa; depois, o contato é abandonado |
 | D7 | Vir conhecer a empresa | **Emenda de 16/11/2026.** É **oferta no fim**, não sexta pergunta: recebida a ficha ou o currículo, a OlivIA diz que a pessoa pode vir conhecer a empresa. Se ela quiser, a Fran recebe a candidatura marcada "quer visitar" e combina o dia. A OlivIA não agenda |
+| D9 | O que cada função faz: a ida agora, a volta em seguida | **Emenda de 16/11/2026.** *"Vamos tratar até a ida aqui, prever que teremos uma volta em seguida."* Esta etapa **manda o pedido** das descrições de função à Fran pelo chamado no WhatsApp (que já existe) e **deixa pronto o lugar** onde o resumo de cada função entra na OlivIA. A devolução dos arquivos pelo WhatsApp é o **#1528**; o resumo por função, escrito a partir deles e corrigido pelo dono, é conteúdo e chega depois, sem código novo |
 | D8 | Os benefícios | **Emenda de 16/11/2026.** O que o cadastro da vaga diz de benefícios entra no que ela pode falar. O texto do cadastro é ajustado para não trazer a palavra que o filtro de saída recusa |
 
 ## Os fios que encostam
@@ -201,6 +202,18 @@ reescreve o texto das vagas abertas sem "salário atrativo" (fica *"plano de sa�
 vale-alimentação, auxílio-combustível e auxílio-educação"*; o dono confirma o texto antes de ligar). O
 filtro de saída não muda: valor e a palavra "salário" continuam recusados.
 
+**5d. O que cada função faz (D9).** Dois atos, e só eles nesta etapa:
+- **O lugar.** `docs/olivia/funcoes/<vaga_id>.md`, um arquivo curto por vaga (o que a pessoa faz no dia,
+  em linguagem de quem vai fazer; cada afirmação com fonte e data, como a base da empresa). O bloco das
+  vagas na instrução inclui o arquivo da vaga **quando ele existe**, relido quando muda, sem restart.
+  Sem arquivo, nada entra, e a OlivIA continua dizendo só o que o cadastro da vaga diz. Nesta etapa a
+  pasta nasce vazia.
+- **A ida.** Um chamado endereçado à Fran, que chega ao WhatsApp dela (#1222), pedindo as descrições de
+  função das vagas abertas. O texto do pedido é aprovado pelo dono antes de sair. Pré-requisito: o
+  usuário dela no AxiaGestão com o WhatsApp preenchido.
+- **O que não é desta etapa:** receber os arquivos de volta pelo WhatsApp (**#1528**) e escrever o
+  resumo de cada função (conteúdo, depois que os arquivos chegarem; o dono corrige antes de valer).
+
 **6. A trava contra o "anotei" falso.** Código, não instrução: a fala que afirma ter anotado,
 encaminhado ou passado à equipe, numa conversa de vaga sem candidatura gravada nesta mensagem nem antes,
 é recusada (`olivia: recusada: promessa`) e sai no lugar a frase de cadastro que diz o que ainda falta.
@@ -227,8 +240,11 @@ incompleta; inventário e política; manuais; a medição de uma semana.
 **Dentro, pela emenda:** o toque único para toda conversa de vaga sem candidatura (D6); a oferta da
 visita e a marca "quer visitar" (D7); os benefícios do cadastro no que ela pode dizer (D8).
 
-**Fora:** o que cada função faz de verdade, para tirar dúvida e vender a vaga (o degrau seguinte que o
-dono nomeou: documento curto por vaga a partir das descrições de função, chamado próprio); agendar a
+o pedido das descrições de função à Fran e o
+lugar do resumo por função na instrução (D9).
+
+**Fora:** a volta dos arquivos pelo WhatsApp (#1528) e o texto do resumo de cada função, que depende
+deles; agendar a
 visita pela OlivIA; mensagem fora da janela de 24 h; a conversa técnica do agrônomo (terceiro modo); perguntas da ficha editáveis por vaga; os
 textos longos do fluxo fixo (#1524); o defeito da vaga trocada no caminho de reserva (#1522); pré-triagem
 da ficha por IA; o candidato reconhecido como cliente.
