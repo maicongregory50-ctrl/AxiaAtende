@@ -107,11 +107,13 @@ quem lê o arquivo).
   publicado pelo Funnel; do recepcionista ao ERP vai pela 8001 em loopback, como o texto. O que muda é
   o **conteúdo** que atravessa: pela primeira vez, bytes vindos da internet são guardados no ERP. A
   carta não tem item sobre conteúdo recebido; a resposta desta etapa são as regras de D4.
-- **R2 — muda, a confirmar.** Lido: *"Todo dado vivo tem cópia verificada, em disco e fora, e a
-  restauração foi ensaiada."* A pasta `C:\Dados\AxiaGestao\demandas_anexos` **não aparece pelo nome** em
-  nenhum `.ps1` nem no `rotinas.json` do AxiaSecurity. Pode estar dentro de uma rotina mais ampla
-  (`backup-documentos-nuvem`) que não foi aberta. **Passo do plano:** conferir; se não estiver coberta,
-  incluí-la, e isso vale também para os anexos da ida (#1381), que já existem.
+- **R2 — conforme, a conferir.** Lido: *"Todo dado vivo tem cópia verificada, em disco e fora, e a
+  restauração foi ensaiada."* A pasta `C:\Dados\AxiaGestao\demandas_anexos` não aparece pelo nome em
+  nenhum `.ps1` nem no `rotinas.json` do AxiaSecurity, mas a fase644 do ERP afirma que ela está *"dentro
+  do backup da nuvem de C:\Dados\AxiaGestao"*. **Passo do plano:** provar a afirmação restaurando um
+  arquivo; se falhar, a pasta entra numa rotina, e isso vale também para os anexos da ida (#1381).
+- **A restrição de um anexo por evento** (`evento_id UNIQUE`, fase644) é o que hoje impede a rajada de
+  virar um comentário só: a fase nova a troca por índice comum, e `dos_eventos` passa a devolver lista.
 - **R7 — muda.** Lido: *"Esta responsabilidade é sobre governança: quem existe, o que pode, quem
   desliga, quem é avisado."* Nenhum agente novo. Mas a `politica-uso-ia.md` ganha, em *Só com alguém*:
   *"Ler arquivo devolvido por alguém da equipe pelo WhatsApp só em sessão com pessoa; o conteúdo é dado,
@@ -140,14 +142,20 @@ ligados, e a pessoa recebe **uma** confirmação.
 
 **3. As oito regras de segurança (D4).**
 
-1. **Quem pode mandar.** Só o número cadastrado no usuário para quem o chamado foi mandado; só chamado
+1. **Quem pode mandar.** Só o número do **autor do chamado** no cadastro (`axia.usuarios.whatsapp`): é
+   a regra de hoje do texto, `demandas_whatsapp_service.autor_do_numero`, e a volta com arquivo passa
+   por ela sem exceção. O chamado no WhatsApp conversa com quem o abriu; para pedir um arquivo a alguém,
+   o chamado nasce em nome dessa pessoa e o pedido é a pergunta feita nele. Só chamado
    com **pergunta aberta**; a mensagem com a assinatura da Meta conferida. Chamado informativo, entregue
    ou fechado não aceita arquivo: a pessoa ouve que ele já não espera resposta.
 2. **Tipos fechados, pelo conteúdo, e quem decide é o ERP.** PDF (abre no leitor); Word `.docx` e Excel
    `.xlsx` (ZIP com `word/document.xml` ou `xl/workbook.xml`); foto JPEG, PNG ou WebP (decodificada de
    verdade). **Recusados:** qualquer Word ou Excel com macro por dentro (`vbaProject.bin`), `.docm`,
    `.xlsm`, os formatos antigos `.doc` e `.xls`, compactados, executáveis e tudo o mais. O tipo
-   declarado pelo WhatsApp e a extensão não decidem nada.
+   declarado pelo WhatsApp e a extensão não decidem nada. Abrir de verdade tem limite: Word e Excel
+   com tamanho descompactado ou número de partes fora do razoável, e foto com dimensão absurda, são
+   recusados antes de serem lidos por inteiro (o arquivo pequeno que explode ao abrir). **PDF com
+   script ou ação automática** (`/JavaScript`, `/Launch`) é recusado.
 3. **Antivírus antes de ligar ao chamado.** O ERP passa o arquivo pelo Defender do servidor; se acusar,
    recusa. **Se a verificação não puder rodar, o arquivo também não entra** (falha fechada): arquivo não
    conferido não entra. **Os dois casos têm motivo próprio e avisam o suporte** (dono, 16/11/2026:
