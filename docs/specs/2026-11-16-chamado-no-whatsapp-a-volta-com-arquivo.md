@@ -149,8 +149,19 @@ ligados, e a pessoa recebe **uma** confirmação.
    `.xlsm`, os formatos antigos `.doc` e `.xls`, compactados, executáveis e tudo o mais. O tipo
    declarado pelo WhatsApp e a extensão não decidem nada.
 3. **Antivírus antes de ligar ao chamado.** O ERP passa o arquivo pelo Defender do servidor; se acusar,
-   recusa. **Se a verificação não puder rodar, recusa também** (falha fechada): arquivo não conferido não
-   entra.
+   recusa. **Se a verificação não puder rodar, o arquivo também não entra** (falha fechada): arquivo não
+   conferido não entra. **Os dois casos têm motivo próprio e avisam o suporte** (dono, 16/11/2026:
+   *"Recusa por falta de antivírus precisa mensagem específica para avisar o suporte"*):
+   - `antivirus_indisponivel`: o defeito é **nosso**, não do arquivo. O ERP devolve esse motivo, distinto
+     de todos os outros. O arquivo fica guardado no trânsito do AxiaAtende e é tentado de novo por até
+     uma hora. **O suporte é avisado na hora**, pelo canal de avisos ao dono que já existe (#1337), com
+     texto próprio: *"A volta com arquivo está recusando por falta de antivírus: o Defender não respondeu
+     no servidor. Chamado N, de Fulano, HH:MM. Os arquivos estão esperando."* Um aviso por hora enquanto
+     durar, e um quando voltar. Passada a hora sem antivírus, o arquivo é apagado do trânsito e a pessoa
+     é avisada de que não entrou.
+   - `ameaca`: o Defender acusou o arquivo. Recusa definitiva, nada guardado, e **o suporte também é
+     avisado**, com outro texto: *"Arquivo recusado por ameaça: 'nome', de Fulano (número), chamado N."*
+     É o sinal de um celular comprometido, e não pode ficar só numa linha de tela.
 4. **Limites.** 10 MB por arquivo (o recepcionista confere o tamanho que a Meta declara antes de
    baixar, e o real depois); 10 por rajada; 20 por pessoa por dia. Acima, a pessoa ouve o limite.
 5. **Rastro.** Cada arquivo aceito: quem, quando, de qual número, para qual chamado, o nome original e
@@ -173,15 +184,21 @@ comentário, os anexos ligados. Só então o recepcionista manda a confirmação
 
 **5. O que a pessoa ouve.** *"Anotado no chamado N: 3 arquivos. ✓"* depois que o ERP aceitou. A recusa,
 na hora em que o ERP recusa, em linguagem simples: *"Não aceitei 'planilha.xlsm': arquivo com macro"*,
-*"passou de 10 MB"*, *"tipo de arquivo não aceito"*, *"não consegui conferir o arquivo; tente de novo
-mais tarde"*. Rajada com um arquivo recusado e dois aceitos: os dois entram, e a confirmação diz quais.
+*"passou de 10 MB"*, *"tipo de arquivo não aceito"*. **Sem antivírus, a frase é outra e é só dela:**
+*"Recebi 'nome', mas o nosso verificador de segurança está fora do ar e não posso aceitar arquivo sem
+conferir. O suporte já foi avisado. Guardei o arquivo e aviso aqui quando ele entrar; não precisa
+mandar de novo."* Quando entra: a confirmação de sempre. Se passar uma hora: *"O verificador não voltou
+e o arquivo não entrou no chamado N. O suporte está cuidando; mande de novo mais tarde."* Rajada com um arquivo recusado e dois aceitos: os dois entram, e a confirmação diz quais.
 
 **6. Quem vê.** Na gaveta do chamado no ERP, o comentário mostra os arquivos, com download. A skill da
 fila ganha `anexos N` (lista e baixa para uma pasta que a pessoa indica); `ver N` mostra os nomes.
 
 **7. O fracasso silencioso a evitar.** A pessoa ouvir "anotado" e o arquivo não estar no chamado. A
 confirmação nasce da resposta do ERP à transação do item 4, nunca do recebimento. Arquivo que ficou em
-trânsito (ERP fora) é tentado de novo; passada uma hora sem o ERP, a pessoa é avisada de que não entrou.
+trânsito (ERP fora, ou antivírus fora) é tentado de novo; passada uma hora, a pessoa é avisada de que
+não entrou. **O segundo fracasso silencioso é a recusa por falta de antivírus parecer recusa do
+arquivo**: por isso o motivo é próprio, a frase à pessoa é própria e o suporte é avisado (regra 3). A
+medição conta `antivirus_indisponivel` separado das outras recusas.
 
 **Por que B e não A:** o resumo de cada função é escrito a partir do chamado; arquivo guardado só no
 atendimento fica onde ninguém que lê o chamado procura. **Por que não C:** contraria a regra 6.
@@ -235,6 +252,12 @@ frases de hoje que passam a dizer errado.
 4. **Sinais.**
    - **"Anotado no chamado N: 3 arquivos. ✓"**: os arquivos estão no chamado.
    - **"Não aceitei 'nome': ..."**: aquele arquivo não entrou, e a frase diz por quê. Os outros entraram.
+   - **"...o nosso verificador de segurança está fora do ar..."**: o problema é do servidor, não do seu
+     arquivo. Ele ficou guardado e entra sozinho quando o verificador voltar; o suporte já foi avisado.
+     Não mande de novo.
+   - **No WhatsApp do dono, "A volta com arquivo está recusando por falta de antivírus"**: o Defender
+     não respondeu no servidor; há arquivo esperando. **"Arquivo recusado por ameaça"**: o antivírus
+     acusou um arquivo mandado por alguém da equipe; vale conferir o celular da pessoa.
    - **"Este chamado não espera resposta"**: ele já foi respondido ou era só aviso; o arquivo não entrou.
    - **Silêncio por até 5 minutos** depois do último arquivo é normal: o sistema espera para ver se vem
      mais um. Escrever um texto encerra a espera na hora.
