@@ -1,12 +1,19 @@
 # Trabalhe conosco — manual de uso
 
 **Chamado:** #1098 · **Spec:** `docs/specs/2026-10-22-trabalhe-conosco-vaga-e-pre-triagem.md`
+· **Foto como currículo e a OlivIA:** #1520 (`docs/manuais/olivia.md`)
 
 ## 1. Para que serve
 
 Receber os candidatos da vaga aberta pelo WhatsApp da empresa (49 3664 0121) sem ocupar ninguém. O
 atendimento explica a vaga, responde as dúvidas mais comuns com textos aprovados, recebe o currículo
-em PDF e entrega cada um à Fran já com uma pré-triagem. A decisão sobre o candidato é sempre dela.
+em PDF **ou em foto** e entrega cada um à Fran: o PDF já com uma pré-triagem, a foto sem ela (#1520). A
+decisão sobre o candidato é sempre dela.
+
+**Desde o #1520**, quem é de fora e escreve **fora** da conversa da vaga (por exemplo, depois de tocar
+*Era outro assunto* por engano) conversa com a OlivIA, que reconhece o currículo em PDF ou em foto e o
+encaminha à Fran do mesmo jeito: não há mais "não consigo abrir arquivo" para o candidato. Isso vale com
+a chave `OLIVIA_FALA` ligada; a foto dentro da conversa da vaga vale sempre.
 
 ## 2. Quem usa e quando
 
@@ -29,8 +36,9 @@ em PDF e entrega cada um à Fran já com uma pré-triagem. A decisão sobre o ca
    vem como **lista** — *Ver as vagas* — com uma linha por vaga (o nome e o primeiro requisito), mais
    *Outras áreas* e *Era outro assunto*; a escolhida segue como no item 1, com os requisitos dela.
    Quem vem pelo anúncio continua caindo direto na vaga daquele anúncio. Cabem até 8 vagas na lista.
-3. Mandou o PDF: recebe *"Recebemos o seu currículo ✅"*, com o aviso da pré-triagem e de que os
-   pré-selecionados recebem retorno por ali.
+3. Mandou o PDF **ou a foto do currículo**: recebe *"Recebemos o seu currículo ✅"*, com o aviso da
+   pré-triagem e de que os pré-selecionados recebem retorno por ali. Word, áudio ou figurinha recebem
+   *"Precisamos do seu currículo em PDF ou em foto"*.
 4. Se escrever em vez de mandar, o atendimento responde com um dos textos aprovados: a região da vaga,
    salário e benefícios, prazo de retorno, "vocês receberam?", "não tenho PDF", falar com uma pessoa
    (o cartão da Fran). Fora disso, pede de novo o PDF, curto, sem repetir os requisitos (ou repete a
@@ -48,6 +56,11 @@ em PDF e entrega cada um à Fran já com uma pré-triagem. A decisão sobre o ca
 5. Para falar com o candidato: no botão **Conversar** chega o cartão de contato dele; na mensagem que
    chega pelo modelo (quando você não escreveu para o número da empresa nas últimas 24 horas), o botão
    **Conversar com o candidato** abre a conversa direto.
+6. **Currículo em foto** (#1520): chega como **imagem**, com a legenda *"Currículo em foto (sem
+   pré-triagem) · Vaga: … · Candidato: … · Escreveu: …"* e só o botão **Conversar** — não há triagem a
+   avaliar. Se você não escreveu para o número da empresa nas últimas 24 horas, a foto chega dentro de um
+   **PDF de uma página** (*curriculo-foto.pdf*) na mensagem de sempre, com "Sem pré-triagem (foto: sem
+   triagem)"; os botões Triagem certa/errada dessa mensagem são do modelo aprovado e podem ser ignorados.
 
 **O dono:** na tela **Destinos**, cartão *Trabalhe conosco*: **Desligar pré-triagem** e **Fechar vaga**.
 Na tabela dos motivos, a pessoa de *Trabalhe conosco* é quem recebe os currículos.
@@ -64,9 +77,10 @@ Na tabela dos motivos, a pessoa de *Trabalhe conosco* é quem recebe os currícu
 | **Banco de currículos** no título | o candidato escolheu *Outras áreas* no menu, ou não havia vaga aberta |
 | "Sem pré-triagem (pré-triagem desligada / a IA não respondeu / banco de currículos, sem vaga)" | o currículo chegou igual, sem a leitura da IA, pelo motivo entre parênteses |
 | "Não consegui ler o arquivo" | o PDF é imagem ruim ou está protegido; abra e leia você |
+| "Sem pré-triagem (foto: sem triagem)" / "Currículo em foto (sem pré-triagem)" | o candidato mandou a foto do currículo; a IA não lê foto para a triagem (#1520, D5) |
 | "Escreveu: …" no resumo | o que o candidato escreveu na conversa antes de mandar o PDF |
-| Na Recepção, **currículo recebido** | o PDF chegou e vai à Fran |
-| Na Recepção, **sem currículo** | a pessoa conversou e não mandou PDF |
+| Na Recepção, **currículo recebido** | o PDF ou a foto chegou e vai à Fran |
+| Na Recepção, **sem currículo** | a pessoa conversou e não mandou o currículo |
 
 **O currículo que não chegou à Fran ainda:** enquanto a Meta não aprovar o modelo da mensagem, ele só
 sai quando a Fran tiver escrito para o número da empresa nas últimas 24 horas. Os outros esperam na
@@ -77,8 +91,9 @@ fila, tentando uma vez por hora, e não se perdem.
 - **Não aprova, não reprova e não dá nota:** quem decide é a Fran.
 - **Não pergunta ao candidato se ele atende aos requisitos:** quem confere é a pré-triagem.
 - **Não faz pré-triagem do banco de currículos** (*Outras áreas*): não há requisitos contra os quais ler.
+- **Não faz pré-triagem do currículo em foto** (#1520): a Fran olha a foto.
 - **Não responde ao candidato o resultado:** o retorno é da Fran.
-- **Não aceita foto, Word ou texto como currículo:** só PDF.
+- **Não aceita Word ou texto como currículo:** só PDF ou foto (a foto passou a valer em 13/11/2026, #1520).
 - **Não inventa resposta:** a cada pergunta escolhe um texto aprovado pelo dono; o que não está na
   lista volta para a pergunta da vaga.
 - **Não guarda o currículo para sempre:** em 12 meses o arquivo é apagado, com o nome e o número;

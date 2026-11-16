@@ -2,7 +2,7 @@
 **Data:** 2026-11-14
 **Chamado:** #1520
 **Spec de origem:** docs/specs/2026-11-14-a-olivia-anonima-fala.md
-**Status:** APROVADO
+**Status:** EM EXECUÇÃO (passos 1 a 13 feitos em 16/11/2026; 14 em diante, na janela do dono)
 **Executável pelo agente:** não -- o base da empresa é texto do dono, o modelo novo da Meta e os restarts são da janela dele; o código é escrito em sessão de execução com ele por perto
 
 > Ordem por dependência: migração → base → agente (desligado) → ponto de entrada → foto → vigia → tela → testes → documentos → ligar. **A chave `OLIVIA_FALA` nasce `false` e só vira `true` no passo 14**: até lá tudo o que sobe é inerte, e a bateria de hoje tem de passar igual.
@@ -176,13 +176,37 @@
   # conferir a tela; depois, no .env.recepcionista: OLIVIA_FALA=true
   Restart-Service axiaatende-recepcionista
   ```
-- **O modelo `olivia_resumo` da Meta**: o backend o cria ao subir; se a Meta o reprovar, o aviso do
-  vigia fica só na tela até o texto ser ajustado.
+- **O modelo `olivia_resumo` da Meta**: com o porteiro dos avisos ligado (`AXIAATENDE_PORTEIRO=on`,
+  como está hoje), o resumo sai como texto na janela de 24 h ou pelo **Ver** da reabertura, e o modelo é
+  só cadastro (o mesmo do `aviso_painel`, 063): **nada a fazer na Meta**. Só se o porteiro for desligado,
+  em janela elevada: `python -m backend.modelos_meta --propor --so olivia_resumo`
+  (corrigido na execução: o backend NÃO cria modelo na Meta ao subir).
 - **A prova dirigida** de um número de fora (passo 15) e a leitura da medição da semana (passo 16).
 
 ```pos-entrega
 dono=corrigir a base da empresa; Restart-Service axiaatende-backend e axiaatende-recepcionista com OLIVIA_FALA=false; conferir Conversas e Custos; OLIVIA_FALA=true e Restart-Service axiaatende-recepcionista; prova de um número de fora
 ```
+
+## O que a execução mudou (16/11/2026)
+
+- **Modelo da conversa:** `claude-sonnet-5-5` (Sonnet 5.5, o Sonnet vigente, mesmo preço do Sonnet 5),
+  e não `claude-sonnet-5`. D8 diz "Sonnet"; o preço entrou na 065 (US$ 2 / 10 por milhão).
+- **Ponto de entrada:** `motor.tratar` recebe um objeto `olivia` (como `envio` e `campo`), criado em
+  `processar_pendentes` só com `cfg.olivia_fala`; o efeito é o do passo 5. O agradecimento e a resposta
+  automática depois do atendimento continuam antes dela (silêncio, "por nada"). O casamento exato do nó
+  atual ("Sc" no "em qual estado?") continua sem IA.
+- **Ferramentas que não mandam mensagem** (`ver_vagas`, `ler_arquivo_recebido`) vão ao log, não a
+  `enviadas` (que conta o que a Meta aceitou); as que mandam gravam `olivia: ferramenta <nome>: ...`.
+  A fala grava `olivia: fala: <texto>` (o texto alimenta o histórico).
+- **Foto à Fran fora da janela de 24 h:** o modelo da Fran só leva PDF no cabeçalho; a foto (JPEG) vai
+  embrulhada num PDF de uma página (`vaga.pdf_da_foto`, sem biblioteca nova). Dentro da janela, imagem
+  com o botão "Conversar". Foto que não é JPEG espera a janela.
+- **`so_pdf`** passou a dizer "PDF ou em foto" (065), coerente com D5.
+- **Inventário (R7):** a linha nasceu como **agente** (tem ferramentas: PADRÃO §6.2), registro `painel`,
+  e não "chamada" como a spec dizia; a política ganhou a regra e a primeira resposta do B3.
+- **O vigia** conta também a conversa em que ela falou e que travou e voltou ao menu
+  (`conduzida_por = 'menu'`), porque é justamente uma candidata a "sem saída".
+- **Banco de dev 5437** estava parado; a sessão o subiu com `pg_ctl` (só o de dev) para a bateria.
 
 ## Riscos de execução identificados
 

@@ -42,6 +42,18 @@ quanto ela pesa. A aba some para qualquer outro login.
 Só é preciso lançar preço quando a Meta ou o Google mudarem a tabela, ou quando aparecer um modelo novo
 como "sem preço" (o nome na tela é o que o Google devolveu; lance com esse nome).
 
+**A OlivIA que conversa com quem é de fora** (#1520), que só aparece depois de ligada (`OLIVIA_FALA`):
+
+- **OlivIA · conversa com quem é de fora** (Claude **Sonnet 5.5**, `claude-sonnet-5-5`): cada volta da
+  conversa é uma chamada. O preço vem lançado na migração 065: **US$ 2,00** por milhão de tokens de entrada
+  e **US$ 10,00** de saída (tabela de 03/11/2026). A instrução dela vai em cache na Anthropic, que cobra
+  menos pela parte repetida; aqui a entrada é contada **cheia**, então o valor da tela erra para cima,
+  nunca para baixo. Estimativa da spec: centavos por conversa, menos de R$ 2 por dia em dia de anúncio.
+- **OlivIA · leitura do arquivo recebido** (Haiku 5.5): quando a pessoa manda um PDF ou uma foto, uma
+  chamada curta diz o que é (currículo, comprovante, outra coisa). Nada é guardado por ela.
+- **Aviso: resumo da OlivIA** (Meta, utilidade): o resumo do vigia ao seu WhatsApp, só nos dias com
+  conversa sem saída ou frase recusada.
+
 **Duas funções da equipe** (#1238, 03/11/2026), que só aparecem depois de ligadas:
 
 - **OlivIA · assunto da mensagem da equipe** (Claude): quando alguém da casa escreve no WhatsApp sem
