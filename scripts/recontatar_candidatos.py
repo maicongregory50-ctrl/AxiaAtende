@@ -28,6 +28,7 @@ from backend.banco import conexao  # noqa: E402
 
 DESDE = "2026-11-12"
 JANELA = timedelta(hours=23)
+ESPERA = timedelta(hours=3)   # quem escreveu ha menos disso ainda esta no tempo dele: nao se recontata
 RESUMO = "olivia: recontato"
 
 TEXTOS = {
@@ -83,8 +84,11 @@ def candidatos(con, agora: datetime) -> list[dict]:
         caso = "sem_vaga" if v is None else ("ficha" if v["modo"] == "ficha_ou_curriculo" else "curriculo")
         lingua = olivia._lingua_da_conversa(con, c)
         na_janela = ultima is not None and agora - ultima < JANELA
+        # dono, 17/11/2026 ("a OlivIA precisa aprender a esperar tambem"): o recontato das 09:46 alcancou
+        # quem tinha dito "ja envio" as 08:30. Quem falou ha menos de ESPERA nao e recontatado.
+        cedo = ultima is not None and agora - ultima < ESPERA
         estado = ("ja recebeu o recontato" if ja else "em conversa agora" if aberta
-                  else "fora da janela" if not na_janela else "mandar")
+                  else "fora da janela" if not na_janela else "falou ha pouco" if cedo else "mandar")
         lista.append({"wa_id": c["wa_id"], "conversa_id": c["id"], "ultima": ultima, "caso": caso, "lingua": lingua,
                       "estado": estado, "texto": TEXTOS[(caso, lingua)].format(vaga=titulo(v, lingua) if v else "")})
     return lista

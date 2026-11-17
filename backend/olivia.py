@@ -417,6 +417,10 @@ REGRAS_DA_VAGA = (
     "18. Quem atende a vaga é você: não há botão do menu para isso. O que você não sabe da vaga (as tarefas "
     "do dia a dia, pagamento, quando chamam), diga que a equipe explica no contato com o candidato, e siga "
     "pedindo o currículo ou a ficha.\n"
+    # dono, 17/11/2026, lendo a conversa do Jeferson: "a OlivIA precisa aprender a esperar tambem"
+    "19. Saiba esperar. Se a pessoa disse que vai mandar o currículo depois, responda UMA vez, curto, e não "
+    "peça de novo nas mensagens seguintes. A um agradecimento ou a uma despedida, responda curto, sem "
+    "repetir o pedido.\n"
 )
 
 
@@ -473,6 +477,9 @@ def instrucao(con) -> str:
 
 
 FERRAMENTAS_NOMES = ("ver_vagas", "ler_arquivo_recebido", "oferecer_opcao_do_menu", "encaminhar_curriculo", "encerrar")
+# As que NAO mandam nada a pessoa: a fala que vem junto delas espera o resultado (#1543).
+FERRAMENTAS_MUDAS = ("ver_vagas", "ler_arquivo_recebido", "encaminhar_curriculo", "escolher_vaga", "anotar_ficha",
+                     "marcar_visita")
 
 
 def ferramentas(con, conversa=None) -> list[dict]:
@@ -795,26 +802,44 @@ def _atender(con, saida, ia, e, agora: datetime, estado: dict) -> bool:
                            (conversa["id"],)).fetchone()
     estado["conversa"] = conversa
     sistema = instrucao(con)
+    guardada = ""
     for volta in range(VOLTAS):
         lista = ferramentas(con, estado["conversa"])   # #1525: o estado muda dentro da mesma mensagem
         estado["oferecidas"] = {f["name"] for f in lista}
         r = ia.conversar(sistema, marca, turnos, lista)
         if r is None:
+            if guardada:
+                _falar(con, saida, estado, guardada, travada=bool(marca))
             if not estado["falou"]:
                 print("olivia: a IA nao respondeu (%s): o caminho de hoje" % e.wamid, flush=True)
             return estado["falou"]
-        if r.get("texto"):
+        # #1543 (dono, 17/11/2026: "a OlivIA precisa aprender a esperar tambem"): a fala que vem JUNTO de uma
+        # ferramenta que nao manda nada a pessoa (marcar a vaga, anotar a ficha) espera o resultado. Sem isso
+        # saiam duas mensagens seguidas para uma so da pessoa ("Combinado! Fico no aguardo." e, no mesmo
+        # minuto, "Vaga marcada! E so mandar o curriculo"). Fica a que ela disser depois; se nao disser, esta.
+        mudas = bool(r.get("ferramentas")) and all(f["nome"] in FERRAMENTAS_MUDAS for f in r["ferramentas"])
+        if r.get("texto") and mudas:
+            guardada = r["texto"]
+        elif r.get("texto"):
             _falar(con, saida, estado, r["texto"], travada=bool(marca))
+            guardada = ""
         if not r.get("ferramentas"):
             break
         turnos.append({"role": "assistant", "content": r.get("conteudo") or r["texto"]})
         resultados = []
-        for f in r["ferramentas"]:
-            resultado = _executar(con, saida, ia, estado, f["nome"], f.get("entrada") or {}, agora)
-            resultados.append({"type": "tool_result", "tool_use_id": f["id"], "content": resultado})
+        try:
+            for f in r["ferramentas"]:
+                resultado = _executar(con, saida, ia, estado, f["nome"], f.get("entrada") or {}, agora)
+                resultados.append({"type": "tool_result", "tool_use_id": f["id"], "content": resultado})
+        except Exception:
+            if guardada:   # a ferramenta quebrou: a fala guardada sai, e a pessoa nao fica sem resposta dela
+                _falar(con, saida, estado, guardada, travada=bool(marca))
+            raise
         turnos.append({"role": "user", "content": resultados})
         if estado["acabou"]:
             break
+    if guardada and not estado["acabou"]:
+        _falar(con, saida, estado, guardada, travada=bool(marca))   # ela nao disse mais nada depois da ferramenta
     return estado["falou"]
 
 

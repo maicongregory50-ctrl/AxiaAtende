@@ -676,3 +676,32 @@ def test_1543_curriculo_sem_triagem_vai_a_fran_sem_a_pergunta_da_triagem_e_com_o
     assert "Escreveu: Banco de currículo ou engenheiro agrônomo" in legenda
     assert "triagem acertou" not in legenda.lower() and "—" not in legenda
     assert [b[1] for b in botoes] == ["Conversar"]
+
+
+def test_1543_a_fala_que_vem_com_ferramenta_muda_espera_o_resultado(conduz):
+    """17/11/2026, 08:30: "Combinado! Fico no aguardo." e, no mesmo minuto, "Vaga marcada! E so mandar o
+    curriculo" -- duas mensagens para uma so da pessoa. Fica a que ela diz depois da ferramenta."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Olá! Qual vaga te interessa?"}]
+    passo(conduz, s, toque("w1", "menu:trabalhe", numero=DE_FORA), ia)
+    antes = len(s.enviadas)
+    ia.conversa = [{"texto": "Combinado! Fico no aguardo.", "ferramentas": [("escolher_vaga", {"vaga_id": 2})]},
+                   {"texto": "Vaga de Auxiliar marcada. Mande o currículo quando puder."}]
+    passo(conduz, s, texto("w2", "auxiliar, já envio", numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=1))
+    assert len(s.enviadas) == antes + 1
+    assert s.ultima[2] == "Vaga de Auxiliar marcada. Mande o currículo quando puder."
+
+
+def test_1543_se_ela_nao_disser_mais_nada_a_fala_guardada_sai(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Olá! Qual vaga te interessa?"}]
+    passo(conduz, s, toque("w1", "menu:trabalhe", numero=DE_FORA), ia)
+    antes = len(s.enviadas)
+    ia.conversa = [{"texto": "Combinado! Fico no aguardo.", "ferramentas": [("escolher_vaga", {"vaga_id": 2})]}]
+    passo(conduz, s, texto("w2", "auxiliar, já envio", numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=1))
+    assert len(s.enviadas) == antes + 1 and s.ultima[2] == "Combinado! Fico no aguardo."
+
+
+def test_1543_a_instrucao_manda_esperar(conduz):
+    with conexao(conduz) as con:
+        assert "Saiba esperar" in O.instrucao(con)
