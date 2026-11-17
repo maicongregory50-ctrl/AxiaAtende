@@ -155,6 +155,20 @@ def test_c_o_botao_da_folha_diz_o_nome_da_opcao(ligada):
     assert s.ultima[2] == "Posso te passar para Trabalhe conosco?"
 
 
+def test_c_depois_dos_botoes_ela_nao_fala_mais_nesta_vez(ligada):
+    """Dono, 17/11/2026: "vamos ajustar o muito falante da OlivIA". Em 18:54 sairam tres mensagens para uma:
+    "Vou te mostrar o botao", os botoes, e "Mandei o botao... Posso ajudar em mais alguma coisa?"."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "É sobre frete: quem atende é o setor de Fretes.",
+                    "ferramentas": [("oferecer_opcao_do_menu", {"chave": "fretes"})]},
+                   {"texto": "Mandei o botão de Fretes. Posso ajudar em mais alguma coisa?"}]
+    antes = len(s.enviadas)
+    passo(ligada, s, texto("w1", "vi um frete de vocês para o Paraná"), ia=ia)
+    assert [x[0] for x in s.enviadas[antes:]] == ["texto", "botoes"]
+    assert len(ia.chamadas) == 1                                         # nem pergunta de novo ao modelo
+    assert "depois deles você não escreve mais nada" in ia.chamadas[0]["sistema"]
+
+
 def test_c_oferecer_um_no_com_opcoes_manda_a_pergunta_dele(ligada):
     s, ia = SaidaFalsa(), IAFalsa()
     ia.conversa = [{"texto": "Você é produtor ou revenda?", "ferramentas": [("oferecer_opcao_do_menu", {"chave": "comercial"})]}]

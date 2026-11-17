@@ -476,7 +476,9 @@ def instrucao(con) -> str:
         "conversa com essa pessoa com texto próprio, cordial e direto, e leva cada uma ao lugar certo. "
         # 16/11/2026 (dono): "e muito texto para ler" -- o publico do chao de fabrica le pouco
         "SEJA CURTA: no máximo duas frases curtas por mensagem, uma pergunta por vez, sem repetir o que "
-        "já disse. Nada de listas longas.\n\n"
+        "já disse. Nada de listas longas. Ao usar oferecer_opcao_do_menu, diga UMA frase curta na mesma "
+        "resposta, antes dos botões, sem anunciar que vai mandá-los: os botões já fazem a pergunta, e depois "
+        "deles você não escreve mais nada nesta vez. Não termine com \"posso ajudar em mais alguma coisa?\".\n\n"
         "REGRAS, sem exceção:\n"
         # #1525 (D7 da spec, item 7): na prova de 16/11 um audio em espanhol foi respondido em portugues
         "1. Fale na língua da ÚLTIMA mensagem da pessoa, português ou espanhol, inclusive quando ela é a "
@@ -959,6 +961,7 @@ def _oferecer(con, saida, estado, chave: str, agora: datetime) -> str:
         con.execute("UPDATE atendimento.conversas SET no_atual_id = %s WHERE id = %s", (raiz["id"], c["id"]))
         _registrar(con, c["id"], p.para, "lista", "%s oferecer_opcao_do_menu: raiz" % FERRAMENTA, w)
         estado["falou"] = estado["falou"] or bool(w)
+        estado["acabou"] = estado.get("acabou") or bool(w)   # o menu tambem encerra a vez dela
         return "O menu inteiro foi mandado à pessoa." if w else "O menu não pôde ser mandado agora."
     no = motor._no(con, chave)
     opcoes = {o["chave"]: o for o in _opcoes_do_menu(con)}
@@ -984,6 +987,11 @@ def _oferecer(con, saida, estado, chave: str, agora: datetime) -> str:
     con.execute("UPDATE atendimento.conversas SET ia_proposta_id = %s WHERE id = %s", (no["id"], c["id"]))
     _registrar(con, c["id"], p.para, tipo, "%s oferecer_opcao_do_menu: %s" % (FERRAMENTA, chave), w)
     estado["falou"] = estado["falou"] or bool(w)
+    if w:
+        # Dono, 17/11/2026: "vamos ajustar o muito falante da OlivIA". Os botoes ja fazem a pergunta ("Posso te
+        # passar para Fretes?"); depois deles saia mais uma fala ("Mandei o botao... Posso ajudar em mais alguma
+        # coisa?"), a terceira mensagem para uma so da pessoa (conversa de 18:54). Os botoes encerram a vez dela.
+        estado["acabou"] = True
     return ("Os botões de \"%s\" foram mandados; a pessoa toca e recebe o contato." % no["rotulo"]) if w \
         else "Os botões não puderam ser mandados agora."
 
