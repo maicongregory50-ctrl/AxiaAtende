@@ -120,7 +120,11 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
 
 - A chave `pendencias.ligado` (em `atendimento.ajustes`) liga e desliga tudo. Desligada, nada sai e
   nenhuma resposta é tomada; o atendimento volta a ser o de antes.
-- `pendencias.juntar_minutos` (10) é quanto tempo a junção espera a rajada acabar.
+- `pendencias.juntar_minutos` é quanto tempo a junção espera a rajada acabar. Nasceu em 10; o dono o
+  baixou para **1** em 17/11/2026 (*"se ficar ruim, subimos"*: uma pergunta sozinha esperava os 10
+  minutos). Muda sem restart, em janela elevada: `scripts\pendencias.py juntar <minutos>` (de 0 a 30;
+  `mostrar` diz o valor de agora). Sinal de que ficou curto demais: a pessoa receber duas mensagens
+  seguidas do mesmo chamado em vez de uma.
 - `roteador.ligado` e `roteador.carencia_minutos` (3): a resposta sem deslizar que entra direto, e a
   espera antes de ir ao ERP (manual `roteador.md`).
 - A volta das telas traz do ERP a cada minuto e leva as respostas; o recepcionista manda e lê.
