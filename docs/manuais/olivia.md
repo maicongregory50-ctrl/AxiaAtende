@@ -41,7 +41,10 @@ autenticado são os próximos degraus, em chamados próprios.
    isso"*** de novo depois disso, ela manda o **menu** e para de falar naquela conversa: dali em diante, é o
    menu de sempre. Cinco respostas dela sem a conversa andar (sem toque, currículo ou opção escolhida) só a
    fazem mudar de abordagem, **nunca** mandam o menu (dono, 16/11/2026: o candidato que ia mandar o
-   currículo à noite recebeu o menu no meio de uma conversa boa).
+   currículo à noite recebeu o menu no meio de uma conversa boa). **Na conversa de vaga** (#1543,
+   17/11/2026) a contagem de respostas não vale, e um segundo "Sim" ou "Ok" não conta como mensagem
+   repetida: ali perguntar e ouvir resposta é a conversa andando. Só *"não é isso"* e a repetição de uma
+   mensagem de mais de três palavras a fazem mudar de abordagem.
    Ela escreve **curto**: no máximo duas frases por mensagem, uma pergunta por vez. Quando a pessoa manda
    o currículo sem dizer a vaga, ela pergunta qual antes de encaminhar, e encaminha o arquivo que já veio.
 6. **A conversa da vaga** (#1525), com a chave `olivia.conduz_vaga` ligada: quem chega pelo anúncio ou
@@ -50,7 +53,11 @@ autenticado são os próximos degraus, em chamados próprios.
    de contato** depois do aviso de cadastro. Na vaga de currículo obrigatório, diz que o currículo é
    indispensável (pode ser foto) e oferece a vaga de ficha, se houver. Recebida a ficha ou o currículo,
    oferece uma vez a visita à empresa. Quem para no meio, ou nem começa, recebe **um** toque só, dentro das
-   24 horas. O detalhe está no manual `trabalhe-conosco.md`, seção 6. Ela fala dos **benefícios** que o
+   24 horas, **e só entre 7h e 21h** (#1543): o toque que cairia de noite espera a manhã, e não sai se as
+   24 horas fecharem antes. Ele vai na língua em que a conversa correu e fala da vaga que a pessoa disse,
+   mesmo que tenha sido na conversa anterior. **Na conversa de vaga ela não oferece o botão *Trabalhe
+   conosco***: quem atende a vaga é ela; o que não sabe (as tarefas, pagamento), diz que a equipe explica
+   no contato. O detalhe está no manual `trabalhe-conosco.md`, seção 6. Ela fala dos **benefícios** que o
    cadastro da vaga traz, nunca de valor, e, quando existir o arquivo da vaga em
    `C:\AxiaAtende\docs\olivia\funcoes\`, do que a função faz (`LEIAME.md` ali).
 7. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte

@@ -523,3 +523,103 @@ def test_destinos_mostra_e_troca_o_modo(conduz):
         assert t.put("/api/vagas/3/modo", json={"modo": "ficha_ou_curriculo"}).status_code == 200
         assert t.put("/api/vagas/3/modo", json={"modo": "outro"}).status_code == 422
     assert ler(conduz, "SELECT modo FROM atendimento.vagas WHERE id = 3")[0]["modo"] == "ficha_ou_curriculo"
+
+
+# ── #1543: os quatro defeitos da primeira noite (16 para 17/11/2026) ──────────
+
+def test_1543_trabalhe_conosco_sai_do_que_ela_oferece(conduz):
+    with conexao(conduz) as con:
+        enum = [f for f in O.ferramentas(con) if f["name"] == "oferecer_opcao_do_menu"][0][
+            "input_schema"]["properties"]["chave"]["enum"]
+        assert "trabalhe" not in enum and "trabalhe" not in [o["chave"] for o in O._opcoes_do_menu(con)]
+        assert "Quem atende a vaga é você" in O.instrucao(con)
+        con.execute("UPDATE atendimento.ajustes SET valor = 'false'::jsonb WHERE chave = 'olivia.conduz_vaga'")
+        assert "trabalhe" in [o["chave"] for o in O._opcoes_do_menu(con)]   # desligada, o menu de sempre
+
+
+def test_1543_o_sim_do_botao_antigo_nao_devolve_o_botao(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"ferramentas": [("oferecer_opcao_do_menu", {"chave": "trabalhe"})]},
+                   {"texto": "Qual vaga te interessa?"}]
+    passo(conduz, s, toque("w1", "ia:sim:trabalhe", numero=DE_FORA), ia)
+    assert not [r for r in resumos(conduz) if "oferecer_opcao_do_menu" in r]
+    assert s.ultima[2] == "Qual vaga te interessa?"
+
+
+def test_1543_o_toque_usa_a_vaga_da_conversa_anterior(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"ferramentas": [("escolher_vaga", {"vaga_id": 3})]}, {"texto": "Você tem currículo?"}]
+    passo(conduz, s, toque("w1", "menu:trabalhe", numero=DE_FORA), ia)
+    with conexao(conduz) as con:   # a pessoa fecha pelo menu e reabre: conversa nova, de vaga, sem vaga
+        con.execute("UPDATE atendimento.conversas SET situacao = 'encerrada'")
+    ia.conversa = [{"texto": "Quando o currículo estiver pronto, mande por aqui."}]
+    passo(conduz, s, toque("w2", "menu:trabalhe", numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=5))
+    c = conversa(conduz)
+    assert c["trabalhe"] and c["vaga_id"] is None
+    with conexao(conduz) as con:
+        assert O.tocar_vagas(con, s, AGORA + timedelta(hours=2, minutes=10)) == 1
+    assert "currículo" in s.ultima[2] and "ficha" not in s.ultima[2]
+
+
+def test_1543_conversa_em_espanhol_sem_ficha_recebe_o_toque_em_espanhol(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"ferramentas": [("escolher_vaga", {"vaga_id": 3})]},
+                   {"texto": "Para esta vacante el currículum es obligatorio. ¿Lo tienes a mano?"}]
+    passo(conduz, s, texto("w1", "Trabajar con ustedes", numero=DE_FORA), ia)
+    c = conversa(conduz)
+    assert c["trabalhe"] and c["lingua"] is None
+    with conexao(conduz) as con:
+        assert O._lingua_da_conversa(con, c) == "es"
+        assert O.tocar_vagas(con, s, AGORA + timedelta(hours=2)) == 1
+    assert "Todavía" in s.ultima[2]
+
+
+def test_1543_conversa_em_portugues_continua_em_portugues(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Olá! É a vaga de Auxiliar de produção. Você tem currículo?"}]
+    passo(conduz, s, anuncio("w1"), ia)
+    with conexao(conduz) as con:
+        assert O._lingua_da_conversa(con, conversa(conduz)) == "pt"
+
+
+def test_1543_o_toque_espera_o_horario(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    noite = datetime(2026, 11, 17, 0, 16, tzinfo=timezone.utc)   # 21:16 de 16/11 em Brasilia
+    ia.conversa = [{"texto": "Olá! É a vaga de Auxiliar de produção. Você tem currículo?"}]
+    passo(conduz, s, anuncio("w1"), ia, agora=noite)
+    with conexao(conduz) as con:
+        assert O.tocar_vagas(con, s, noite + timedelta(hours=2, minutes=40)) == 0   # 23:56: espera
+        assert conversa(conduz)["vaga_lembrada_em"] is None
+        assert O.tocar_vagas(con, s, datetime(2026, 11, 17, 10, 0, tzinfo=timezone.utc)) == 1   # 07:00
+        assert O.tocar_vagas(con, s, datetime(2026, 11, 17, 11, 0, tzinfo=timezone.utc)) == 0   # um so
+
+
+def test_1543_o_toque_que_esperou_e_perdeu_a_janela_nao_sai(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    cedo = datetime(2026, 11, 17, 9, 30, tzinfo=timezone.utc)   # 06:30 em Brasilia
+    ia.conversa = [{"texto": "Olá! Você tem currículo?"}]
+    passo(conduz, s, anuncio("w1"), ia, agora=cedo)
+    with conexao(conduz) as con:
+        assert O.tocar_vagas(con, s, cedo + timedelta(minutes=20)) == 0                          # 06:50: cedo demais
+        assert O.tocar_vagas(con, s, datetime(2026, 11, 18, 10, 0, tzinfo=timezone.utc)) == 0   # 07:00, 24 h 30 depois
+    assert O.TOQUE_VAGA not in resumos(conduz)
+
+
+def test_1543_respostas_curtas_na_vaga_nao_travam(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Olá! É a vaga de Auxiliar de produção. Você tem currículo?"}]
+    passo(conduz, s, anuncio("w1"), ia)
+    for i, t in enumerate(["Tenho", "Sim", "Sim", "Já envio", "Ok", "Ok", "Uma pergunta", "Qual a função"]):
+        ia.conversa = [{"texto": "Certo, resposta %d." % i}]
+        passo(conduz, s, texto("t%d" % i, t, numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=1 + i))
+    assert not [r for r in resumos(conduz) if r.startswith(O.FALA_TRAVOU)]
+    assert conversa(conduz)["conduzida_por"] == "olivia" and "Certo, resposta 7." == s.ultima[2]
+
+
+def test_1543_nao_e_isso_continua_marcando_na_vaga(conduz):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Olá! É a vaga de Auxiliar de produção. Você tem currículo?"}]
+    passo(conduz, s, anuncio("w1"), ia)
+    ia.conversa = [{"texto": "Me diga em uma frase o que você precisa."}]
+    passo(conduz, s, texto("t1", "não é isso que eu perguntei", numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=1))
+    assert [r for r in resumos(conduz) if r.startswith(O.FALA_TRAVOU)]
