@@ -705,3 +705,13 @@ def test_1543_se_ela_nao_disser_mais_nada_a_fala_guardada_sai(conduz):
 def test_1543_a_instrucao_manda_esperar(conduz):
     with conexao(conduz) as con:
         assert "Saiba esperar" in O.instrucao(con)
+
+
+def test_1525_quem_clica_no_anuncio_da_empilhadeira_cai_na_vaga(conduz):
+    """069: os dois anuncios que o dono criou em 12/11 ficaram sem vaga ate 17/11 (51 mensagens)."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Olá! É a vaga de Operador de empilhadeira. Você tem currículo?"}]
+    passo(conduz, s, anuncio("w1", corpo="Olá! Posso ter mais informações sobre isso?", fonte="120250019686590192"), ia)
+    c = conversa(conduz)
+    assert c["trabalhe"] and c["vaga_id"] == 3 and c["conduzida_por"] == "olivia"
+    assert ler(conduz, "SELECT anuncio_ids FROM atendimento.vagas WHERE id = 3")[0]["anuncio_ids"] == ["120250019686590192"]
