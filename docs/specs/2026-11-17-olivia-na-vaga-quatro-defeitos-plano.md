@@ -66,8 +66,11 @@ dono=Restart-Service axiaatende-recepcionista; confirmar o horario do toque (7h 
 ## Riscos de execução identificados
 
 - **Passos 1 a 7 interrompidos:** nada muda em produção até o restart.
-- **Passo 3, o toque que espera a manhã:** quem escreveu às 6h59 de ontem e ficou em silêncio perde o
-  toque (a janela fecha às 6h59 de hoje, antes das 7h). É o preço de não escrever de madrugada.
+- **Passo 3, o horário (decidido pelo dono em 17/11/2026, depois do plano):** das **6h às 21h**, e *"às 21
+  horas mandas todos os toques da fila se forem vencer antes das 6h do dia seguinte"*. Com a rotina
+  rodando a cada minuto, o silêncio de 21h a 6h (9 horas) nunca consome a janela de 24 h de quem escreveu
+  dentro do horário; a última chamada das 21h cobre o toque que ficou na fila por serviço parado. O que
+  este risco dizia antes ("quem escreveu às 6h59 perde o toque") estava errado: esse toque sai às 8h59.
 - **Passo 4:** tirar o `fraco` da vaga deixa a conversa de vaga sem o aviso de "mude de abordagem"; o
   vigia diário continua contando a conversa de vaga sem ficha nem currículo como sem saída.
 
