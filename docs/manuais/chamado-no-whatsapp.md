@@ -140,7 +140,9 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
   restart, por `scripts\chamado_no_whatsapp.py ligar-arquivo|desligar-arquivo` (janela elevada, como o
   `ligar`; o `ver` mostra as duas chaves): desligada, o arquivo segue os caminhos de hoje (o que já estava no caminho termina). Os tetos:
   `pendencias.rajada_minutos` (5), `pendencias.rajada_teto` (10), `pendencias.arquivo_dia_teto` (20). O
-  recepcionista baixa para `envios_pasta\chamados_volta` (o trânsito) e as telas levam cada arquivo ao ERP
+  recepcionista baixa para `envios_pasta\chamados_volta` (o trânsito: `C:\Dados\AxiaAtende\envios\chamados_volta`,
+  que precisa existir com **Modificar** para o LocalService, a conta do recepcionista; sem isso cada arquivo
+  é recusado com "baixar: [WinError 5] Acesso negado", como em 17/11) e as telas levam cada arquivo ao ERP
   (`POST /demandas/whatsapp/{id}/arquivo`); a cópia sai do trânsito assim que o ERP responde. Fechada a
   rajada, as telas gravam **um** comentário com os arquivos, e só com o evento de volta o recepcionista
   manda o "Anotado". ERP fora: o arquivo espera até 24 h; sem antivírus: até 1 h. O `/saude` das telas
