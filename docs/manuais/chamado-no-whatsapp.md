@@ -133,7 +133,8 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
   o texto já saiu: o erro fica na mensagem ("anexo: ...") e no log. A chave `pendencias.anexo_ligado`
   desliga só o documento; o texto continua saindo.
 - **A volta com arquivo (#1528).** A chave `pendencias.arquivo_volta` (nasce desligada) liga e desliga, sem
-  restart: desligada, o arquivo segue os caminhos de hoje (o que já estava no caminho termina). Os tetos:
+  restart, por `scripts\chamado_no_whatsapp.py ligar-arquivo|desligar-arquivo` (janela elevada, como o
+  `ligar`; o `ver` mostra as duas chaves): desligada, o arquivo segue os caminhos de hoje (o que já estava no caminho termina). Os tetos:
   `pendencias.rajada_minutos` (5), `pendencias.rajada_teto` (10), `pendencias.arquivo_dia_teto` (20). O
   recepcionista baixa para `envios_pasta\chamados_volta` (o trânsito) e as telas levam cada arquivo ao ERP
   (`POST /demandas/whatsapp/{id}/arquivo`); a cópia sai do trânsito assim que o ERP responde. Fechada a
