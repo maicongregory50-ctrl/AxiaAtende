@@ -61,6 +61,14 @@ autenticado são os próximos degraus, em chamados próprios.
    no contato. O detalhe está no manual `trabalhe-conosco.md`, seção 6. Ela fala dos **benefícios** que o
    cadastro da vaga traz, nunca de valor, e, quando existir o arquivo da vaga em
    `C:\AxiaAtende\docs\olivia\funcoes\`, do que a função faz (`LEIAME.md` ali).
+   **A conversa de quem quer comprar** (#1589), com a chave `olivia.conduz_venda` ligada: ela diz se a
+   Renascer tem o que a pessoa procura (seção *Temos e não temos* da base), pergunta com quem fala quando
+   o nome não aparece no perfil, pergunta **uma vez** a cidade e quanto a pessoa precisa, e, sabendo se é
+   produtor, revenda ou corretor e de que estado, **entrega o cartão de quem atende direto**, sem o botão
+   "Sim". Em dúvida, manda os botões de sempre. Não fala de preço, dose, época, estoque nem prazo, e não
+   avisa o representante: quem chama é a pessoa, pelo cartão. Desligada a chave, quem quer comprar recebe
+   os botões do Comercial, como antes. Liga e desliga sem restart: `scripts\olivia.py ligar-venda` e
+   `desligar-venda`.
 7. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
    e a data entre colchetes (a OlivIA não as repete à pessoa). A OlivIA relê o arquivo sozinha quando
    ele muda: **não precisa reiniciar nada**. O inventário das fontes, com o que entrou e por quê, está em
@@ -78,6 +86,8 @@ autenticado são os próximos degraus, em chamados próprios.
 | Na tela **Custos**, **OlivIA · conversa com quem é de fora** (Claude Sonnet 5.5) e **OlivIA · leitura do arquivo recebido** (Haiku) | o custo dela, por chamada, desde a primeira conversa |
 | No `/saude` do recepcionista (`http://127.0.0.1:8008/saude`), **"olivia": "ligada"** | a voz dela está ligada no servidor |
 | No `/saude`, **"olivia_vaga": "ligada"** | ela conduz a conversa de vaga (#1525) |
+| No `/saude`, **"olivia_venda": "ligada"** | ela conduz a conversa de quem quer comprar (#1589) |
+| Na conversa de compra, **o cartão de quem atende sem o botão "Sim" antes** | ela tinha certeza da categoria (produtor, revenda, corretor) e do estado. **Os botões** em vez do cartão: ficou em dúvida, ou a chave está desligada |
 | **Frase recusada: promessa** | numa conversa de vaga, ela tentou dizer que anotou ou encaminhou antes de a ficha ou o currículo estar gravado; saiu no lugar a frase do que ainda falta, e contou no resumo |
 | No resumo, **"N fichas incompletas"** | fichas que foram à Fran pela metade porque a pessoa parou de responder |
 | No `/saude`, em `audio`: **"de_fora": true** e **"pendentes_de_fora"** | o áudio de quem é de fora está ligado, e quantos esperam a transcrição |
@@ -96,6 +106,8 @@ autenticado são os próximos degraus, em chamados próprios.
 - **Não pergunta idade, estado civil, nacionalidade, filhos nem saúde**, não marca dia de visita e não
   manda mais de um toque por conversa.
 - **Não promete prazo, valor, salário nem vaga**, e não escreve telefone, e-mail ou link.
+- **Na conversa de compra não negocia**: não diz preço, dose, época de plantio nem estoque, não recomenda
+  produto para a área da pessoa, não guarda ficha de quem quer comprar e não avisa o representante.
 - **Não faz pré-triagem de currículo em foto**: a Fran olha.
 - **Não responde figurinha nem localização**, e o **áudio só com a chave `audio.de_fora` ligada**; fora
   disso, a linha curta de sempre. **Não responde em áudio.**

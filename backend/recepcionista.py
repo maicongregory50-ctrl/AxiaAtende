@@ -309,6 +309,7 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 seg = segurar.estado(con)
                 from . import olivia as olivia_mod   # #1525: a chave da conducao da vaga (no banco)
                 vaga_ligada = olivia_mod.conduz_vaga(con)
+                venda_ligada = olivia_mod.conduz_venda(con)   # #1589: a conversa de quem quer comprar
         except Exception as erro:  # noqa: BLE001
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
@@ -319,6 +320,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "olivia": "ligada" if cfg.olivia_fala else "desligada",
                 # #1525: a OlivIA conduz a conversa de vaga (ajuste `olivia.conduz_vaga`; vale so com a de cima)
                 "olivia_vaga": "ligada" if vaga_ligada else "desligada",
+                # #1589: a OlivIA conduz a conversa de quem quer comprar (ajuste `olivia.conduz_venda`)
+                "olivia_venda": "ligada" if venda_ligada else "desligada",
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
                 "chegadas": chegadas,
                 # #1028: o que o motor DEIXOU de mandar desde que o servico subiu, para a regra que
