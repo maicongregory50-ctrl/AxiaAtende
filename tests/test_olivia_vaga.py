@@ -22,12 +22,24 @@ FICHA = [("nome", "Maria Aparecida da Silva"), ("cidade", "Cunha Porã"), ("expe
 
 @pytest.fixture
 def conduz(cfg, tmp_path):
-    """A OlivIA ligada (OLIVIA_FALA) e a chave da vaga ligada; a Auxiliar (2) com anuncio."""
+    """A OlivIA ligada (OLIVIA_FALA) e a chave da vaga ligada; a Auxiliar (2) com anuncio. O horario do toque
+    fica ABERTO o dia inteiro (os tres ajustes), para os testes da espera de 2 h nao dependerem do relogio; o
+    horario da noite (18h, 20h, 21h) e provado a parte, com a fixture `noite`."""
     c = replace(cfg, responde=True, olivia_fala=True, campo_pasta=tmp_path / "campo")
     with conexao(c) as con:
         con.execute("UPDATE atendimento.ajustes SET valor = 'true'::jsonb WHERE chave = 'olivia.conduz_vaga'")
         con.execute("UPDATE atendimento.vagas SET anuncio_ids = ARRAY[%s] WHERE id = 2", (ANUNCIO_AUX,))
+        con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES ('olivia.toque_hora_de', '0'::jsonb),
+                       ('olivia.toque_hora_ideal', '0'::jsonb), ('olivia.toque_hora_ate', '24'::jsonb)""")
     return c
+
+
+@pytest.fixture
+def noite(conduz):
+    """`conduz` com o horario do toque como nasce: 18h, 20h, 21h."""
+    with conexao(conduz) as con:
+        con.execute("DELETE FROM atendimento.ajustes WHERE chave LIKE 'olivia.toque_hora_%%'")
+    return conduz
 
 
 @pytest.fixture
@@ -582,51 +594,58 @@ def test_1543_conversa_em_portugues_continua_em_portugues(conduz):
         assert O._lingua_da_conversa(con, conversa(conduz)) == "pt"
 
 
-def test_1543_o_toque_espera_o_horario(conduz):
-    s, ia = SaidaFalsa(), IAFalsa()
-    noite = datetime(2026, 11, 17, 0, 16, tzinfo=timezone.utc)   # 21:16 de 16/11 em Brasilia
+def _br(dia, hora, minuto=0):
+    """Hora de Brasilia (UTC-3) de novembro de 2026, em UTC."""
+    return datetime(2026, 11, dia, hora, minuto, tzinfo=timezone.utc) + timedelta(hours=3)
+
+
+def _chegou(cfg, s, quando):
+    ia = IAFalsa()
     ia.conversa = [{"texto": "Olá! É a vaga de Auxiliar de produção. Você tem currículo?"}]
-    passo(conduz, s, anuncio("w1"), ia, agora=noite)
-    with conexao(conduz) as con:
-        assert O.tocar_vagas(con, s, noite + timedelta(hours=2, minutes=40)) == 0   # 23:56: espera
-        assert conversa(conduz)["vaga_lembrada_em"] is None
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 17, 10, 0, tzinfo=timezone.utc)) == 1   # 07:00
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 17, 11, 0, tzinfo=timezone.utc)) == 0   # um so
+    passo(cfg, s, anuncio("w1"), ia, agora=quando)
 
 
-def test_1543_as_21h_sai_o_toque_que_venceria_antes_das_6h(conduz):
-    """Dono, 17/11/2026: "as 21 horas mandas todos os toques da fila se forem vencer antes das 6h do dia
-    seguinte". Quem escreveu as 05:00 e nao foi tocado no dia (servico parado) tem a janela fechando as 05:00
-    de amanha: as 21h e a ultima chamada."""
-    s, ia = SaidaFalsa(), IAFalsa()
-    cedo = datetime(2026, 11, 17, 8, 0, tzinfo=timezone.utc)   # 05:00 em Brasilia
-    ia.conversa = [{"texto": "Olá! Você tem currículo?"}]
-    passo(conduz, s, anuncio("w1"), ia, agora=cedo)
-    with conexao(conduz) as con:
-        assert O.tocar_vagas(con, s, cedo + timedelta(minutes=30)) == 0                          # 05:30: silencio
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 18, 0, 20, tzinfo=timezone.utc)) == 0   # 21:20: passou a chamada
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 18, 0, 5, tzinfo=timezone.utc)) == 1    # 21:05: a ultima chamada
-    assert O.TOQUE_VAGA in resumos(conduz)
+def test_1543_quem_escreve_de_manha_recebe_o_toque_as_20h(noite):
+    """Dono, 17/11/2026: "precisa ser sempre depois das 18h, antes normalmente eles estao no trabalho, entao
+    la pelas 20h seria o ideal"."""
+    s = SaidaFalsa()
+    _chegou(noite, s, _br(17, 10))
+    with conexao(noite) as con:
+        assert O.tocar_vagas(con, s, _br(17, 12)) == 0        # 2 h depois, de dia: espera
+        assert O.tocar_vagas(con, s, _br(17, 17, 59)) == 0
+        assert O.tocar_vagas(con, s, _br(17, 18, 30)) == 0    # ja pode, mas as 20h ainda alcanca
+        assert conversa(noite)["vaga_lembrada_em"] is None
+        assert O.tocar_vagas(con, s, _br(17, 20)) == 1
+        assert O.tocar_vagas(con, s, _br(17, 20, 30)) == 0    # um so
+    assert O.TOQUE_VAGA in resumos(noite)
 
 
-def test_1543_as_21h_quem_pode_esperar_a_manha_espera(conduz):
-    s, ia = SaidaFalsa(), IAFalsa()
-    tarde = datetime(2026, 11, 17, 23, 30, tzinfo=timezone.utc)   # 20:30 em Brasilia
-    ia.conversa = [{"texto": "Olá! Você tem currículo?"}]
-    passo(conduz, s, anuncio("w1"), ia, agora=tarde)
-    with conexao(conduz) as con:
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 18, 0, 5, tzinfo=timezone.utc)) == 0   # 21:05: a janela vai ate 20:30 de amanha
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 18, 9, 0, tzinfo=timezone.utc)) == 1   # 06:00: sai
+def test_1543_entre_18h_e_20h_so_sai_o_que_nao_chegaria_as_20h(noite):
+    s = SaidaFalsa()
+    _chegou(noite, s, _br(16, 19))                             # a janela fecha as 19:00 de 17/11
+    with conexao(noite) as con:
+        assert O.tocar_vagas(con, s, _br(17, 17)) == 0        # antes das 18h, nem assim
+        assert O.tocar_vagas(con, s, _br(17, 18)) == 1
 
 
-def test_1543_o_toque_sai_a_partir_das_6h(conduz):
-    s, ia = SaidaFalsa(), IAFalsa()
-    noite = datetime(2026, 11, 17, 2, 0, tzinfo=timezone.utc)   # 23:00 de 16/11 em Brasilia
-    ia.conversa = [{"texto": "Olá! Você tem currículo?"}]
-    passo(conduz, s, anuncio("w1"), ia, agora=noite)
-    with conexao(conduz) as con:
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 17, 8, 59, tzinfo=timezone.utc)) == 0   # 05:59
-        assert O.tocar_vagas(con, s, datetime(2026, 11, 17, 9, 0, tzinfo=timezone.utc)) == 1    # 06:00
+def test_1543_depois_das_21h_nada_sai_e_o_toque_fica_para_a_noite_seguinte(noite):
+    s = SaidaFalsa()
+    _chegou(noite, s, _br(16, 20, 30))                         # as 21h ainda nao fez 2 h
+    with conexao(noite) as con:
+        assert O.tocar_vagas(con, s, _br(16, 20, 59)) == 0
+        assert O.tocar_vagas(con, s, _br(16, 22, 31)) == 0    # 2 h depois, mas e noite alta
+        assert O.tocar_vagas(con, s, _br(16, 23, 56)) == 0    # os de 16/11 sairam a essa hora
+        assert O.tocar_vagas(con, s, _br(17, 7)) == 0
+        assert O.tocar_vagas(con, s, _br(17, 18)) == 0        # a janela vai ate 20:30: espera as 20h
+        assert O.tocar_vagas(con, s, _br(17, 20)) == 1
+
+
+def test_1543_quem_escreve_as_19h30_recebe_as_18h_do_dia_seguinte(noite):
+    s = SaidaFalsa()
+    _chegou(noite, s, _br(16, 19, 30))
+    with conexao(noite) as con:
+        assert O.tocar_vagas(con, s, _br(16, 20, 30)) == 0    # so 1 h de espera
+        assert O.tocar_vagas(con, s, _br(17, 18)) == 1        # a janela fecha as 19:30, antes das 20h
 
 
 def test_1543_respostas_curtas_na_vaga_nao_travam(conduz):

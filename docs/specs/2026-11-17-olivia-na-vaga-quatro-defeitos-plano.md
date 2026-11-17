@@ -32,6 +32,11 @@
    do horário o toque **espera**; sai na primeira volta dentro do horário, se a janela de 24 h ainda
    estiver aberta. — verificação: teste (às 23:56 não sai; às 07:00 seguintes sai; às 07:00 com a janela
    já fechada não sai). — reversão: revert.
+   **Emenda do dono, 17/11/2026 à tarde:** *"precisa ser sempre depois das 18h, antes normalmente eles
+   estão no trabalho, então lá pelas 20h seria o ideal"*. O horário passou a 18h–21h, com 20h como a hora
+   em que sai o toque de todos (`olivia.toque_hora_ideal`); entre 18h e 20h só sai o de quem a janela de
+   24 h fecha antes das 20h. A última chamada das 21h saiu. Testes: `test_1543_quem_escreve_de_manha_*`,
+   `*_entre_18h_e_20h_*`, `*_depois_das_21h_*`, `*_as_19h30_*`.
 
 4. **O "travou" na conversa de vaga** — `backend/olivia.py: travou`: na conversa de vaga, com a chave
    ligada, a contagem de falas (`fraco`) não vale: perguntar e ouvir resposta é a conversa andando. E a

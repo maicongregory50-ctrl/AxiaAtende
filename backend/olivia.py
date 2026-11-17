@@ -179,37 +179,34 @@ def _vaga_da_pessoa(con, c):
     return vaga._vaga(con, antes["vaga_id"]) if antes else None
 
 
-# Hora de Brasilia; ajustes `olivia.toque_hora_de` / `olivia.toque_hora_ate`. Dono, 17/11/2026: "das 6h as
-# 21h, sim; as 21 horas mandas todos os toques da fila se forem vencer antes das 6h do dia seguinte".
-TOQUE_DE, TOQUE_ATE = 6, 21
-ULTIMA_CHAMADA_MIN = 10   # os primeiros minutos das 21h: a ultima chamada antes do silencio
+# Hora de Brasilia; ajustes `olivia.toque_hora_de` / `olivia.toque_hora_ideal` / `olivia.toque_hora_ate`.
+# Dono, 17/11/2026 (tarde): "o toque da olivia nos candidatos precisa ser sempre depois das 18h, antes
+# normalmente eles estao no trabalho, entao la pelas 20h seria o ideal". Troca a regra da manha (6h as 21h).
+TOQUE_DE, TOQUE_IDEAL, TOQUE_ATE = 18, 20, 21
 
 
-def _horario_do_toque(con) -> tuple[int, int]:
+def _horario_do_toque(con) -> tuple[int, int, int]:
     def hora(chave, padrao):
         try:
             return int(motor._ajuste(con, chave, padrao))
         except (TypeError, ValueError):
             return padrao
-    return hora("olivia.toque_hora_de", TOQUE_DE), hora("olivia.toque_hora_ate", TOQUE_ATE)
+    return (hora("olivia.toque_hora_de", TOQUE_DE), hora("olivia.toque_hora_ideal", TOQUE_IDEAL),
+            hora("olivia.toque_hora_ate", TOQUE_ATE))
 
 
 def _hora_de_tocar(con, agora: datetime) -> bool:
-    """#1543: o toque unico nao sai de madrugada (os de 16/11 sairam as 23:56 e as 00:40). Fora do horario
-    ele ESPERA: sai na primeira volta dentro dele, se a janela de 24 h ainda estiver aberta."""
-    de, ate = _horario_do_toque(con)
+    """#1543: o toque unico so sai a noite (18h as 21h): de dia a pessoa esta no trabalho, e de madrugada
+    ninguem quer (os de 16/11 sairam as 23:56 e as 00:40). Fora do horario ele ESPERA."""
+    de, _, ate = _horario_do_toque(con)
     return de <= agora.astimezone(motor.FUSO).hour < ate
 
 
-def _ultima_chamada(con, agora: datetime) -> datetime | None:
-    """Nos primeiros minutos da hora em que o silencio comeca (21h), a hora em que o toque volta a poder sair
-    (6h do dia seguinte): o toque cuja janela de 24 h fecha ANTES dela sai agora, mesmo sem a espera de 2 h,
-    porque de manha ja nao alcancaria a pessoa. Fora desses minutos, None."""
-    de, ate = _horario_do_toque(con)
-    local = agora.astimezone(motor.FUSO)
-    if local.hour != ate or local.minute >= ULTIMA_CHAMADA_MIN:
-        return None
-    return (local + timedelta(days=1)).replace(hour=de, minute=0, second=0, microsecond=0)
+def _hora_ideal(con, agora: datetime) -> datetime:
+    """As 20h de hoje (hora de Brasilia). A partir dela sai o toque de todo mundo; entre as 18h e ela so sai
+    o de quem a janela de 24 h fecharia antes."""
+    _, ideal, _ = _horario_do_toque(con)
+    return agora.astimezone(motor.FUSO).replace(hour=min(max(ideal, 0), 23), minute=0, second=0, microsecond=0)
 
 
 def _cadastro(con, chave: str, lingua: str, **extra) -> str:
@@ -1185,10 +1182,10 @@ def tocar_vagas(con, saida, agora: datetime) -> int:
     convite para a ficha, ou o curriculo. Fora da janela nada sai (so modelo pago alcancaria, e esta etapa
     nao usa). Nunca um segundo: `vaga_lembrada_em` e gravado mesmo se o envio falhar. So com a chave ligada."""
     from .envio import inicio_da_janela
-    volta_as = None if _hora_de_tocar(con, agora) else _ultima_chamada(con, agora)
-    if not conduz_vaga(con) or not (_hora_de_tocar(con, agora) or volta_as):
+    if not conduz_vaga(con) or not _hora_de_tocar(con, agora):
         return 0
     espera = _horas(con, "olivia.vaga_toque_h", 2)
+    ideal = _hora_ideal(con, agora)
     n = 0
     for c in con.execute("""SELECT c.* FROM atendimento.conversas c
                              WHERE c.trabalhe AND c.conduzida_por = 'olivia' AND c.vaga_lembrada_em IS NULL
@@ -1199,13 +1196,10 @@ def tocar_vagas(con, saida, agora: datetime) -> int:
                              ORDER BY c.id""", (agora - timedelta(hours=48),)).fetchall():
         numero = c["wa_id"] or c["bsuid"]
         ultima = inicio_da_janela(con, c["wa_id"]) if c["wa_id"] else c["ultimo_toque_em"]
-        if ultima is None or agora - ultima >= motor.JANELA_DA_META:
+        if ultima is None or agora - ultima >= motor.JANELA_DA_META or agora - ultima < espera:
             continue
-        if volta_as is None:
-            if agora - ultima < espera:
-                continue
-        elif ultima + motor.JANELA_DA_META >= volta_as:
-            continue   # a ultima chamada das 21h so leva quem nao seria alcancado as 6h
+        if agora < ideal and ultima + motor.JANELA_DA_META > ideal:
+            continue   # antes das 20h so sai o de quem nao seria alcancado as 20h
         lingua = _lingua_da_conversa(con, c)   # #1543: nao so a da ficha
         v = _vaga_da_pessoa(con, c)            # #1543: a vaga que a pessoa disse, mesmo na conversa anterior
         if c["ficha"] is not None and _mandou(con, c["id"], AVISO_FICHA):

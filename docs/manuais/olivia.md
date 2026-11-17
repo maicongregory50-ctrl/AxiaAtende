@@ -53,9 +53,10 @@ autenticado são os próximos degraus, em chamados próprios.
    de contato** depois do aviso de cadastro. Na vaga de currículo obrigatório, diz que o currículo é
    indispensável (pode ser foto) e oferece a vaga de ficha, se houver. Recebida a ficha ou o currículo,
    oferece uma vez a visita à empresa. Quem para no meio, ou nem começa, recebe **um** toque só, dentro das
-   24 horas, **e só entre 6h e 21h** (#1543; dono, 17/11/2026): o toque que cairia de noite espera as 6h.
-   Às 21h há uma **última chamada**: o toque cuja janela de 24 horas fecharia antes das 6h sai ali, para
-   não se perder. Ele vai na língua em que a conversa correu e fala da vaga que a pessoa disse,
+   24 horas, **e só à noite, às 20h** (#1543; dono, 17/11/2026: de dia a pessoa está no trabalho). Às 20h
+   sai o toque de quem está há duas horas ou mais sem escrever. Entre 18h e 20h só sai o de quem a janela
+   de 24 horas fecharia antes das 20h (quem escreveu entre 18h e 20h da véspera). Depois das 21h e durante
+   o dia nada sai: o toque espera a noite seguinte. Ele vai na língua em que a conversa correu e fala da vaga que a pessoa disse,
    mesmo que tenha sido na conversa anterior. **Na conversa de vaga ela não oferece o botão *Trabalhe
    conosco***: quem atende a vaga é ela; o que não sabe (as tarefas, pagamento), diz que a equipe explica
    no contato. O detalhe está no manual `trabalhe-conosco.md`, seção 6. Ela fala dos **benefícios** que o
