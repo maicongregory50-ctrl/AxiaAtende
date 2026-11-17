@@ -647,3 +647,32 @@ def test_1543_nao_e_isso_continua_marcando_na_vaga(conduz):
     ia.conversa = [{"texto": "Me diga em uma frase o que você precisa."}]
     passo(conduz, s, texto("t1", "não é isso que eu perguntei", numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=1))
     assert [r for r in resumos(conduz) if r.startswith(O.FALA_TRAVOU)]
+
+
+def pdf(wamid, numero=DE_FORA, nome="Curriculo.pdf"):
+    return {"from": numero, "id": wamid, "timestamp": "1760040000", "type": "document",
+            "document": {"id": "mid-pdf", "mime_type": "application/pdf", "filename": nome}}
+
+
+def test_1543_curriculo_sem_triagem_vai_a_fran_sem_a_pergunta_da_triagem_e_com_o_que_a_pessoa_escreveu(conduz):
+    """17/11/2026, curriculo #43: a Fran recebeu "Sem pre-triagem ... A triagem acertou?" com os botoes da
+    triagem, e sem o "engenheiro agronomo" que o candidato escreveu na mensagem que disparou o envio."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Recebi seu currículo. É para qual vaga, ou para o banco de currículos?"}]
+    passo(conduz, s, pdf("d1"), ia)
+    ia.conversa = [{"ferramentas": [("encaminhar_curriculo", {"vaga_id": None})]},
+                   {"texto": "Pronto! Seu currículo foi para o banco de currículos."}]
+    passo(conduz, s, texto("t1", "Banco de currículo ou engenheiro agrônomo", numero=DE_FORA), ia,
+          agora=AGORA + timedelta(minutes=1))
+    k = candidaturas(conduz)
+    assert len(k) == 1 and k[0]["vaga_id"] is None
+    assert "engenheiro agrônomo" in k[0]["texto"]
+    fran_escreveu(conduz)
+    with conexao(conduz) as con:
+        assert V.mandar_a_fran(con, s, IAFalsa(), "segredo", AGORA + timedelta(minutes=2)) == 1
+    tipo, para, legenda, botoes = s.ultima
+    assert tipo == "documento" and para == fran(conduz)
+    assert "sem pré-triagem (banco de currículos, sem vaga)" in legenda
+    assert "Escreveu: Banco de currículo ou engenheiro agrônomo" in legenda
+    assert "triagem acertou" not in legenda.lower() and "—" not in legenda
+    assert [b[1] for b in botoes] == ["Conversar"]

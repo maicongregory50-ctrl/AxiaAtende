@@ -734,6 +734,15 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
                 tipo = "imagem"
             elif foto and pdf_modelo is None:
                 raise RuntimeError("foto que nao e JPEG: espera a janela de 24 h de quem recebe")
+            elif c["triagem"] is None and ultima is not None and agora - ultima < timedelta(hours=24):
+                # #1543: o PDF que NAO foi triado (banco de curriculos, triagem desligada, a IA nao respondeu).
+                # Em 17/11/2026 a Fran recebeu "Sem pre-triagem ... — — — Resumo: — A triagem acertou?" com os
+                # botoes Triagem certa / Triagem errada: pergunta sobre uma triagem que nao houve. Dentro da
+                # janela vai como a foto: o que se sabe, e so o botao de conversar. Fora dela o texto do modelo
+                # aprovado na Meta nao muda.
+                w = saida.documento(d["whatsapp"], pdf[0], pdf[1], legenda_sem_triagem(con, c),
+                                    [Opcao("vaga:falar:%d" % c["id"], "Conversar")])
+                tipo = "documento"
             elif ultima is not None and agora - ultima < timedelta(hours=24):
                 w = saida.documento(d["whatsapp"], pdf[0], pdf[1],
                                     corpo_do_modelo(con, vs, sem_botoes=c["declarou"] is None),
@@ -765,6 +774,19 @@ def mandar_a_fran(con, saida: Saida, ia, segredo: str, agora: datetime) -> int:
                                                         "curriculo %d para a fran" % c["id"]))
         mandadas += 1
     return mandadas
+
+
+def legenda_sem_triagem(con, c) -> str:
+    """#1543: a legenda do curriculo em PDF que nao passou pela pre-triagem -- por que nao passou, a vaga,
+    quem mandou e o que escreveu. Sem a pergunta "A triagem acertou?"."""
+    vaga = _vaga(con, c["vaga_id"])
+    partes = ["Novo currículo, sem pré-triagem (%s)" % (c["triagem_erro"] or "não houve"),
+              "Vaga: %s" % (vaga["titulo"] if vaga else "Banco de currículos"),
+              "Candidato: %s (%s)" % (_cortar((c["nome_perfil"] or "sem nome no perfil").strip(), 60),
+                                      numero_bonito(c["wa_id"]))]
+    if c["texto"]:
+        partes.append("Escreveu: %s" % c["texto"])
+    return _cortar(" · ".join(partes), CORPO_ATE)
 
 
 def legenda_da_foto(con, c) -> str:

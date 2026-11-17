@@ -987,6 +987,14 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
         estado["conversa"] = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (c["id"],)).fetchone()
         if cid is None:
             return "Esse currículo já estava guardado."
+        # #1543: o que a pessoa escreveu NA mensagem que disparou o envio ainda nao foi processado, e
+        # `vaga.o_que_escreveu` so le o processado. Em 17/11/2026 um candidato respondeu "Banco de curriculo
+        # ou engenheiro agronomo" e a Fran recebeu o curriculo sem essa linha.
+        dito = (estado["e"].texto or "").strip()
+        if dito:
+            con.execute("""UPDATE atendimento.candidaturas
+                              SET texto = left(CASE WHEN texto = '' THEN %s ELSE texto || ' / ' || %s END, 1000)
+                            WHERE id = %s AND position(%s in texto) = 0""", (dito, dito, cid, dito))
         return ("Currículo recebido e encaminhado à recrutadora%s%s. Diga à pessoa que a equipe vai analisar, "
                 "sem prometer retorno nem prazo." % (" para a vaga" if v else " (banco de currículos)",
                                                      "" if tipo == "pdf" else ", em foto"))
