@@ -903,7 +903,8 @@ def _oferecer(con, saida, estado, chave: str, agora: datetime) -> str:
         estado["falou"] = estado["falou"] or bool(w)
         return "O menu inteiro foi mandado à pessoa." if w else "O menu não pôde ser mandado agora."
     no = motor._no(con, chave)
-    validas = {o["chave"] for o in _opcoes_do_menu(con)}
+    opcoes = {o["chave"]: o for o in _opcoes_do_menu(con)}
+    validas = set(opcoes)
     if no is None or chave not in validas or no["acao"] == "encerrar":
         return "Essa opção não existe no menu. Use uma chave da lista OPÇÕES DO MENU."
     if motor._filhos(con, no["id"]):
@@ -913,7 +914,12 @@ def _oferecer(con, saida, estado, chave: str, agora: datetime) -> str:
         tipo = "botoes" if len(motor._filhos(con, no["id"])) <= 3 else "lista"
     else:
         # uma folha: o "Sim" de hoje (ia:sim:<chave>), e o link sai da tela Destinos quando ela tocar
-        nome = "".join(ch for ch in no["rotulo"] if ch.isalnum() or ch in " -/").strip() or no["rotulo"]
+        # O nome com o CAMINHO: o rotulo de um no filho so faz sentido embaixo do pai. Em 17/11/2026 um
+        # fornecedor recebeu "Posso te passar para Ainda não sou?" e respondeu "?" (#1520, conversa 352).
+        def limpo(t):
+            return "".join(ch for ch in t if ch.isalnum() or ch in " -/").strip() or t
+        caminho = (opcoes.get(chave) or {}).get("caminho") or [no["rotulo"]]
+        nome = " › ".join(limpo(x) for x in caminho)
         w = saida.botoes(p.para, "Posso te passar para %s?" % nome[:200],
                          [Opcao("ia:sim:%s" % no["chave"], "Sim"), Opcao("ia:menu", "Ver todas as opções")])
         tipo = "botoes"

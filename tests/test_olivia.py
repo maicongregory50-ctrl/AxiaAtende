@@ -626,3 +626,13 @@ def test_a_instrucao_pede_mensagens_curtas(ligada):
     with conexao(ligada) as con:
         sistema = O.instrucao(con)
     assert "no máximo duas frases curtas" in sistema and "Nunca peça para mandar o mesmo arquivo" in sistema
+
+
+def test_c_o_botao_da_folha_filha_diz_o_caminho(ligada):
+    """#1520, conversa 352 (17/11/2026): "Posso te passar para Ainda não sou?" -- o rotulo de um no filho so
+    faz sentido embaixo do pai. O botao diz o caminho."""
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"ferramentas": [("oferecer_opcao_do_menu", {"chave": "fornecedores.ainda"})]}]
+    passo(ligada, s, texto("w1", "sou representante e quero falar com compras"), ia=ia)
+    assert s.ultima[2].startswith("Posso te passar para Fornecedores › ") and s.ultima[2].endswith("?")
+    assert s.ultima[2] != "Posso te passar para Ainda não sou?"
