@@ -5,16 +5,22 @@ Envios, para quem acompanha)
 
 ## 1. Para que serve
 
-O chamado conversa com você pelo WhatsApp. O que chega na caixa do sistema chega também no celular, e o
-que você responde no celular entra no chamado, como se você tivesse escrito no sistema.
+O chamado conversa com você pelo WhatsApp, só quando há algo para você: uma pergunta, ou o fim (a
+entrega ou a recusa). O acompanhamento fica no sistema. O que você responde no celular entra no
+chamado, como se você tivesse escrito no sistema.
 
 ## 2. Quem usa e quando
 
 Quem abre chamado no sistema: Benedito, Fran, Alisson e o resto da equipe. **Só quando o chamado pede
 alguma coisa de você ou termina** (dono, 05/11/2026, #1269): quando precisamos de uma resposta sua (a
 pergunta que o dono decidiu fazer), quando alguém da equipe escreve direto a você, e no fim — a entrega,
-que diz como usar e pede o teste, ou a recusa. O andamento (virou decisão, o trabalho começou, o plano
-foi gravado) fica no chamado, no sistema, e não vem ao celular.
+que diz o que mudou e pede o teste, ou a recusa. O andamento (virou decisão, o trabalho começou, o plano
+foi pedido ou gravado) fica no chamado, no sistema, e não vem ao celular.
+
+**A entrega chega curta** (dono, 17/11/2026, #1587): só o primeiro parágrafo, que diz o que mudou e o
+que você faz agora, e, quando há mais, a linha *"O restante está no chamado N, no sistema."*. O texto
+completo (o que acontecia, o como usar em detalhe, o que ficou de fora) continua no chamado e no
+widget. A pergunta e a recusa chegam inteiras, como sempre.
 
 ## 3. O caminho comum
 
@@ -25,7 +31,8 @@ foi gravado) fica no chamado, no sistema, e não vem ao celular.
    Deslize (é o **Responder** do WhatsApp) e escreva. Volta **"Anotado no chamado 1217. ✓"**. Se a
    pergunta pede um documento, deslize e mande o arquivo pelo clipe (seção **Devolver um arquivo**, logo
    abaixo).
-4. Se é **a entrega** ("já está no ar"), teste e toque:
+4. Se é **a entrega** ("já está no ar"), ela diz em um parágrafo o que mudou. Se quiser o detalhe e o
+   como usar, abra o chamado no sistema ou no widget. Teste e toque:
    - **Ficou bom**: o chamado fecha, em seu nome;
    - **Não ficou bom**: escreva em uma linha o que falta. O chamado volta para ajuste.
 5. Se você escrever **sem deslizar** e tiver pergunta ou entrega esperando, **quando estiver claro de
@@ -64,6 +71,9 @@ antivírus antes de guardar.
   do chamado, use o sistema ou espere a próxima pergunta. Essa linha vem uma vez só por chamado.
 - **Vários chamados numa mensagem só**, separados por um traço: o sistema junta o que chega para você
   em poucos minutos, para não mandar uma mensagem atrás da outra.
+- **"O restante está no chamado N, no sistema."** no fim de uma entrega (#1587): a entrega tem mais
+  texto no sistema. Sem essa linha, a mensagem é a entrega inteira.
+- **Silêncio no WhatsApp não quer dizer chamado parado**: o andamento aparece no chamado, no sistema.
 - **"Esta entrega já foi respondida. ✓"**: você (ou alguém pela caixa do sistema) já tinha respondido.
 - **Um documento (PDF ou Word) com a legenda "Chamado N"** logo depois da mensagem (#1381): é o arquivo
   que a equipe mandou junto da pergunta ou da entrega, um roteiro ou um manual, por exemplo. Toque para
@@ -108,7 +118,9 @@ com o motivo.
 - Arquivo que entrou no chamado errado não sai sozinho: quem trata o chamado o remove.
 - Não manda aviso fora de hora por conta própria: o que é só aviso espera você escrever para a empresa.
 - Não avisa cada etapa do chamado, nem manda a pergunta do agente de suporte sem o dono (#1269): isso
-  fica no chamado, no sistema.
+  fica no chamado, no sistema. Também não avisa que o plano foi pedido (#1587).
+- Não manda a explicação completa da entrega: só o primeiro parágrafo (#1587). Não resume nem encurta a
+  pergunta, e nada é recusado por tamanho.
 - Não manda o detalhe técnico: só a parte do comentário escrita para quem pediu.
 
 ## 6. Pré-requisito de cadastro
@@ -128,6 +140,11 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
 - `roteador.ligado` e `roteador.carencia_minutos` (3): a resposta sem deslizar que entra direto, e a
   espera antes de ir ao ERP (manual `roteador.md`).
 - A volta das telas traz do ERP a cada minuto e leva as respostas; o recepcionista manda e lê.
+- **O que o ERP libera (#1587).** A régua mora no ERP (`demandas_whatsapp_service`), não aqui: a frase
+  automática do PLANEJADOR não sai, e a entrega sai só com o primeiro parágrafo e a linha de rodapé. A
+  chave `WHATSAPP_SO_ESSENCIAL` no `C:\AxiaGestao\.env` (nasce ligada) desliga as duas; desligá-la é
+  `false` em janela elevada e o restart do `axiagestao-backend` pela Porta-Ação. O que já saiu curto
+  continua inteiro no chamado.
 - Resposta que o ERP recusa fica com o erro na tela Envios; não é tentada de novo.
 - **O anexo (#1381).** Quem trata manda pela skill `demanda` (`comentar N --pergunta ... --anexo <arquivo>`
   ou `entregar N --devolucao @f --anexo <arquivo>`): PDF ou Word, até 10 MB, um por resposta. A volta das
