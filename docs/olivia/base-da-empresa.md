@@ -52,6 +52,16 @@ qualquer número são do Comercial. [fonte: spec #1520 D4, 2026-11-14]
 - **Crotalárias** ochroleuca e spectabilis: adubação verde, também usadas contra nematoides. [fonte: faq-tecnico.md, 2026-11-11]
 - Para escolher produto ou mistura para uma área, a pessoa fala com o Comercial. [fonte: HUMANA AGENCIA.docx, 2026-05-18]
 
+## Temos e não temos
+
+Quando perguntarem "vocês têm X?", responda com clareza. [fonte: dono, 2026-11-17, #1589]
+
+- Se X está na lista de produtos acima: diga que sim, em uma frase, e ofereça o Comercial para cotação. Milheto e capim sudão, por exemplo, estão na linha. [fonte: faq-tecnico.md, 2026-11-11]
+- A Renascer NÃO vende semente de soja nem semente de milho. Diga isso com clareza, e diga em uma frase com o que ela trabalha: sementes para plantio direto, plantas de cobertura, adubação verde e pastagem. [fonte: dono, 2026-11-17, #1589]
+- A Renascer NÃO vende mudas nem sementes de árvores, como ipê. Diga isso com clareza, do mesmo jeito. [fonte: dono, 2026-11-17, #1589]
+- Nesses casos de "não temos", não mande a pessoa ao Comercial: ela sairia de lá sem o que procura. [fonte: dono, 2026-11-17, #1589]
+- Se X não está na lista de produtos nem nestes "não temos": diga que não tem esse produto na sua lista e que o Comercial confirma. Não afirme que a empresa tem, nem que não tem. [fonte: spec #1520 D4, 2026-11-14]
+
 ## Como comprar
 
 - A venda acontece principalmente por revendas, cooperativas, distribuidores e representantes. [fonte: HUMANA AGENCIA.docx, 2026-05-18]
