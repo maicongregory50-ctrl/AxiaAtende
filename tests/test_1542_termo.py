@@ -113,6 +113,26 @@ def test_fora_das_9h_as_17h_espera_e_sai_na_janela(ligado):
     assert _linha(ligado)["estado"] == "enviada"
 
 
+def test_termo_estornado_antes_de_sair_nao_sai(ligado):
+    e = ErpFalso([PENDENTE])
+    _volta(ligado, e)
+    assert _linha(ligado)["estado"] == "a_enviar"
+    e.pendentes = []                                 # estornado no ERP: some da lista
+    _volta(ligado, e)
+    assert _linha(ligado) is None
+    s = SaidaFalsa()
+    assert _mandar(ligado, s) == 0 and not s.modelos
+
+
+def test_o_que_ja_saiu_nao_some_quando_o_erp_tira_da_lista(ligado):
+    e = ErpFalso([PENDENTE])
+    _volta(ligado, e)
+    _mandar(ligado, SaidaFalsa())
+    e.pendentes = []
+    _volta(ligado, e)
+    assert _linha(ligado)["estado"] == "enviada"
+
+
 def test_falha_da_meta_vira_falhou_e_volta_ao_erp(ligado):
     e = ErpFalso([PENDENTE])
     _volta(ligado, e)

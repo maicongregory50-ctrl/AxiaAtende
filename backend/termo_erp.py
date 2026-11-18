@@ -52,7 +52,17 @@ def volta(cfg, ir=erp.termos_reprovacao, pdf=erp.termo_pdf, estado=erp.estado_do
     except erp.ErpIndisponivel as e:
         return {"erro": str(e)}
     token, novos = r["token"], 0
+    vivos = [p["id"] for p in r["pendentes"]]
     with conexao(cfg) as con:
+        # O que ainda nao saiu e o ERP nao lista mais (termo estornado, ou pedido trocado por um Reenviar) nao sai:
+        # sem isto, o termo estornado depois de trazido sairia na janela das 9h (#1542, 18/11).
+        for x in con.execute("""DELETE FROM atendimento.termos_reprovacao
+                                 WHERE estado = 'a_enviar' AND NOT (erp_envio_id = ANY(%s)) RETURNING arquivo""",
+                             (vivos,)).fetchall():
+            try:
+                Path(x["arquivo"]).unlink(missing_ok=True)
+            except OSError:
+                pass
         ja = {x["erp_envio_id"] for x in con.execute("SELECT erp_envio_id FROM atendimento.termos_reprovacao").fetchall()}
 
     pasta = Path(cfg.envios_pasta) / "termos"
