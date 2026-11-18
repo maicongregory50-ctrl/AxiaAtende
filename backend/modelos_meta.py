@@ -37,6 +37,8 @@ BOTOES_TRIAGEM = ("Triagem certa", "Triagem errada")
 BOTAO_CANDIDATO = "Conversar com o candidato"
 #: #1188: o botao da reabertura dos avisos internos; volta com a carga `reabrir:<numero>`.
 BOTAO_VER = "Ver"
+#: #1542: o termo de reprovacao de lote; volta com a carga `termo:ciente:<id>`. E o recebimento do termo.
+BOTAO_CIENTE = "Recebi e estou ciente"
 #: O endereco publico do recepcionista (Funnel 443). O botao da direta termina em {{1}} = o codigo.
 ENDERECO_FALAR = "https://serverrenascer.taild57672.ts.net/falar/"
 LIMITE_BOTAO = 25
@@ -54,6 +56,9 @@ EXEMPLOS = {
     "req3": "Vivência comercial: consta (3 anos em revenda de insumos)",
     "req4": "Mora em Maravilha ou vizinha: não (Cascavel, PR)",
     "resumo": "perfil comercial e técnico; o currículo não mostra experiência com sementes.",
+    # #1542: o termo de reprovacao de lote (produtor e numeros de mentira)
+    "produtor": "João Exemplo", "numero_termo": "0001/2026", "lotes": "A000000-01",
+    "valor": "2.970,00", "vencimento": "02/12/2026",
 }
 EXEMPLOS_AVISO = {
     "aviso_recusa": ["Agro Exemplo", "5475 · Chapecó", "https://wa.me/5549999999999"],
@@ -138,6 +143,8 @@ def componentes(m: dict, cabecalho: str | None = None, documento: str | None = N
             "example": [ENDERECO_FALAR + "v1-0a1b2c3d4e5f6a7b"]}]})
     elif m["botao"] == "ver":
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": BOTAO_VER}]})
+    elif m["botao"] == "ciente":
+        saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": BOTAO_CIENTE}]})
     for b in (c for c in saida if c["type"] == "BUTTONS"):
         for botao in b["buttons"]:
             assert len(botao["text"]) <= LIMITE_BOTAO, botao["text"]

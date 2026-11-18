@@ -58,9 +58,10 @@ def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
                                                  "aviso_sem_atendimento", "curriculo_para_fran",
                                                  "epoca_de_plantio", "informativo_ao_comprador", "informativo_curto",
                                                  "informativo_renascer", "olivia_resumo",
-                                                 "pecas_da_revenda", "reabrir_avisos", "vaga_visita"]
+                                                 "pecas_da_revenda", "reabrir_avisos", "termo_reprovacao_lote",
+                                                 "vaga_visita"]
     criados = [p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]
-    assert len(criados) == 21   # #1525: + vaga_visita; #1528: + arquivo_sem_antivirus, arquivo_ameaca; #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 a 045: + informativos; #350: + auditoria; #1337: + integracao; #1434: + painel; #1520: + olivia_resumo
+    assert len(criados) == 22   # #1542: + termo_reprovacao_lote; #1525: + vaga_visita; #1528: + arquivo_sem_antivirus, arquivo_ameaca; #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 a 045: + informativos; #350: + auditoria; #1337: + integracao; #1434: + painel; #1520: + olivia_resumo
     import json
     reabrir = next(json.loads(p.content) for p in criados if json.loads(p.content)["name"] == "reabrir_avisos")
     assert reabrir["category"] == "UTILITY"
@@ -98,3 +99,15 @@ def test_propor_o_modelo_com_pdf_exige_o_exemplo(cfg, tmp_path):
     imagem.write_bytes(b"\xff\xd8\xff")
     with pytest.raises(SystemExit):
         modelos_meta.propor(replace(cfg, meta_token="t"), imagem, http=cliente_falso([]))
+
+
+def test_1542_o_termo_de_reprovacao_vai_com_pdf_e_o_botao_de_ciencia(cfg):
+    (m,) = [x for x in modelos_meta.cadastro(cfg) if x["nome"] == "termo_reprovacao_lote"]
+    assert (m["categoria"], m["uso"], m["cabecalho_documento"]) == ("UTILITY", "termo_reprovacao", True)
+    c = modelos_meta.componentes(m, documento="h")
+    assert [x["type"] for x in c] == ["HEADER", "BODY", "BUTTONS"]
+    assert c[0]["format"] == "DOCUMENT"
+    assert c[2]["buttons"] == [{"type": "QUICK_REPLY", "text": "Recebi e estou ciente"}]
+    assert "Cláusula Sexta, item 4" in m["texto"] and "concord" not in m["texto"].lower()
+    assert len(c[1]["example"]["body_text"][0]) == 5
+
