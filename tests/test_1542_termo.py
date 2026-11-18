@@ -101,6 +101,18 @@ def test_chave_desligada_nada_sai(ligado):
     assert _linha(ligado)["estado"] == "a_enviar"
 
 
+def test_fora_das_9h_as_17h_espera_e_sai_na_janela(ligado):
+    _volta(ligado, ErpFalso([PENDENTE]))
+    s = SaidaFalsa()
+    for hora_utc in (11, 20, 2):                     # 08h, 17h e 23h em Brasilia
+        with conexao(ligado) as con:
+            assert termo_erp.mandar(con, s, True, AGORA.replace(hour=hora_utc)) == 0
+    assert not s.modelos and _linha(ligado)["estado"] == "a_enviar"
+    with conexao(ligado) as con:
+        assert termo_erp.mandar(con, s, True, AGORA.replace(hour=12)) == 1   # 09h em Brasilia
+    assert _linha(ligado)["estado"] == "enviada"
+
+
 def test_falha_da_meta_vira_falhou_e_volta_ao_erp(ligado):
     e = ErpFalso([PENDENTE])
     _volta(ligado, e)

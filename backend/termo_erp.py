@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from . import erp
 from .banco import conexao
@@ -28,6 +29,10 @@ from .envio import com_nove, modelo_do_uso, parametros, so_digitos
 
 INTERVALO_SEGUNDOS = 60
 PREFIXO_TOQUE = "termo:ciente:"
+#: O termo so sai das 9h as 17h, hora de Brasilia (dono, 18/11/2026: reprovacao nao chega ao produtor fora do
+#: expediente). Fora da janela o pedido espera "a_enviar" (no ERP, "Enviando...") e sai na primeira volta das 9h.
+FUSO = ZoneInfo("America/Sao_Paulo")
+JANELA_HORAS = (9, 17)
 CONFIRMACAO = "Recebemos a sua confirmação de recebimento do termo {numero}. Obrigado."
 
 #: o estado daqui -> o estado do ERP
@@ -125,10 +130,12 @@ def _data_br(v) -> str:
 # ── o RECEPCIONISTA ──────────────────────────────────────────────────────────────────────────────
 
 def mandar(con, saida, ativo: bool, agora: datetime | None = None) -> int:
-    """Manda o modelo com o PDF aos pedidos que as telas enfileiraram. Desligado, nada sai."""
+    """Manda o modelo com o PDF aos pedidos que as telas enfileiraram. Desligado, ou fora das 9h-17h, nada sai."""
     if not ativo:
         return 0
     agora = agora or datetime.now(timezone.utc)
+    if not no_horario(agora):
+        return 0
     saiu = 0
     m = modelo_do_uso(con, "termo_reprovacao")
     for p in con.execute("""SELECT * FROM atendimento.termos_reprovacao WHERE estado = 'a_enviar' AND erro = ''
@@ -154,6 +161,11 @@ def mandar(con, saida, ativo: bool, agora: datetime | None = None) -> int:
             con.execute("""UPDATE atendimento.termos_reprovacao SET estado = 'falhou', erro = %s, estado_em = %s
                             WHERE id = %s""", (motivo, agora, p["id"]))
     return saiu
+
+
+def no_horario(agora: datetime) -> bool:
+    """Das 9h (inclusive) as 17h (exclusive), hora de Brasilia."""
+    return JANELA_HORAS[0] <= agora.astimezone(FUSO).hour < JANELA_HORAS[1]
 
 
 def aplicar_status(con, wamid: str, novo: str, erro: str, agora: datetime) -> None:
