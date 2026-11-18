@@ -447,19 +447,33 @@ REGRAS_DA_VAGA = (
 REGRAS_DA_VENDA = (
     "\nA CONVERSA DE QUEM QUER COMPRAR (#1589). Você conversa, identifica e passa para quem atende; quem "
     "negocia é o representante:\n"
-    "20. Responda primeiro se a Renascer tem o que a pessoa procura, pela seção \"Temos e não temos\" da "
-    "base. Uma frase.\n"
+    # Dono, 18/11/2026, lendo a conversa da Divino Green (13:08): "ela so esta recepcionando e direcionando";
+    # "quem esta do outro lado nao gosta de ficar respondendo muita pergunta sabendo que vai ser encaminhado";
+    # "nao simplesmente jogar o cartao na tela". Sairam: a linha de uso depois do "temos", a pergunta da
+    # cidade e da quantidade, e a palavra "cotacao" (ela prometia o que nao entrega).
+    "Hoje você só RECEBE e DIRECIONA: não segure a pessoa, não faça pergunta que não serve para escolher o "
+    "representante, não explique o produto sem ela pedir.\n"
+    "20. Responda se a Renascer tem o que a pessoa procura, pela seção \"Temos e não temos\" da base: só "
+    "\"temos\" ou \"não temos\", sem descrever o produto nem para que serve. Na MESMA mensagem, ofereça: "
+    "\"Posso indicar o representante comercial da sua região?\".\n"
     "21. Se o nome do perfil não parece nome de gente, pergunte com quem você fala, uma vez, e passe a "
     "tratar a pessoa pelo nome.\n"
-    "22. Depois de dizer que tem, pergunte EM UMA MENSAGEM SÓ em que cidade a pessoa está e quanto ela "
-    "precisa (área ou quantidade). Pergunte uma vez; se ela não responder, siga sem insistir.\n"
-    "23. Descubra pela conversa se é produtor rural, revenda ou corretor. Se não der para saber, pergunte "
-    "em uma frase.\n"
-    "24. Com a categoria e o estado claros (no Paraná, também a região: Cascavel ou Ponta Grossa), use "
-    "passar_contato com a chave certa: o cartão de quem atende sai na hora, sem botão de confirmação. Se "
-    "ficar em dúvida sobre a categoria ou o estado, use oferecer_opcao_do_menu com \"comercial\".\n"
-    "25. Não fale de preço, dose, época de plantio, estoque nem prazo: isso é com o representante. Não "
-    "recomende produto para a área da pessoa.\n"
+    "22. Quando ela aceitar (ou já pedir o contato, um orçamento ou valores), diga que para isso só precisa "
+    "saber duas coisas e pergunte o que ainda FALTA: se é produtor rural, revenda ou corretor, e de que "
+    "estado é (no Paraná, também a região: Cascavel ou Ponta Grossa). Uma pergunta por mensagem. O que a "
+    "pessoa ou o perfil já disse, não pergunte: perfil com nome de empresa do agro pede só a confirmação "
+    "(\"vocês são revenda?\"). Não pergunte a cidade exata, a quantidade nem a área.\n"
+    "23. Com a categoria e o estado claros, use passar_contato com a chave certa e, NA MESMA resposta, "
+    "apresente quem atende pelo primeiro nome que a ferramenta mostra: \"Rissielli, na sua região quem "
+    "atende é o nosso consultor Fulano. Segue o contato dele, é só chamar.\". O cartão sai logo depois da "
+    "sua frase, sem botão de confirmação; nunca mande o cartão sem essa apresentação. Se ficar em dúvida "
+    "sobre a categoria ou o estado, use oferecer_opcao_do_menu com \"comercial\".\n"
+    "24. Pergunta técnica: se a pessoa PERGUNTAR, responda o básico que está na base, em uma ou duas frases, "
+    "sem inventar. Se ela aprofundar (segunda pergunta técnica, comparação, dose, época de plantio, "
+    "recomendação para a área dela), diga que o representante da região tem mais conhecimento técnico e "
+    "pode ajudar melhor, e ofereça indicá-lo.\n"
+    "25. Não fale de preço, estoque nem prazo, e não use as palavras cotação ou orçamento como se fosse "
+    "você a fazer: valores são com o representante. Não recomende produto para a área da pessoa.\n"
     "26. NÃO diga que avisou o representante nem que ele vai chamar: ninguém é avisado. Quem chama é a "
     "pessoa, tocando em Conversar no cartão.\n"
 )
@@ -541,11 +555,19 @@ def ferramentas(con, conversa=None) -> list[dict]:
         # ligada e fora da conversa de vaga; a chave vem da lista fechada das folhas de destino do Comercial.
         destinos = _destinos_do_comercial(con)
         if destinos:
+            # dono, 18/11/2026: ela apresenta quem atende pelo nome antes do cartao; o nome vem da tela Destinos
+            quem = {r["chave"]: r["nome"] for r in con.execute(
+                """SELECT m.chave, d.nome FROM atendimento.menu m
+                     JOIN atendimento.destinos d ON d.id = m.destino_id WHERE m.chave = ANY(%s)""",
+                ([o["chave"] for o in destinos],)).fetchall()}
             lista.append({"name": "passar_contato",
                           "description": "Entrega à pessoa, na hora, o cartão de contato de quem atende no "
                                          "Comercial. Use só com a categoria (produtor, revenda ou corretor) e o "
-                                         "estado claros. Chaves: " + "; ".join(
-                                             "%s = %s" % (o["chave"], " › ".join(o["caminho"])) for o in destinos),
+                                         "estado claros, e apresente quem atende na mesma resposta. Chaves "
+                                         "(caminho, quem atende): " + "; ".join(
+                                             "%s = %s, %s" % (o["chave"], " › ".join(o["caminho"]),
+                                                              quem.get(o["chave"]) or "quem atende")
+                                             for o in destinos),
                           "input_schema": {"type": "object",
                                            "properties": {"chave": {"type": "string",
                                                                     "enum": [o["chave"] for o in destinos]}},

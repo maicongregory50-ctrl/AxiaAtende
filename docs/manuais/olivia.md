@@ -62,12 +62,15 @@ autenticado são os próximos degraus, em chamados próprios.
    no contato. O detalhe está no manual `trabalhe-conosco.md`, seção 6. Ela fala dos **benefícios** que o
    cadastro da vaga traz, nunca de valor, e, quando existir o arquivo da vaga em
    `C:\AxiaAtende\docs\olivia\funcoes\`, do que a função faz (`LEIAME.md` ali).
-   **A conversa de quem quer comprar** (#1589), com a chave `olivia.conduz_venda` ligada: ela diz se a
-   Renascer tem o que a pessoa procura (seção *Temos e não temos* da base), pergunta com quem fala quando
-   o nome não aparece no perfil, pergunta **uma vez** a cidade e quanto a pessoa precisa, e, sabendo se é
-   produtor, revenda ou corretor e de que estado, **entrega o cartão de quem atende direto**, sem o botão
-   "Sim". Em dúvida, manda os botões de sempre. Não fala de preço, dose, época, estoque nem prazo, e não
-   avisa o representante: quem chama é a pessoa, pelo cartão. Desligada a chave, quem quer comprar recebe
+   **A conversa de quem quer comprar** (#1589), com a chave `olivia.conduz_venda` ligada: ela só
+   **recebe e direciona** (dono, 18/11/2026). Diz "temos" ou "não temos" (seção *Temos e não temos* da
+   base), sem descrever o produto, e oferece indicar o representante da região. Pergunta com quem fala
+   quando o nome não aparece no perfil. Aceita a indicação, pergunta **só o que falta** para escolher quem
+   atende: se é produtor, revenda ou corretor, e o estado. Não pergunta cidade nem quantidade. Então
+   **apresenta quem atende pelo nome** e o cartão sai logo depois, sem o botão "Sim". Pergunta técnica ela
+   responde no básico, pela base, só se a pessoa perguntar; se a conversa aprofunda, diz que o
+   representante sabe mais e o indica. Em dúvida, manda os botões de sempre. Não fala de preço, estoque
+   nem prazo, não diz que vai fazer cotação, e não avisa o representante: quem chama é a pessoa, pelo cartão. Desligada a chave, quem quer comprar recebe
    os botões do Comercial, como antes. Liga e desliga sem restart: `scripts\olivia.py ligar-venda` e
    `desligar-venda`.
 7. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte

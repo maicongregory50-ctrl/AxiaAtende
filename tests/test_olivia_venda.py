@@ -62,6 +62,12 @@ def test_a_a_070_nasce_desligada_e_as_regras_so_entram_com_a_chave(sem_venda):
         con.execute("UPDATE atendimento.ajustes SET valor = 'true'::jsonb WHERE chave = 'olivia.conduz_venda'")
         i = O.instrucao(con)
         assert "QUEM QUER COMPRAR" in i and "passar_contato" in i and "NÃO diga que avisou" in i
+        # dono, 18/11/2026 (Divino Green): recepciona e direciona -- "temos", oferece o representante,
+        # pergunta so categoria e estado, apresenta quem atende antes do cartao
+        assert "Posso indicar o representante comercial da sua região?" in i
+        assert "Não pergunte a cidade exata, a quantidade nem a área" in i
+        assert "nunca mande o cartão sem essa apresentação" in i
+        assert "quanto ela precisa" not in i
 
 
 # ── (b) o cartao do representante certo, sem o botao ────────────────────────
@@ -104,8 +110,11 @@ def test_c_desligada_a_ferramenta_nao_existe_e_os_botoes_sao_os_de_hoje(sem_vend
 
 def test_d_so_folha_de_destino_do_comercial(venda):
     with conexao(venda) as con:
-        enum = [f for f in O.ferramentas(con, {"id": 0, "trabalhe": False}) if f["name"] == "passar_contato"][0][
-            "input_schema"]["properties"]["chave"]["enum"]
+        f = [f for f in O.ferramentas(con, {"id": 0, "trabalhe": False}) if f["name"] == "passar_contato"][0]
+        enum = f["input_schema"]["properties"]["chave"]["enum"]
+        quem = con.execute("""SELECT d.nome FROM atendimento.menu m JOIN atendimento.destinos d
+                                ON d.id = m.destino_id WHERE m.chave = %s""", (FOLHA,)).fetchone()["nome"]
+        assert quem in f["description"]            # ela apresenta quem atende pelo nome (dono, 18/11/2026)
     assert FOLHA in enum and "comercial" not in enum and "fornecedores.ainda" not in enum and "trabalhe" not in enum
     assert all(x.startswith("comercial.") for x in enum)
     s, ia = SaidaFalsa(), IAFalsa()
