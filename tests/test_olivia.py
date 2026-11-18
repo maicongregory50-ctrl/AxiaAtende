@@ -167,6 +167,8 @@ def test_c_depois_dos_botoes_ela_nao_fala_mais_nesta_vez(ligada):
     assert [x[0] for x in s.enviadas[antes:]] == ["texto", "botoes"]
     assert len(ia.chamadas) == 1                                         # nem pergunta de novo ao modelo
     assert "depois deles você não escreve mais nada" in ia.chamadas[0]["sistema"]
+    # dono, 18/11/2026: fornecedor que cobra um servico vai ao Financeiro, nao a Fornecedores
+    assert "vai direto ao Financeiro" in ia.chamadas[0]["sistema"]
 
 
 def test_c_oferecer_um_no_com_opcoes_manda_a_pergunta_dele(ligada):

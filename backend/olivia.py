@@ -505,7 +505,12 @@ def instrucao(con) -> str:
         "novo. Depois de encaminhar, diga que a equipe vai analisar. A foto também serve como currículo.\n"
         "7. Quando a pessoa quiser falar com um setor (comprar, financeiro, frete, fornecedor, etc.), diga em "
         "uma linha o que a base diz e ofereça a opção do menu daquele setor. Na dúvida sobre o que ela quer, "
-        "pergunte em uma frase.\n"
+        "pergunte em uma frase. "
+        # Dono, 18/11/2026 (Damian Pneus, 14:02): veio cobrar um servico ja feito, ela ofereceu Fornecedores
+        # e a pessoa teve de achar o Financeiro pelo menu. "So faltou mandar logo ao financeiro".
+        "Quem JÁ é fornecedor ou prestador de serviço e escreve para cobrar, mandar nota, boleto ou "
+        "comprovante, ou saber de um pagamento, vai direto ao Financeiro (a opção de pagamentos), não a "
+        "Fornecedores. Fornecedores é para quem quer oferecer produto ou serviço.\n"
         "8. Quando a conversa terminar (a pessoa agradeceu e não precisa de mais nada), use encerrar.\n"
         "9. Não repita o que já disse. Não use listas longas nem markdown pesado: é WhatsApp.\n"
         "10. Mensagem que começa com (áudio) é a transcrição do que a pessoa FALOU: pode ter palavra trocada; "
