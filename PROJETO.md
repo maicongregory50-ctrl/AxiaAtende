@@ -36,6 +36,7 @@ envio que o AxiaMarketing pede. Ele não decide campanha, peça nem lista: isso 
 | O Relacionamento do ERP pelo agente `ATENDIMENTO` (`CRM.EVT.W`): empurrar os estados das mensagens (#1090) e buscar as retomadas (#1193, `GET /relacionamento/retomadas`) | AxiaGestão | os estados não chegam ao ERP e quem foi retomado lá continua bloqueado aqui pela recusa; o envio e o recepcionista continuam |
 | Os pedidos de CT-e da Logística do ERP pelo agente `ATENDIMENTO` (`LOG.CTE`, #1128): informar a janela de 24 h do destino "Logística", buscar os pedidos e a ficha do frete, devolver o estado | AxiaGestão | o botão CT-e da tela Fretes fica em "Enviando…" e a Logística manda a ficha à mão pelo botão Ficha; o resto continua |
 | O chamado no WhatsApp pelo agente `ATENDIMENTO` (`SUP.WPP`, #1222): trazer o que chega ao autor, levar a resposta e o Ficou bom, e **a volta com arquivo** (#1528, `POST /demandas/whatsapp/{id}/arquivo`: o ERP decide pelo conteúdo e pelo antivírus) | AxiaGestão | o chamado não chega ao WhatsApp e a resposta espera; o arquivo devolvido fica no trânsito por até 1 h (sem antivírus) ou 24 h (ERP fora) e a pessoa é avisada de que não entrou; o resto continua |
+| Os termos de reprovação de lote do ERP pelo agente `ATENDIMENTO` (`QUA.TRM`, #1542): buscar os pedidos e o PDF do termo, devolver o estado do envio e a ciência do botão **Recebi e estou ciente**; e o modelo `termo_reprovacao_lote` aprovado na Meta | AxiaGestão e Meta | o termo fica "Enviando…" na aba Lotes do ERP e sem ciência; a cobrança não muda (está no contrato e no financeiro); a Qualidade baixa o PDF e manda à mão; o resto continua |
 | Assinatura Claude Code no perfil | perfil do usuário | sem sessão de agente; os serviços continuam |
 
 ## Se eu cair
@@ -53,6 +54,11 @@ Antes da troca, cair não afeta ninguém: o recepcionista está em escuta e o Op
 **A ficha do frete (#1128) também para:** o pedido de CT-e fica "Enviando…" na tela Fretes do ERP e não
 sai depois sozinho se a janela de 24 h tiver fechado (volta "Falhou"); a Logística baixa a ficha pelo botão
 **Ficha** e manda à mão.
+
+**O termo de reprovação (#1542) também para:** o pedido fica "Enviando…" na aba Lotes do ERP e sai sozinho
+quando o AxiaAtende voltar (o modelo não depende da janela de 24 h). O toque em **Recebi e estou ciente**
+feito enquanto o ERP estava fora fica guardado aqui e vai na volta seguinte. Desligar sem cair: a chave
+`TERMO_REPROVACAO_ATIVO=false` no `.env.recepcionista`; o termo e a cobrança continuam valendo no ERP.
 
 ## Se o endereço público cair
 
