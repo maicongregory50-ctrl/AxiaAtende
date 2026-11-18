@@ -109,6 +109,10 @@ class Config:
     # a OlivIA, com texto proprio (backend/olivia.py); desligada, o menu de sempre. NASCE DESLIGADA, e
     # desligar e o rollback operacional inteiro (D9): a foto como curriculo e a base nao dependem dela.
     olivia_fala: bool = False
+    # #1542: O TERMO DE REPROVACAO DO ERP (`TERMO_REPROVACAO_ATIVO=true` no .env.recepcionista). Ligada, o
+    # recepcionista manda o modelo `termo_reprovacao_lote` aos pedidos que as telas trouxeram do ERP. NASCE
+    # DESLIGADA, e so liga com o modelo aprovado na Meta e a chave do ERP (REPROVACAO_ENVIA_WHATSAPP) ligada.
+    termo_reprovacao_ativo: bool = False
 
     def dsn(self) -> str:
         partes = ["host=%s" % self.banco_host, "port=%d" % self.banco_porta,
@@ -171,6 +175,7 @@ def carregar(ambiente: str | None = None, **trocas) -> Config:
             erp_segredo=segredos.get("AXIAATENDE_ERP_SEGREDO", ""),
             responde=segredos.get("ATENDE_RESPONDE", "false").lower() == "true",
             olivia_fala=segredos.get("OLIVIA_FALA", "false").lower() == "true",
+            termo_reprovacao_ativo=segredos.get("TERMO_REPROVACAO_ATIVO", "false").lower() == "true",
             responde_so_para=tuple(n.strip() for n in segredos.get("ATENDE_SO_PARA", "").split(",") if n.strip()),
             # `AXIAATENDE_SAIDA`: `local` (o padrao: as telas so em http://127.0.0.1:8009).
             cookie_seguro=os.environ.get("AXIAATENDE_SAIDA", "local") == "vpn",

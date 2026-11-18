@@ -89,6 +89,8 @@ def aplicar_status(con, st: dict, agora: datetime, envio=None) -> None:
                     (novo, agora, erro, linha["id"]))
     if envio is not None:
         envio.aplicar_status(con, st, novo, erro, agora)
+    from . import termo_erp   # #1542: o termo de reprovacao acha a linha dele pelo wamid
+    termo_erp.aplicar_status(con, st.get("id") or "", novo, erro, agora)
 
 
 def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: datetime | None = None,
@@ -218,6 +220,12 @@ def rotina_do_minuto(cfg: config.Config, saida, envio=None, agora: datetime | No
             audio.limpar(cfg, con, momento)
     except Exception as falha:  # noqa: BLE001
         print("audio: limpeza: %s: %s" % (type(falha).__name__, falha), flush=True)
+    try:   # #1542: o termo de reprovacao ao WhatsApp Legal do produtor (com modelo; so com a chave ligada)
+        from . import termo_erp
+        with conexao(cfg) as con:
+            termo_erp.mandar(con, saida, cfg.termo_reprovacao_ativo, momento)
+    except Exception as falha:  # noqa: BLE001
+        print("termo: %s: %s" % (type(falha).__name__, falha), flush=True)
     try:   # #1128: a ficha do frete ao WhatsApp da Logistica do ERP (so dentro das 24 h, sem modelo)
         from . import logistica_erp
         with conexao(cfg) as con:

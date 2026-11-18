@@ -686,6 +686,11 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     antes de qualquer conversa de atendimento abrir. `olivia` (#1520): a voz da OlivIA para quem e de
     fora, so com a chave `OLIVIA_FALA` ligada; None = o menu de sempre."""
     p = e.pessoa
+    # #1542: "Recebi e estou ciente" do termo de reprovacao. Nao abre menu nem OlivIA.
+    if e.toque and e.toque.startswith("termo:ciente:"):
+        from . import termo_erp
+        termo_erp.tocar(con, saida, e, agora)
+        return
     if e.toque and e.toque.startswith("envio:"):
         if envio is not None:
             envio.tratar_toque(con, saida, e, agora)

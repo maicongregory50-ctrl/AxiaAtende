@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import agenda, auditoria_erp, clientes_erp, pendencias_erp, config, eventos_erp, logistica_erp, migracoes, retomadas_erp, seguranca
+from . import agenda, auditoria_erp, clientes_erp, pendencias_erp, config, eventos_erp, logistica_erp, migracoes, retomadas_erp, seguranca, termo_erp
 from .banco import conexao
 
 COOKIE = "axiaatende_sessao"
@@ -102,6 +102,18 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             if parar.wait(logistica_erp.INTERVALO_SEGUNDOS):
                 return
 
+    def termos_de_reprovacao():
+        """#1542: os termos de reprovacao do ERP para ca (com o PDF), e o estado e a ciencia de volta (1 min)."""
+        while True:
+            try:
+                r = termo_erp.volta(cfg)
+                if "erro" in r:
+                    print("termo: %s" % r["erro"], flush=True)
+            except Exception as falha:  # noqa: BLE001 -- a volta nunca derruba as telas
+                print("termo: %s" % type(falha).__name__, flush=True)
+            if parar.wait(termo_erp.INTERVALO_SEGUNDOS):
+                return
+
     def avisos_da_auditoria():
         """#350 e #1337: os avisos que o ERP deixa (auditoria de estoque vencida, API externa recusando), do
         ERP para a fila dos avisos, e o estado de volta (1 min). O log cita o canal."""
@@ -141,6 +153,7 @@ def criar_app(cfg: config.Config | None = None) -> FastAPI:
             threading.Thread(target=empurrar_os_eventos, name="eventos-erp", daemon=True).start()
             threading.Thread(target=meus_clientes, name="meus-clientes", daemon=True).start()
             threading.Thread(target=pedidos_de_cte, name="logistica", daemon=True).start()
+            threading.Thread(target=termos_de_reprovacao, name="termo", daemon=True).start()
             threading.Thread(target=avisos_da_auditoria, name="auditoria", daemon=True).start()
             threading.Thread(target=chamados_no_whatsapp, name="pendencias", daemon=True).start()
         yield

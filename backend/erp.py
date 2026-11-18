@@ -430,3 +430,62 @@ def chamado_arquivo(cfg, token: str, demanda_id: int, numero: str, caminho: str,
 def chamado_validar(cfg, token: str, demanda_id: int, numero: str, resultado: str, motivo: str | None) -> None:
     _whatsapp(cfg.erp_url.rstrip("/") + "/demandas/whatsapp/%d/validar" % int(demanda_id),
               {"numero": numero, "resultado": resultado, "motivo": motivo}, token)
+
+
+# ── #1542: o termo de reprovacao de lote (as rotas /campo/agente/reprovacoes do ERP, atividade QUA.TRM) ──
+
+def termos_reprovacao(cfg) -> dict:
+    """Os pedidos de envio PENDENTES, num token so. {"pendentes": [...], "token": ...}."""
+    if not cfg.erp_agente or not cfg.erp_segredo:
+        raise ErpIndisponivel("a ligação com o ERP não está ligada")
+    try:
+        token = _token(cfg)
+        return {"pendentes": _pedir(cfg.erp_url.rstrip("/") + "/campo/agente/reprovacoes/pendentes", token=token),
+                "token": token}
+    except urllib.error.HTTPError as e:
+        motivo = {401: "o ERP recusou o agente (segredo)", 403: "o agente está sem a permissão QUA.TRM",
+                  404: "o ERP ainda não tem o envio do termo (#1542)"}
+        raise ErpIndisponivel(motivo.get(e.code, "o ERP respondeu %d" % e.code)) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+    except (KeyError, ValueError, TypeError):
+        raise ErpIndisponivel("o ERP respondeu algo inesperado") from None
+
+
+def termo_pdf(cfg, token: str, termo_id: int) -> bytes:
+    try:
+        return _baixar(cfg.erp_url.rstrip("/") + "/campo/agente/reprovacoes/%d/termo.pdf" % int(termo_id), token)
+    except urllib.error.HTTPError as e:
+        raise ErpIndisponivel("o termo não veio (%d)" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+
+
+def estado_do_termo(cfg, token: str, envio_id: int, estado: str, motivo: str = "", wamid: str = "") -> None:
+    """ENVIADO, ENTREGUE, LIDO ou FALHOU. 404 = o pedido nao existe mais (nada a fazer)."""
+    corpo = {"estado": estado, "motivo": (motivo or "")[:500] or None, "ref_externa": (wamid or "")[:120] or None}
+    try:
+        _pedir(cfg.erp_url.rstrip("/") + "/campo/agente/reprovacoes/envios/%d/estado" % int(envio_id), corpo, token=token)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return
+        raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+
+
+def ciencia_do_termo(cfg, token: str, envio_id: int, numero: str, quando: str, wamid: str = "") -> dict:
+    """O toque em "Recebi e estou ciente". 400/422 = o ERP recusou (numero diferente do pedido): ErpRecusou."""
+    corpo = {"numero": numero, "quando": quando, "ref_externa": (wamid or "")[:120] or None}
+    try:
+        return _pedir(cfg.erp_url.rstrip("/") + "/campo/agente/reprovacoes/envios/%d/ciencia" % int(envio_id),
+                      corpo, token=token)
+    except urllib.error.HTTPError as e:
+        if e.code in (400, 422):
+            raise ErpRecusou(_frase(e)) from None
+        if e.code == 404:
+            return {}
+        raise ErpIndisponivel("o ERP respondeu %d" % e.code) from None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise ErpIndisponivel("o ERP não respondeu") from None
+
