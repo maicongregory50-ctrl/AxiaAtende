@@ -1,4 +1,4 @@
-# A resposta padrão ao produtor cooperante que responde a um aviso automático do contrato
+﻿# A resposta padrão ao produtor cooperante que responde a um aviso automático do contrato
 **Data:** 2026-11-19
 **Chamado:** #1664
 **Status:** APROVADO
@@ -82,7 +82,7 @@ porta ou dado novo (uma chave de ajuste no banco que já existe e é copiado).
 - **D3. O nome e o tratamento.** O primeiro nome do `produtor_nome` do aviso, com a caixa arrumada
   (`primeiro_nome`). O dono aprovou "Seu Alfonso" e "o senhor"; como o aviso não diz se é senhor ou
   senhora, a forma gravada é a sem gênero acima ("Bom dia, Alfonso!"), e "Seu/Dona" entra quando o ERP
-  passar a mandar o tratamento. **A confirmar com o dono na aprovação do plano.**
+  passar a mandar o tratamento. Confirmado pelo dono em 19/11/2026 ("a").
 - **D4. O cartão.** O do contato legal do contrato: o destino nomeado no ajuste `cooperante.destino`
   (nasce apontando o destino "Maicon Gregory" da tela Destinos). Sai logo depois do texto.
 - **D5. O contato é avisado na hora**, com o que o produtor escreveu, o nome, o número do aviso e o link
