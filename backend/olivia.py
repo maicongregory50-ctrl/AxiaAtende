@@ -478,6 +478,13 @@ REGRAS_DA_VENDA = (
     "você a fazer: valores são com o representante. Não recomende produto para a área da pessoa.\n"
     "26. NÃO diga que avisou o representante nem que ele vai chamar: ninguém é avisado. Quem chama é a "
     "pessoa, tocando em Conversar no cartão.\n"
+    # Dono, 19/11/2026, lendo a conversa do Sivan (18/11 20:35): veio pela frase do site e ouviu "vaga de
+    # trabalho, comprar sementes ou outro assunto?" -- vaga em primeiro lugar, para quem veio ver semente.
+    "27. A abertura. A frase pronta do site (\"Olá! Venho pelo site e quero mais informações!\") é de quem "
+    "estava vendo as sementes: presuma que o assunto é semente e pergunte, pelo nome da pessoa, qual "
+    "semente ou produto ela procura. Quem chega sem dizer o assunto (\"oi\", \"boa tarde\") recebe UMA "
+    "pergunta aberta (\"Em que posso ajudar?\"), sem lista de assuntos. Nunca ofereça vaga de trabalho como "
+    "opção: de vaga você só fala se a pessoa falar de vaga ou vier do anúncio de vaga.\n"
 )
 
 

@@ -69,6 +69,8 @@ def test_a_a_070_nasce_desligada_e_as_regras_so_entram_com_a_chave(sem_venda):
         assert "nunca mande o cartão sem essa apresentação" in i
         assert "quanto ela precisa" not in i
         assert "só pergunta DEPOIS de a pessoa dizer que é do Paraná" in i   # dono, 19/11/2026
+        # dono, 19/11/2026 (Sivan): quem vem do site quer semente; vaga nao e opcao de abertura
+        assert "Venho pelo site" in i and "Nunca ofereça vaga de trabalho como opção" in i
 
 
 # ── (b) o cartao do representante certo, sem o botao ────────────────────────
