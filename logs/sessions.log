@@ -44,3 +44,5 @@
 [2026-11-10][ATENDE-END] #1337 fechado: aviso de API externa recusando no WhatsApp do dono (auditoria_erp.py em canais, migracao 060, ad5205c+cb639e2); prova 10/11 08:40 ensaio id 3 ENVIADO com wamid; comentado no #1280 (modelo Meta so cadastro com porteiro ligado)
 [2026-11-12][ATENDE-END] #1474 duas vagas no Trabalhe conosco (migracao 062: Auxiliar e Operador abertas, Comercial fechada; lista das vagas no menu em vaga.py), commit 3bc8883, entregue 5.2 -- espera os restarts do dono; 1 falha alheia em test_vaga (063 de outra sessao, nao commitada)
 [2026-11-16][ATENDE-END] #1520 passos 1-13 e B1-B8 feitos (OlivIA anonima + audio de fora, chaves desligadas), bateria 666 verde; espera o dono no passo 14
+[2026-11-17 11:06][ATENDE-END] #1525 OlivIA conduz a vaga: entregue e fechado (commits 79c0cba, 3df25d7; chave olivia.conduz_vaga ligada 16/11). Provas da ficha seguem em outra sessao; medicao de uma semana (passo 20) a partir de 23/11; #1539 espera a Fran.
+[2026-11-19][ATENDE-END] #1660 OlivIA qualifica produtor rural SC/RS: no ar, chave ligada pelo dono; prova real NAO realizada, fica com a sessao de acompanhamento da OlivIA; entregue e fechado.
