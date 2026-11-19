@@ -691,6 +691,14 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
         from . import termo_erp
         termo_erp.tocar(con, saida, e, agora)
         return
+    # #1664: quem recebeu um AVISO DE CONTRATO (hoje, o termo de reprovacao) e escreve dentro do prazo recebe
+    # a resposta padrao e o cartao do contato legal, e o contato e avisado. Antes do portao do cliente, que o
+    # trataria como cliente da carteira. So com a chave `cooperante.resposta_padrao` ligada; toque de botao
+    # segue o caminho de sempre; False (chave desligada, sem aviso, erro) segue a corrente de hoje.
+    if not e.toque:
+        from . import cooperante
+        if cooperante.tratar(con, saida, e, agora):
+            return
     if e.toque and e.toque.startswith("envio:"):
         if envio is not None:
             envio.tratar_toque(con, saida, e, agora)
