@@ -318,6 +318,9 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 from . import olivia as olivia_mod   # #1525: a chave da conducao da vaga (no banco)
                 vaga_ligada = olivia_mod.conduz_vaga(con)
                 venda_ligada = olivia_mod.conduz_venda(con)   # #1589: a conversa de quem quer comprar
+                qualifica_ligada = olivia_mod.qualifica(con)  # #1660: o piloto (so vale com a venda)
+                from . import cooperante   # #1664: a resposta padrao a quem responde a um aviso de contrato
+                cooperante_ligada = cooperante.ligado(con)
         except Exception as erro:  # noqa: BLE001
             return JSONResponse({"de_pe": False, "ambiente": cfg.ambiente, "erro": type(erro).__name__},
                                 status_code=503)
@@ -330,6 +333,10 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "olivia_vaga": "ligada" if vaga_ligada else "desligada",
                 # #1589: a OlivIA conduz a conversa de quem quer comprar (ajuste `olivia.conduz_venda`)
                 "olivia_venda": "ligada" if venda_ligada else "desligada",
+                # #1660: ela qualifica o produtor rural do piloto (ajuste `olivia.qualifica_produtor`, com a venda)
+                "olivia_qualifica": "ligada" if qualifica_ligada else "desligada",
+                # #1664: a resposta padrao ao cooperante (ajuste `cooperante.resposta_padrao`, scripts/cooperante.py)
+                "cooperante_resposta": "ligada" if cooperante_ligada else "desligada",
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,
                 "chegadas": chegadas,
                 # #1028: o que o motor DEIXOU de mandar desde que o servico subiu, para a regra que
