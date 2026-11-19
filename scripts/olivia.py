@@ -6,6 +6,9 @@ Em producao, janela elevada:
     $env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
     .\\.venv\\Scripts\\python.exe scripts\\olivia.py mostrar|ligar-vaga|desligar-vaga
 
+#1589: `ligar-venda|desligar-venda`, a conversa de quem quer comprar (070). #1660: `ligar-qualifica|
+desligar-qualifica`, o piloto da qualificacao do produtor rural (072); recusa ligar com a venda desligada.
+
 `ligar-vaga` RECUSA ligar enquanto algum texto de cadastro da ficha ainda tiver a marca [TEXTO DO DONO]:
 o texto provisorio da 067 nao sai para candidato nenhum.
 """
@@ -28,8 +31,10 @@ def provisorios(con) -> list[str]:
 
 def main() -> int:
     acao = (sys.argv[1:] or ["mostrar"])[0]
-    if acao not in ("mostrar", "ligar-vaga", "desligar-vaga", "ligar-venda", "desligar-venda"):
-        print("uso: olivia.py mostrar|ligar-vaga|desligar-vaga|ligar-venda|desligar-venda")
+    if acao not in ("mostrar", "ligar-vaga", "desligar-vaga", "ligar-venda", "desligar-venda",
+                    "ligar-qualifica", "desligar-qualifica"):
+        print("uso: olivia.py mostrar|ligar-vaga|desligar-vaga|ligar-venda|desligar-venda|"
+              "ligar-qualifica|desligar-qualifica")
         return 2
     cfg = config.carregar()
     with conexao(cfg) as con:
@@ -51,8 +56,27 @@ def main() -> int:
                 print("RECUSADO: o ajuste %s nao existe neste banco (a migracao 070 nao foi aplicada?)"
                       % olivia.AJUSTE_VENDA)
                 return 1
+        if acao in ("ligar-qualifica", "desligar-qualifica"):
+            # #1660: o piloto da qualificacao do produtor rural. A chave nasce na migracao 072 e so vale com a
+            # venda ligada: ligar com a venda desligada nao faria nada, e por isso e recusado.
+            if acao == "ligar-qualifica" and not olivia.conduz_venda(con):
+                print("RECUSADO: a conversa de quem quer comprar (%s) esta desligada; ligue-a antes (ligar-venda)"
+                      % olivia.AJUSTE_VENDA)
+                return 1
+            n = con.execute("""UPDATE atendimento.ajustes SET valor = %s::jsonb, atualizado_em = now()
+                                WHERE chave = %s""", ("true" if acao == "ligar-qualifica" else "false",
+                                                      olivia.AJUSTE_QUALIFICA)).rowcount
+            if n != 1:
+                print("RECUSADO: o ajuste %s nao existe neste banco (a migracao 072 nao foi aplicada?)"
+                      % olivia.AJUSTE_QUALIFICA)
+                return 1
         ligada = olivia.conduz_vaga(con)
         venda = olivia.conduz_venda(con)
+        qualifica = olivia.qualifica(con)
+        estados = olivia._estados_do_piloto(con)
+        destinos = {r["chave"]: r["nome"] for r in con.execute(
+            """SELECT m.chave, d.nome FROM atendimento.menu m LEFT JOIN atendimento.destinos d ON d.id = m.destino_id
+                WHERE m.chave = ANY(%s)""", ([olivia.FOLHA_DO_PRODUTOR + uf.lower() for uf in estados],)).fetchall()}
         toque = olivia._horas(con, "olivia.vaga_toque_h", 2)
         parcial = olivia._horas(con, "olivia.ficha_parcial_h", 4)
         falta = provisorios(con)
@@ -63,6 +87,10 @@ def main() -> int:
     print("textos provisorios %s: %s" % (MARCA, ", ".join(falta) or "nenhum"))
     print("conversa de quem quer comprar pela OlivIA (#1589): %s (vale so com OLIVIA_FALA=true)"
           % ("LIGADA" if venda else "desligada"))
+    print("qualificacao do produtor rural (#1660): %s; estados do piloto: %s" % (
+        "LIGADA" if qualifica else "desligada", ", ".join(estados) or "nenhum"))
+    for chave, nome in sorted(destinos.items()):
+        print("  %s -> ficha e cartao para: %s" % (chave, nome or "SEM DESTINO"))
     return 0
 
 

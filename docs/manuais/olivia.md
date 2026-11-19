@@ -70,9 +70,31 @@ autenticado são os próximos degraus, em chamados próprios.
    **apresenta quem atende pelo nome** e o cartão sai logo depois, sem o botão "Sim". Pergunta técnica ela
    responde no básico, pela base, só se a pessoa perguntar; se a conversa aprofunda, diz que o
    representante sabe mais e o indica. Em dúvida, manda os botões de sempre. Não fala de preço, estoque
-   nem prazo, não diz que vai fazer cotação, e não avisa o representante: quem chama é a pessoa, pelo cartão. Desligada a chave, quem quer comprar recebe
-   os botões do Comercial, como antes. Liga e desliga sem restart: `scripts\olivia.py ligar-venda` e
-   `desligar-venda`.
+   nem prazo e não diz que vai fazer cotação. Fora do piloto abaixo, não avisa o representante: quem chama
+   é a pessoa, pelo cartão. **O cartão nunca sai sem apresentação** (#1660): se ela não disser a frase, o
+   sistema manda "Na sua região quem atende é o nosso consultor Fulano. Segue o contato dele." antes do
+   cartão. Desligada a chave, quem quer comprar recebe os botões do Comercial, como antes. Liga e desliga
+   sem restart: `scripts\olivia.py ligar-venda` e `desligar-venda`.
+   **O piloto do produtor rural** (#1660), com a chave `olivia.qualifica_produtor` ligada (só vale com a
+   da venda): para o **produtor rural de SC e do RS**, ela faz quatro perguntas rápidas **antes** do
+   cartão, e **quem atende a região recebe no próprio WhatsApp a ficha da conversa**. Revenda, corretor e
+   produtor de outro estado seguem como acima.
+   - **Para que serve.** O consultor atende sabendo do que o produtor precisa, em vez de receber um
+     contato vazio.
+   - **Quem usa e quando.** O consultor da região (no piloto, o dono), toda vez que a OlivIA fecha uma
+     conversa com um produtor desses estados. Não há tela: tudo chega no WhatsApp.
+   - **O caminho comum.**
+     1. Ela pede licença ("posso te fazer quatro perguntas rápidas?") e pergunta, uma por mensagem, só o
+        que ainda não foi dito: qual semente e para quê; a área ou a quantidade; quando planta; o município.
+     2. Chega no seu WhatsApp, do número da empresa, a mensagem **"Lead da OlivIA"** com o nome do produtor,
+        o que ele procura e para quê, a área ou a quantidade, quando planta, o município, duas linhas de
+        resumo e o link para conversar com ele.
+     3. Ela diz ao produtor que você está recebendo o resumo, e o seu cartão sai logo depois. Ele pode te
+        chamar antes de você chamar.
+     4. Toque no link e atenda. Depois, conte na sessão como foi (um print serve): é com isso que as
+        próximas etapas são desenhadas.
+   - **Quem recebe** a ficha e o cartão é o destino da folha *Comercial › Produtor rural › SC* (ou *RS*) na
+     tela **Destinos**. Trocar o destino ali troca quem recebe a ficha.
 7. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
    e a data entre colchetes (a OlivIA não as repete à pessoa). A OlivIA relê o arquivo sozinha quando
    ele muda: **não precisa reiniciar nada**. O inventário das fontes, com o que entrou e por quê, está em
@@ -91,6 +113,13 @@ autenticado são os próximos degraus, em chamados próprios.
 | No `/saude` do recepcionista (`http://127.0.0.1:8008/saude`), **"olivia": "ligada"** | a voz dela está ligada no servidor |
 | No `/saude`, **"olivia_vaga": "ligada"** | ela conduz a conversa de vaga (#1525) |
 | No `/saude`, **"olivia_venda": "ligada"** | ela conduz a conversa de quem quer comprar (#1589) |
+| No `/saude`, **"olivia_qualifica": "ligada"** | o piloto do produtor rural está valendo (#1660): a chave ligada **e** a venda ligada |
+| Na ficha, **"Ficha incompleta: faltou …"** | o produtor teve pressa ou não quis responder; o cartão saiu assim mesmo |
+| Na ficha, **"não disse"** ao lado de uma pergunta | ela não perguntou de novo, de propósito |
+| Mensagem de uma linha começando com **"Resumo da OlivIA: Lead produtor rural …"** | você estava há mais de 24 horas sem escrever ao número da empresa, e a ficha veio pelo modelo curto, com o telefone escrito em vez do link. Escrever qualquer coisa ao número reabre a forma completa para as próximas |
+| **Nenhuma ficha**, e o produtor te chamou pelo cartão | o envio falhou. Ele **não** ouviu que você tinha sido avisado; a falha conta no resumo do vigia ("leads do produtor: … sem envio") |
+| **Frase recusada: aviso sem ficha** | ela tentou dizer que o consultor foi avisado ou está recebendo o resumo sem a ficha ter saído; saiu no lugar a apresentação simples, e contou no resumo |
+| No resumo, **"leads do produtor: N completos, N incompletos, N sem envio"** | as fichas do dia (#1660); o resumo também chega quando alguma não saiu |
 | Na conversa de compra, **o cartão de quem atende sem o botão "Sim" antes** | ela tinha certeza da categoria (produtor, revenda, corretor) e do estado. **Os botões** em vez do cartão: ficou em dúvida, ou a chave está desligada |
 | **Frase recusada: promessa** | numa conversa de vaga, ela tentou dizer que anotou ou encaminhou antes de a ficha ou o currículo estar gravado; saiu no lugar a frase do que ainda falta, e contou no resumo |
 | No resumo, **"N fichas incompletas"** | fichas que foram à Fran pela metade porque a pessoa parou de responder |
@@ -111,7 +140,10 @@ autenticado são os próximos degraus, em chamados próprios.
   manda mais de um toque por conversa.
 - **Não promete prazo, valor, salário nem vaga**, e não escreve telefone, e-mail ou link.
 - **Na conversa de compra não negocia**: não diz preço, dose, época de plantio nem estoque, não recomenda
-  produto para a área da pessoa, não guarda ficha de quem quer comprar e não avisa o representante.
+  produto para a área da pessoa. Fora do piloto do produtor rural de SC e RS (#1660), não guarda ficha de
+  quem quer comprar e não avisa o representante. No piloto, não classifica o produtor, não agenda nada, não
+  avisa outro representante além do destino da folha, e quem manda a ficha é o código, não a fala dela. A
+  ficha é apagada com 12 meses.
 - **Não faz pré-triagem de currículo em foto**: a Fran olha.
 - **Não responde figurinha nem localização**, e o **áudio só com a chave `audio.de_fora` ligada**; fora
   disso, a linha curta de sempre. **Não responde em áudio.**
@@ -160,3 +192,19 @@ $env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista
 chave, os dois tempos (o toque às 2 h, a parcial 4 h depois do toque) e os textos ainda provisórios.
 **`ligar-vaga` recusa** enquanto algum texto de cadastro da ficha tiver a marca `[TEXTO DO DONO]`. Conferir
 em `http://127.0.0.1:8008/saude`: `"olivia_vaga": "ligada"`. Ela só vale com `OLIVIA_FALA=true`.
+
+**O piloto do produtor rural** (#1660) tem chave própria, `olivia.qualifica_produtor`, que nasce desligada
+e liga e desliga **sem restart**. **Antes de ligar**, confira na tela **Destinos** quem recebe *Comercial ›
+Produtor rural › SC* e *› RS*: a ficha vai a essa pessoa. Em janela elevada, em produção:
+
+```
+cd C:\AxiaAtende
+$env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
+.\.venv\Scripts\python.exe scripts\olivia.py ligar-qualifica
+```
+
+`desligar-qualifica` volta, na hora, ao "recebe e direciona" (as fichas já guardadas ficam). **`ligar-qualifica`
+recusa** com a venda desligada. `mostrar` diz a chave, os estados do piloto e quem recebe cada folha.
+Conferir em `http://127.0.0.1:8008/saude`: `"olivia_qualifica": "ligada"`. **Quem recebe a ficha precisa
+escrever ao número da empresa** de vez em quando: dentro das 24 h a ficha chega completa, com o link; fora
+delas, numa linha só.

@@ -909,6 +909,8 @@ def limpar(con, agora: datetime) -> int:
                       AND (iniciada_em < %s OR id IN (SELECT conversa_id FROM atendimento.candidaturas
                                                        WHERE apagar_em < %s AND apagada_em IS NULL))""",
                 (agora - DOZE_MESES, agora))
+    # #1660 (D10): a ficha do produtor que a OlivIA qualificou sai inteira com 12 meses
+    con.execute("DELETE FROM atendimento.leads WHERE criado_em < %s", (agora - DOZE_MESES,))
     return con.execute("""UPDATE atendimento.candidaturas
                              SET pdf = NULL, texto = '', triagem = NULL, nome_perfil = '', wa_id = NULL,
                                  bsuid = NULL, pdf_nome = '', ficha = NULL, apagada_em = %s

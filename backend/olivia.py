@@ -50,6 +50,13 @@ ferramentas passam a depender do estado da conversa (o que nao e oferecido nao p
 O toque unico (D4, D6) e a ficha parcial saem da rotina do minuto (`tocar_vagas`, `enviar_parciais`). A
 fala que diz ter anotado ou encaminhado sem candidatura gravada e recusada (`PROMESSA`): o fracasso
 silencioso que a spec nomeia.
+
+O PILOTO DO PRODUTOR RURAL (#1660, spec docs/specs/2026-11-19-olivia-qualifica-o-produtor-rural.md): com a
+chave `olivia.qualifica_produtor` (so com a venda), o produtor rural dos estados de `olivia.qualifica_estados`
+responde quatro perguntas antes do cartao. `anotar_lead` grava em `atendimento.leads`; `fechar_lead` manda a
+FICHA ao destino da folha (backend/lead.py, pelo codigo) e deixa o cartao para DEPOIS da fala final dela
+(ficha, fala, cartao). A fala que diz que o consultor esta recebendo o resumo sem a ficha ter saido e trocada
+pela apresentacao (`aviso_sem_ficha`); o cartao sem fala ganha a apresentacao (`_apresentar`, toda a venda).
 """
 import re
 import unicodedata
@@ -57,6 +64,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import clientes_do_dia, internos, motor, vaga
+from . import lead as lead_mod
 from .saida import Opcao
 
 RAIZ_PROJETO = Path(__file__).resolve().parent.parent
@@ -116,6 +124,74 @@ def conduz_venda(con) -> bool:
     """#1589: a chave da conversa de quem quer comprar (ajuste no banco; nasce false na 070). Liga e desliga
     sem restart. Desligada, quem quer comprar recebe os botoes do Comercial, como antes."""
     return motor._ajuste(con, AJUSTE_VENDA, False) is True
+
+
+# ── a qualificacao do produtor rural (#1660, piloto SC e RS) ─────────────────
+
+AJUSTE_QUALIFICA = "olivia.qualifica_produtor"
+AJUSTE_ESTADOS = "olivia.qualifica_estados"
+FOLHA_DO_PRODUTOR = "comercial.produtor."
+RECUSADA_AVISO = RECUSADA + ": aviso sem ficha"
+# D6: a fala que diz que o consultor foi avisado ou esta recebendo, sem a ficha ter saido. Sem acento.
+AVISADO = ("esta recebendo", "ja esta recebendo", "ja recebeu", "recebendo agora", "foi avisado", "ja avisei",
+           "avisei o", "avisei ele", "ja passei o", "passei o resumo", "enviei o resumo", "mandei o resumo",
+           "repassei", "ja vai saber", "vai saber do que", "ja sabe do que", "vai te chamar", "vai te ligar",
+           "vai entrar em contato", "entra em contato com voce", "ele te chama")
+APRESENTACAO = "%sa sua região quem atende é o nosso consultor %s. Segue o contato dele."
+
+
+def qualifica(con) -> bool:
+    """#1660 (D8): a chave do piloto (ajuste no banco; nasce false na 072). So vale com a venda ligada."""
+    return conduz_venda(con) and motor._ajuste(con, AJUSTE_QUALIFICA, False) is True
+
+
+def _estados_do_piloto(con) -> list[str]:
+    """D1: os estados do piloto (ajuste; nasce ["SC", "RS"]), para ampliar sem codigo."""
+    v = motor._ajuste(con, AJUSTE_ESTADOS, ["SC", "RS"])
+    return [str(x).strip().upper() for x in (v if isinstance(v, list) else []) if str(x).strip()]
+
+
+def _folhas_do_piloto(con) -> list[str]:
+    """As folhas `comercial.produtor.<uf>` dos estados do piloto que existem e levam a alguem."""
+    existem = {o["chave"] for o in _destinos_do_comercial(con)}
+    return [FOLHA_DO_PRODUTOR + uf.lower() for uf in _estados_do_piloto(con)
+            if FOLHA_DO_PRODUTOR + uf.lower() in existem]
+
+
+def _lead(con, conversa_id):
+    return con.execute("SELECT * FROM atendimento.leads WHERE conversa_id = %s", (conversa_id,)).fetchone()
+
+
+def _em_qualificacao(con, conversa) -> bool:
+    """D9: a conversa tem ficha comecada e ainda nao mandada."""
+    if not conversa or conversa.get("trabalhe") or not conduz_venda(con):
+        return False
+    lead = _lead(con, conversa["id"])
+    return lead is not None and lead["enviada_em"] is None
+
+
+def _apresentacao(con, conversa, destino_id) -> str:
+    """D7: "<nome>, na sua regiao quem atende e o nosso consultor <primeiro nome>. Segue o contato dele."
+    O nome da pessoa so vem da ficha (o do perfil pode nao ser nome de gente); sem ele, "Na sua regiao"."""
+    d = con.execute("SELECT nome FROM atendimento.destinos WHERE id = %s", (destino_id,)).fetchone() \
+        if destino_id else None
+    if d is None:
+        return FRASE_APROVADA
+    lead = _lead(con, conversa["id"]) if conversa else None
+    nome = motor.primeiro_nome(lead["nome"]) if lead is not None and (lead["nome"] or "").strip() else ""
+    return APRESENTACAO % (("%s, n" % nome) if nome else "N", motor.primeiro_nome(d["nome"]))
+
+
+def aviso_sem_ficha(con, conversa, texto: str) -> bool:
+    """D6, a trava no codigo: a fala afirma que o consultor foi avisado ou esta recebendo, numa conversa de
+    venda SEM ficha enviada. So com a venda ligada e fora da conversa de vaga."""
+    if not conversa or conversa.get("trabalhe") or not conduz_venda(con):
+        return False
+    s = _sem_acento(texto)
+    if not any(p in s for p in AVISADO):
+        return False
+    lead = _lead(con, conversa["id"])
+    return lead is None or lead["enviada_em"] is None
 
 
 def nota_do_perfil(pessoa) -> str:
@@ -488,6 +564,39 @@ REGRAS_DA_VENDA = (
 )
 
 
+def regras_da_qualificacao(estados: list[str]) -> str:
+    """#1660 (D3, D4, D6): o modo de qualificar o produtor rural dos estados do piloto. Entra na instrucao so
+    com a chave `olivia.qualifica_produtor` ligada; fora do piloto valem as regras 20 a 27 sem mudanca."""
+    uf = " e ".join(estados) if len(estados) <= 2 else ", ".join(estados[:-1]) + " e " + estados[-1]
+    return (
+        "\nA QUALIFICAÇÃO DO PRODUTOR RURAL (#1660, piloto). Vale SÓ para PRODUTOR RURAL de %s. Revenda, "
+        "corretor e produtor de outro estado seguem as regras 20 a 27, sem mudança.\n"
+        # dono, 19/11/2026: "fazer essa qualificacao antes" -- as perguntas vem ANTES do cartao (D3)
+        "28. Para produtor rural de %s, depois do \"temos\" e de saber a categoria e o estado, NÃO use "
+        "passar_contato: peça licença numa frase: \"Para o nosso consultor já te atender sabendo do que você "
+        "precisa, posso te fazer quatro perguntas rápidas?\". Aqui a última frase da regra 22 não vale: você "
+        "pergunta a área e o município.\n"
+        "29. Se a pessoa aceitar, pergunte UMA por mensagem, e só o que ela ainda não disse: (1) qual semente "
+        "e para quê (cobertura, pastagem, grão); (2) a área ou a quantidade; (3) quando pretende plantar; "
+        "(4) o município. A cada resposta, use anotar_lead com o que ela disse, como ela disse (o nome e o "
+        "estado também, quando souber).\n"
+        # D4 (dono, "A"): quem nao quer responder recebe o cartao na hora
+        "30. Pressa, recusa (\"só quero o contato\"), resposta que ignora a pergunta ou que não quer "
+        "responder: use fechar_lead NA HORA, sem insistir e sem perguntar o resto. Com as quatro "
+        "respondidas, use fechar_lead. Em fechar_lead, escreva o resumo da conversa em até duas linhas.\n"
+        # D6: o que ela diz acompanha o que aconteceu
+        "31. Depois de fechar_lead, diga UMA mensagem, conforme o que a ferramenta responder. Se a ficha "
+        "SAIU: \"Anotei tudo! O nosso consultor <primeiro nome> está recebendo agora o resumo da nossa "
+        "conversa. Segue o contato dele; se quiser dar uns 5 minutinhos, ele já vai saber do que "
+        "tratamos.\". Se NÃO saiu: só apresente quem atende e diga que segue o contato, sem dizer que ele "
+        "foi avisado. O cartão sai logo depois da sua frase; não escreva mais nada depois. Esta é a única "
+        "exceção à regra 26, e só quando a ferramenta disser que a ficha saiu.\n" % (uf, uf))
+
+
+def _regras_da_qualificacao(con) -> str:
+    return regras_da_qualificacao(_estados_do_piloto(con)) if qualifica(con) and _folhas_do_piloto(con) else ""
+
+
 def instrucao(con) -> str:
     """A instrucao de sistema (vai em cache): quem ela e, as regras, a base, o menu e as vagas."""
     menu = "\n".join("- %s: %s%s" % (o["chave"], " › ".join(o["caminho"]) or o["rotulo"],
@@ -540,7 +649,7 @@ def instrucao(con) -> str:
         "responda ao sentido, e se não der para entender peça em uma frase que ela escreva. Se vier "
         "[não foi possível ouvir o áudio], diga que não conseguiu ouvir e peça para escrever ou mandar de "
         "novo, curto." + (REGRAS_DA_VAGA if conduz_vaga(con) else "\n")
-        + (REGRAS_DA_VENDA if conduz_venda(con) else "") + "\n"
+        + (REGRAS_DA_VENDA + _regras_da_qualificacao(con) if conduz_venda(con) else "") + "\n"
         "BASE DA EMPRESA (o que você pode afirmar; cada linha traz a fonte entre colchetes, que você NÃO "
         "repete para a pessoa):\n<base>\n" + (base() or "(vazia: afirme só o que o menu e as vagas dizem)")
         + "\n</base>\n\nOPÇÕES DO MENU (chave: caminho (descrição)); use a chave em oferecer_opcao_do_menu, "
@@ -551,7 +660,9 @@ def instrucao(con) -> str:
 FERRAMENTAS_NOMES = ("ver_vagas", "ler_arquivo_recebido", "oferecer_opcao_do_menu", "encaminhar_curriculo", "encerrar")
 # As que NAO mandam nada a pessoa: a fala que vem junto delas espera o resultado (#1543).
 FERRAMENTAS_MUDAS = ("ver_vagas", "ler_arquivo_recebido", "encaminhar_curriculo", "escolher_vaga", "anotar_ficha",
-                     "marcar_visita")
+                     "marcar_visita",
+                     # #1660: a ficha sai ANTES da fala final, e a fala depende de ela ter saido (D5, D6)
+                     "anotar_lead", "fechar_lead")
 
 
 def ferramentas(con, conversa=None) -> list[dict]:
@@ -581,6 +692,31 @@ def ferramentas(con, conversa=None) -> list[dict]:
                                            "properties": {"chave": {"type": "string",
                                                                     "enum": [o["chave"] for o in destinos]}},
                                            "required": ["chave"], "additionalProperties": False}, "strict": True})
+        folhas = _folhas_do_piloto(con) if qualifica(con) else []
+        if folhas:
+            # #1660: as duas da qualificacao, so com a chave do piloto ligada e fora da conversa de vaga. A
+            # folha vem da lista fechada dos estados do piloto: a ficha e o cartao vao ao destino dela (D2).
+            campo = {"type": "string", "description": "como a pessoa disse, até %d letras" % lead_mod.CAMPO_ATE}
+            lista.append({"name": "anotar_lead",
+                          "description": "Anota na ficha do produtor rural o que a pessoa respondeu, como ela disse. "
+                                         "Nada vai ao consultor ainda: a ficha só sai com fechar_lead. Campos: nome; "
+                                         "produto (qual semente); finalidade (para quê: cobertura, pastagem, grão); "
+                                         "tamanho (área ou quantidade); quando (quando pretende plantar); "
+                                         "municipio; uf (o estado, duas letras).",
+                          "input_schema": {"type": "object",
+                                           "properties": {k: campo for k in lead_mod.CAMPOS},
+                                           "additionalProperties": False}})
+            lista.append({"name": "fechar_lead",
+                          "description": "Fecha a ficha do produtor rural: ela vai ao WhatsApp de quem atende a "
+                                         "região, e o cartão de contato sai logo depois da sua próxima frase. Use "
+                                         "com as quatro respostas, ou na hora em que a pessoa tiver pressa ou não "
+                                         "quiser responder. A resposta diz se a ficha SAIU. chave: a do estado; "
+                                         "resumo: a conversa em até duas linhas.",
+                          "input_schema": {"type": "object",
+                                           "properties": {"chave": {"type": "string", "enum": folhas},
+                                                          "resumo": {"type": "string",
+                                                                     "description": "até %d letras" % lead_mod.RESUMO_ATE}},
+                                           "required": ["chave", "resumo"], "additionalProperties": False}})
     if conversa is None or not conduz_vaga(con):
         return lista
     abertas = vaga.vagas_abertas(con)
@@ -779,6 +915,9 @@ def travou(con, conversa, e) -> str | None:
     # ha toque de botao, a contagem so crescia, a marca mandava oferecer o menu, e um segundo "Sim" daria o
     # menu e a calaria. Ali so conta o "nao e isso" e a repeticao de mensagem LONGA (mais de tres palavras).
     na_vaga = bool(conversa.get("trabalhe")) and conduz_vaga(con)
+    # #1660 (D9): quatro perguntas respondidas por texto sao quatro falas sem toque. Com a ficha do produtor
+    # comecada e ainda nao mandada, vale o mesmo da vaga.
+    na_vaga = na_vaga or _em_qualificacao(con, conversa)
     if t and not (na_vaga and len(t.split()) <= 3):
         anterior = con.execute("""SELECT corpo->'msg'->'text'->>'body' AS texto FROM atendimento.eventos_meta
                                    WHERE tipo = 'mensagem' AND chave_meta <> ALL(%s) AND processado_em IS NOT NULL
@@ -906,9 +1045,14 @@ def _atender(con, saida, ia, e, agora: datetime, estado: dict) -> bool:
         if r is None:
             if guardada:
                 _falar(con, saida, estado, guardada, travada=bool(marca))
+            _cartao_pendente(con, saida, estado, agora)
             if not estado["falou"]:
                 print("olivia: a IA nao respondeu (%s): o caminho de hoje" % e.wamid, flush=True)
             return estado["falou"]
+        # #1660 (D6, D7): o destino que a resposta vai entregar, para a trava saber quem apresentar, e se ela
+        # falou nesta resposta (o cartao sem fala ganha a apresentacao)
+        estado["texto_da_vez"] = bool((r.get("texto") or "").strip())
+        estado["destino_da_vez"] = _destino_das_ferramentas(con, r.get("ferramentas") or [])
         # #1543 (dono, 17/11/2026: "a OlivIA precisa aprender a esperar tambem"): a fala que vem JUNTO de uma
         # ferramenta que nao manda nada a pessoa (marcar a vaga, anotar a ficha) espera o resultado. Sem isso
         # saiam duas mensagens seguidas para uma so da pessoa ("Combinado! Fico no aguardo." e, no mesmo
@@ -936,7 +1080,42 @@ def _atender(con, saida, ia, e, agora: datetime, estado: dict) -> bool:
             break
     if guardada and not estado["acabou"]:
         _falar(con, saida, estado, guardada, travada=bool(marca))   # ela nao disse mais nada depois da ferramenta
+    _cartao_pendente(con, saida, estado, agora)
     return estado["falou"]
+
+
+def _destino_das_ferramentas(con, chamadas: list) -> int | None:
+    """O destino da folha de `passar_contato` ou `fechar_lead` pedidos nesta resposta (#1660, D6)."""
+    for f in chamadas:
+        if f.get("nome") in ("passar_contato", "fechar_lead"):
+            no = motor._no(con, str((f.get("entrada") or {}).get("chave") or ""))
+            if no is not None and no["destino_id"]:
+                return no["destino_id"]
+    return None
+
+
+def _cartao_pendente(con, saida, estado, agora: datetime) -> None:
+    """#1660: o cartao de `fechar_lead` sai DEPOIS da fala final dela (D6: ficha, fala, cartao). Se ela nao
+    falou depois de fechar a ficha, a apresentacao sai antes do cartao (D7)."""
+    no = estado.pop("cartao", None)
+    if no is None:
+        return
+    c = estado["conversa"]
+    if not estado.get("falou_depois_do_lead"):
+        _apresentar(con, saida, estado, no["destino_id"])
+    motor.escolher(con, saida, estado["e"].pessoa, c, no, agora)
+    estado["conversa"] = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (c["id"],)).fetchone()
+    if _mandou(con, c["id"], "link: %s" % no["chave"]):
+        estado["falou"] = True
+
+
+def _apresentar(con, saida, estado, destino_id) -> None:
+    """D7: a frase de apresentacao, mandada pelo codigo quando o cartao ia sair sem fala dela."""
+    p, c = estado["e"].pessoa, estado["conversa"]
+    texto = _apresentacao(con, c, destino_id)
+    w = saida.texto(p.para, texto)
+    _registrar(con, c["id"], p.para, "texto", "%s: %s" % (FALA, texto), w)
+    estado["falou"] = estado["falou"] or bool(w)
 
 
 def _registrar(con, conversa_id, para, tipo, resumo, wamid):
@@ -953,6 +1132,18 @@ def _falar(con, saida, estado, texto: str, travada: bool = False) -> None:
               flush=True)
         w = saida.texto(p.para, _frase_do_que_falta(con, c))
         _registrar(con, c["id"], p.para, "texto", RECUSADA_PROMESSA, w)
+        estado["falou"] = estado["falou"] or bool(w)
+        return
+    if ok and "cartao" in estado:
+        # #1660: a fala final (ou a apresentacao que a troca) vem antes do cartao; a frase recusada nao conta
+        estado["falou_depois_do_lead"] = True
+    if ok and aviso_sem_ficha(con, c, texto):
+        # #1660 (D6): "o consultor esta recebendo o resumo" sem a ficha ter saido e o fracasso silencioso da
+        # spec. No lugar, a apresentacao simples (ou a frase aprovada, sem saber quem atende).
+        print("olivia: aviso sem ficha na conversa %d: %s" % (c["id"], " ".join(texto.split())[:300]), flush=True)
+        destino = (estado.get("cartao") or {}).get("destino_id") or estado.get("destino_da_vez") or c.get("destino_id")
+        w = saida.texto(p.para, _apresentacao(con, c, destino))
+        _registrar(con, c["id"], p.para, "texto", RECUSADA_AVISO, w)
         estado["falou"] = estado["falou"] or bool(w)
         return
     if not ok:
@@ -1077,6 +1268,11 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
         no = motor._no(con, chave)
         if no is None or chave not in {o["chave"] for o in _destinos_do_comercial(con)}:
             return "Esse contato não existe. Use uma chave da lista da ferramenta, ou oferecer_opcao_do_menu."
+        if "cartao" in estado:
+            return "O cartão desta conversa já vai sair depois da sua frase. Não chame outra ferramenta."
+        if not estado.get("texto_da_vez"):
+            # #1660 (D7, toda a venda): o cartao nunca sai sem apresentacao (19/11, 09:30, conversa de Cacequi)
+            _apresentar(con, saida, estado, no["destino_id"])
         motor.escolher(con, saida, e.pessoa, c, no, agora)
         estado["conversa"] = con.execute("SELECT * FROM atendimento.conversas WHERE id = %s", (c["id"],)).fetchone()
         if not _mandou(con, c["id"], "link: %s" % chave):
@@ -1085,6 +1281,8 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
         estado["acabou"] = True   # o texto e o cartao ja sairam: ela nao escreve mais nada nesta mensagem
         d = con.execute("SELECT nome FROM atendimento.destinos WHERE id = %s", (no["destino_id"],)).fetchone()
         return "O cartão de contato de %s foi entregue à pessoa." % (d["nome"] if d else "quem atende")
+    if nome in ("anotar_lead", "fechar_lead"):
+        return _executar_do_lead(con, saida, estado, nome, entrada, agora)
     if nome == "ver_vagas":
         return _vagas(con)
     if nome == "ler_arquivo_recebido":
@@ -1156,6 +1354,64 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
         estado["acabou"] = True
         return "A despedida foi mandada e a conversa fechou."
     return "Ferramenta desconhecida."
+
+
+# ── a ficha do produtor: as duas ferramentas (#1660) ────────────────────────
+
+def _executar_do_lead(con, saida, estado, nome: str, entrada: dict, agora: datetime) -> str:
+    e, c = estado["e"], estado["conversa"]
+    lead = _lead(con, c["id"])
+    if lead is not None and lead["enviada_em"] is not None:
+        return "A ficha desta conversa já foi ao consultor. Não anote nem feche de novo."
+    valores = {k: lead_mod.limpo(entrada.get(k)) for k in lead_mod.CAMPOS}
+    if valores["uf"]:
+        valores["uf"] = valores["uf"].upper()[:2]
+    if nome == "fechar_lead":
+        chave = str(entrada.get("chave") or "")
+        no = motor._no(con, chave)
+        if no is None or chave not in _folhas_do_piloto(con):
+            return "Essa chave não é de um estado do piloto. Use uma chave da lista da ferramenta."
+        if "cartao" in estado:
+            return "A ficha já foi fechada nesta mensagem. Só fale com a pessoa."
+        valores["uf"] = chave[len(FOLHA_DO_PRODUTOR):].upper()
+    lead = con.execute(
+        """INSERT INTO atendimento.leads (conversa_id, nome, produto, finalidade, tamanho, quando, municipio, uf,
+                                          criado_em)
+           VALUES (%(c)s, %(nome)s, %(produto)s, %(finalidade)s, %(tamanho)s, %(quando)s, %(municipio)s, %(uf)s,
+                   %(agora)s)
+           ON CONFLICT (conversa_id) DO UPDATE SET
+               nome = CASE WHEN EXCLUDED.nome <> '' THEN EXCLUDED.nome ELSE leads.nome END,
+               produto = CASE WHEN EXCLUDED.produto <> '' THEN EXCLUDED.produto ELSE leads.produto END,
+               finalidade = CASE WHEN EXCLUDED.finalidade <> '' THEN EXCLUDED.finalidade ELSE leads.finalidade END,
+               tamanho = CASE WHEN EXCLUDED.tamanho <> '' THEN EXCLUDED.tamanho ELSE leads.tamanho END,
+               quando = CASE WHEN EXCLUDED.quando <> '' THEN EXCLUDED.quando ELSE leads.quando END,
+               municipio = CASE WHEN EXCLUDED.municipio <> '' THEN EXCLUDED.municipio ELSE leads.municipio END,
+               uf = CASE WHEN EXCLUDED.uf <> '' THEN EXCLUDED.uf ELSE leads.uf END
+           RETURNING *""", dict(valores, c=c["id"], agora=agora)).fetchone()
+    falta = lead_mod.faltou(lead)
+    if nome == "anotar_lead":
+        if falta:
+            return ("Anotado na ficha (ainda NÃO foi ao consultor). Falta: %s. Pergunte o próximo, um por vez; "
+                    "se a pessoa tiver pressa, use fechar_lead." % lead_mod.faltou_dito(lead))
+        return "Anotado. As quatro perguntas estão respondidas: use fechar_lead agora, com o resumo."
+    # fechar_lead (D4, D5, D6): grava, manda a ficha ao destino da folha e deixa o cartao para depois da fala
+    lead = con.execute("""UPDATE atendimento.leads SET resumo = %s, completa = %s, faltou = %s, destino_id = %s
+                           WHERE id = %s RETURNING *""",
+                       (lead_mod.limpo(entrada.get("resumo"), lead_mod.RESUMO_ATE), not falta, falta,
+                        no["destino_id"], lead["id"])).fetchone()
+    d = con.execute("SELECT * FROM atendimento.destinos WHERE id = %s", (no["destino_id"],)).fetchone() \
+        if no["destino_id"] else None
+    numero = c["wa_id"] or e.pessoa.wa_id or ""
+    saiu = lead_mod.mandar(con, saida, lead, d, numero, agora)
+    estado["cartao"] = no
+    estado["falou_depois_do_lead"] = False
+    quem = motor.primeiro_nome(d["nome"]) if d is not None else "quem atende"
+    if saiu:
+        return ("A ficha SAIU: %s está recebendo agora o resumo no WhatsApp. Diga à pessoa, numa mensagem, que "
+                "anotou tudo, que o consultor %s está recebendo agora o resumo da conversa, e que segue o contato "
+                "dele. O cartão sai logo depois da sua frase." % (quem, quem))
+    return ("A ficha NÃO saiu. Apresente %s como quem atende a região e diga que segue o contato dele, SEM dizer "
+            "que ele foi avisado ou está recebendo algo. O cartão sai logo depois da sua frase." % quem)
 
 
 # ── a vaga: as quatro ferramentas (#1525) ───────────────────────────────────
@@ -1336,11 +1592,17 @@ def fechar_dia(con, agora: datetime) -> dict:
     incompletas = con.execute("""SELECT count(*) AS n FROM atendimento.candidaturas
                                   WHERE tipo_arquivo = 'ficha' AND ficha ? 'faltou' AND recebida_em > %s""",
                               (desde,)).fetchone()["n"]
+    # #1660: as fichas do produtor do dia -- completas, incompletas e as que nao sairam (erro de envio)
+    leads = con.execute("""SELECT count(*) FILTER (WHERE completa AND enviada_em IS NOT NULL) AS completas,
+                                  count(*) FILTER (WHERE NOT completa AND enviada_em IS NOT NULL) AS incompletas,
+                                  count(*) FILTER (WHERE enviada_em IS NULL AND erro <> '') AS com_erro
+                             FROM atendimento.leads WHERE criado_em > %s""", (desde,)).fetchone()
+    leads = {k: leads[k] for k in ("completas", "incompletas", "com_erro")}
     numeros = {"conversas": len(conversas), "bem": len(bem), "sem_saida": sem, "recusadas": recusadas,
-               "n_recusadas": n_recusadas, "incompletas": incompletas, "avisou": False}
-    if sem or n_recusadas:
+               "n_recusadas": n_recusadas, "incompletas": incompletas, "leads": leads, "avisou": False}
+    if sem or n_recusadas or leads["com_erro"]:
         from .vigia import _avisar
-        texto = resumo_do_dia(len(conversas), len(bem), sem, n_recusadas, recusadas, incompletas)
+        texto = resumo_do_dia(len(conversas), len(bem), sem, n_recusadas, recusadas, incompletas, leads)
         _avisar(con, "olivia_resumo", [texto])
         numeros["avisou"] = True
     local = agora.astimezone(motor.FUSO).date().isoformat()
@@ -1355,7 +1617,8 @@ def _ids(ids: list) -> str:
     return mostra + (" e mais %d" % (len(ids) - 8) if len(ids) > 8 else "")
 
 
-def resumo_do_dia(n: int, bem: int, sem: list, n_recusadas: int, recusadas: list, incompletas: int = 0) -> str:
+def resumo_do_dia(n: int, bem: int, sem: list, n_recusadas: int, recusadas: list, incompletas: int = 0,
+                  leads: dict | None = None) -> str:
     partes = ["Hoje a OlivIA falou em %d conversa%s: %d terminaram bem" % (n, "" if n == 1 else "s", bem)]
     partes.append("%d sem saída%s" % (len(sem), (" (%s)" % _ids(sem)) if sem else ""))
     partes.append("%d frase%s recusada%s%s" % (n_recusadas, "" if n_recusadas == 1 else "s",
@@ -1364,4 +1627,9 @@ def resumo_do_dia(n: int, bem: int, sem: list, n_recusadas: int, recusadas: list
     if incompletas:
         partes.append("%d ficha%s incompleta%s" % (incompletas, "" if incompletas == 1 else "s",
                                                    "" if incompletas == 1 else "s"))
+    if leads and any(leads.values()):
+        # #1660: as fichas do produtor rural
+        partes.append("leads do produtor: %d completo%s, %d incompleto%s, %d sem envio" % (
+            leads["completas"], "" if leads["completas"] == 1 else "s",
+            leads["incompletas"], "" if leads["incompletas"] == 1 else "s", leads["com_erro"]))
     return ", ".join(partes) + "."
