@@ -1,4 +1,4 @@
-﻿# A resposta padrão ao produtor cooperante que responde a um aviso automático do contrato
+# A resposta padrão ao produtor cooperante que responde a um aviso automático do contrato
 **Data:** 2026-11-19
 **Chamado:** #1664
 **Status:** APROVADO
