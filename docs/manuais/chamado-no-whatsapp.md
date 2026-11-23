@@ -28,8 +28,9 @@ widget. A pergunta e a recusa chegam inteiras, como sempre.
    **Chamado 1217 · Trocar unidade do pedido**.
 2. Se ela termina com *"Só aviso, não precisa responder"*, não precisa fazer nada.
 3. Se é **uma pergunta**, ela termina com *"Para responder, deslize esta mensagem para o lado"*.
-   Deslize (é o **Responder** do WhatsApp) e escreva. Volta **"Anotado no chamado 1217. ✓"**. Se a
-   pergunta pede um documento, deslize e mande o arquivo pelo clipe (seção **Devolver um arquivo**, logo
+   Deslize (é o **Responder** do WhatsApp) e escreva. Volta **"Anotado no chamado 1217. ✓"**. Vale
+   também quando a pergunta já tinha sido respondida antes: deslizando uma pergunta, o **texto** entra
+   sempre (#1722). Se a pergunta pede um documento, deslize e mande o arquivo pelo clipe (seção **Devolver um arquivo**, logo
    abaixo).
 4. Se é **a entrega** ("já está no ar"), ela diz em um parágrafo o que mudou. Se quiser o detalhe e o
    como usar, abra o chamado no sistema ou no widget. Teste e toque:
@@ -48,7 +49,8 @@ widget. A pergunta e a recusa chegam inteiras, como sempre.
 ### Devolver um arquivo (#1528)
 
 Quando um chamado pede um documento seu, você devolve o arquivo pelo próprio WhatsApp, e ele entra no
-chamado. Vale enquanto a **pergunta** do chamado estiver sem resposta.
+chamado. Vale enquanto a **pergunta** do chamado estiver sem resposta, e enquanto a volta com arquivo
+estiver ligada. O limite, em uma linha: **texto entra sempre; arquivo, só com a pergunta aberta.**
 
 1. Deslize a mensagem do chamado para o lado, toque no clipe e escolha o arquivo.
 2. Tem mais de um? Mande os outros em seguida, sem deslizar de novo. Você tem 5 minutos entre um e outro.
@@ -57,6 +59,8 @@ chamado. Vale enquanto a **pergunta** do chamado estiver sem resposta.
 4. Volta **"Anotado no chamado N: 3 arquivos. ✓"**.
 5. Mandou sem deslizar? O sistema pergunta **"É para o Chamado N?"**. Toque em **Sim**. Em **Outro
    assunto**, o arquivo segue o atendimento de sempre (a logo do cliente, por exemplo).
+6. Arquivo que **desliza** uma mensagem de chamado nunca vira outra coisa (logo de cliente, foto de
+   campo): ou entra no chamado, ou você ouve por que não entrou (#1722).
 
 Aceita PDF, Word (.docx), Excel (.xlsx) e foto, até 10 MB cada, 10 de uma vez e 20 por dia. Quem confere
 o arquivo é o sistema da empresa: ele abre o arquivo para ver se é mesmo do tipo dito e passa pelo
@@ -66,9 +70,11 @@ antivírus antes de guardar.
 
 - **"Você tem 1 aviso da Sementes Renascer. Toque em Ver."** Você não escreve para a empresa há mais de
   24 horas e tem uma pergunta ou uma entrega esperando. Toque em **Ver** e ela aparece.
-- **"Anotado no chamado N. ✓"**: a sua resposta entrou no chamado.
-- **"Anotado. Esta mensagem é só um aviso…"**: você respondeu a um aviso. Nada foi anotado; para falar
-  do chamado, use o sistema ou espere a próxima pergunta. Essa linha vem uma vez só por chamado.
+- **"Anotado no chamado N. ✓"**: a sua resposta entrou no chamado. Vale também quando a pergunta já
+  tinha sido respondida antes: o texto entra do mesmo jeito (#1722).
+- **"Anotado. Esta mensagem é só um aviso…"**: você deslizou um aviso ou uma entrega, não uma pergunta.
+  O texto não entrou; para falar do chamado, use o sistema ou espere a próxima pergunta. Essa linha vem
+  uma vez só por chamado.
 - **Vários chamados numa mensagem só**, separados por um traço: o sistema junta o que chega para você
   em poucos minutos, para não mandar uma mensagem atrás da outra.
 - **"O restante está no chamado N, no sistema."** no fim de uma entrega (#1587): a entrega tem mais
@@ -85,13 +91,18 @@ antivírus antes de guardar.
 - **"...o nosso verificador de segurança está fora do ar..."**: o problema é do servidor, não do seu
   arquivo. Ele ficou guardado e entra sozinho quando o verificador voltar; o suporte já foi avisado. Não
   mande de novo. Se passar uma hora, chega *"O verificador não voltou..."*: aí sim, mande mais tarde.
-- **"Este chamado não espera resposta"**: ele já foi respondido ou era só aviso; o arquivo não entrou.
+- **"Este chamado não espera resposta: o arquivo não entrou."**: arquivo só entra enquanto a pergunta
+  está aberta. Texto entra sempre; arquivo, não.
+- **"Não estou recebendo arquivo por aqui agora. Anexe no chamado N, no sistema."** (#1722): a volta com
+  arquivo está desligada. O suporte foi avisado; anexe o arquivo pelo sistema.
 - **Silêncio por até 5 minutos** depois do último arquivo é normal: o sistema espera para ver se vem mais
   um. Escrever um texto encerra a espera na hora.
 - **No WhatsApp do dono, "Volta com arquivo: está recusando por falta de antivírus..."**: o Defender não
   respondeu no servidor e há arquivo esperando (um aviso por hora enquanto durar, e *"o antivírus
   voltou"* quando voltar). **"Arquivo recusado por ameaça: ..."**: o antivírus acusou um arquivo mandado
-  por alguém da equipe; vale conferir o celular da pessoa.
+  por alguém da equipe; vale conferir o celular da pessoa. **"Volta com arquivo: está desligada, e
+  fulano tentou mandar um arquivo no chamado N..."** (#1722): a chave está desligada e alguém tentou
+  devolver um arquivo; a linha traz o comando para ligar. No máximo um aviso por dia.
 - **Sem o "Bom dia" de volta.** Se você escreve "Bom dia" e havia mensagem esperando, chegam só as
   mensagens, sem o menu da casa.
 
@@ -109,7 +120,8 @@ com o motivo.
   transcrição estiver ligada) e, desde o #1528, **o arquivo devolvido a uma pergunta**: PDF, Word (.docx),
   Excel (.xlsx) e foto, até 10 MB, 10 de uma vez e 20 por dia. Não aceita arquivo com macro, os formatos
   antigos (.doc, .xls), compactado, vídeo nem áudio como anexo, nem arquivo em chamado que já foi
-  respondido.
+  respondido. Com a volta com arquivo desligada, não aceita arquivo nenhum pelo WhatsApp.
+- Não avisa que a volta com arquivo está desligada se ninguém tentar mandar arquivo (#1722).
 - Quem manda foto de campo: a foto só vai ao chamado se você deslizar a mensagem dele; sem deslizar,
   continua sendo foto de campo.
 - **Nenhum robô lê o arquivo**: quem abre é a pessoa que trata o chamado. No sistema, ele aparece no
@@ -155,7 +167,14 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
   desliga só o documento; o texto continua saindo.
 - **A volta com arquivo (#1528).** A chave `pendencias.arquivo_volta` (nasce desligada) liga e desliga, sem
   restart, por `scripts\chamado_no_whatsapp.py ligar-arquivo|desligar-arquivo` (janela elevada, como o
-  `ligar`; o `ver` mostra as duas chaves): desligada, o arquivo segue os caminhos de hoje (o que já estava no caminho termina). Os tetos:
+  `ligar`; o `ver` mostra as duas chaves). Desligada (#1722): o arquivo que **desliza** uma mensagem de
+  chamado recebe *"Não estou recebendo arquivo por aqui agora. Anexe no chamado N, no sistema."*, nada é
+  baixado, fica uma linha "recusado" (motivo `desligada`) na tela Envios, e sai ao dono **um aviso por
+  dia** pelo modelo `aviso_arquivo_sem_antivirus` ("Volta com arquivo: está desligada, e ... tentou
+  mandar ...", controlado pelo ajuste `pendencias.arquivo_desligada_aviso_em`); o arquivo **sem
+  deslizar** segue os caminhos de antes (a logo, o campo); o que já estava no caminho termina. Arquivo
+  que desliza uma mensagem de **aprovação** recebe a frase de sempre do aviso de aprovação, ligada ou
+  não. A linha de recusa conta no teto de 20 por dia. Os tetos:
   `pendencias.rajada_minutos` (5), `pendencias.rajada_teto` (10), `pendencias.arquivo_dia_teto` (20). O
   recepcionista baixa para `envios_pasta\chamados_volta` (o trânsito: `C:\Dados\AxiaAtende\envios\chamados_volta`,
   que precisa existir com **Modificar** para o LocalService, a conta do recepcionista; sem isso cada arquivo
