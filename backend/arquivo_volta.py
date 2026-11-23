@@ -46,6 +46,10 @@ SEM_ANTIVIRUS = ("Recebi '%s', mas o nosso verificador de segurança está fora 
 AV_EXPIROU = ("O verificador não voltou e o arquivo '%s' não entrou no chamado %s. O suporte está cuidando; "
               "mande de novo mais tarde.")
 NAO_ANOTOU = "Não consegui anotar os arquivos no chamado %s. Mande de novo mais tarde, por favor."
+# #1722 (D1): o arquivo que desliza uma mensagem de chamado com a chave desligada
+DESLIGADA = "Não estou recebendo arquivo por aqui agora. Anexe no chamado %s, no sistema."
+AVISO_DESLIGADA = ("está desligada, e %s tentou mandar um arquivo no chamado %s, %s. "
+                   "Para ligar: chamado_no_whatsapp.py ligar-arquivo.")
 
 
 def _ajuste(con, chave, padrao):
@@ -195,13 +199,59 @@ def entrar(con, saida, para: str, numero: str, p, a: dict, agora: datetime, mid:
     return True
 
 
+def _avisar_desligada(con, p, quem: str, agora: datetime) -> None:
+    """D3: o aviso ao dono quando a chave desligada recusou um arquivo -- no maximo um por dia (o dia de
+    Brasilia), pelo tipo e pelo modelo que ja existem (`arquivo_sem_antivirus`)."""
+    from .vigia import FUSO, _avisar, _hora
+    hoje = agora.astimezone(FUSO).date().isoformat()
+    if _ajuste(con, "pendencias.arquivo_desligada_aviso_em", None) == hoje:
+        return
+    _avisar(con, "arquivo_sem_antivirus", [AVISO_DESLIGADA % (quem, p["referencia"], _hora(agora))])
+    con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES ('pendencias.arquivo_desligada_aviso_em', %s)
+                   ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor""", (Jsonb(hoje),))
+
+
+def _citado(con, saida, e, a: dict, agora: datetime) -> bool | None:
+    """#1722 (D1): o arquivo que CITA uma mensagem de pendencia deste numero nunca desce a corrente (era
+    assim que o PDF da Fran virou logo de cliente, 23/11/2026). Devolve True (tratado aqui) ou None (a
+    chave esta ligada e o chamado segue o caminho de sempre). Nada e baixado aqui."""
+    numero, para = e.pessoa.wa_id or "", e.pessoa.para
+    alvo = [dict(r) for r in con.execute(
+        """SELECT DISTINCT p.* FROM atendimento.pendencias_mensagens m
+             JOIN atendimento.pendencias p ON p.id = m.pendencia_id
+            WHERE m.wamid = %s AND m.sentido = 'saiu'""", (e.contexto,)).fetchall()]
+    alvo = [p for p in alvo if p["para_whatsapp"] == com_nove(numero)]
+    if not alvo:
+        return None
+    if con.execute("SELECT 1 FROM atendimento.pendencias_mensagens WHERE arquivo->>'wamid' = %s",
+                   (e.wamid,)).fetchone():
+        return True   # a Meta reenviou o aviso
+    chamados = [p for p in alvo if p["tipo"] == "chamado"]
+    if not chamados:
+        from . import pendencias as P
+        _dizer(con, saida, para, P.SO_AVISO_APROVACAO, "pendencia %d: arquivo citando aprovacao" % alvo[0]["id"])
+        return True
+    if ligado(con):
+        return None
+    p = next((x for x in chamados if x["espera"] == "resposta"), chamados[0])
+    quem = (e.pessoa.nome or "")[:80]
+    frase = DESLIGADA % p["referencia"]
+    _linha(con, p["id"], dict(a, wamid=e.wamid, quem=quem, motivo="desligada", texto=frase, avisado=True),
+           "arquivo_recusado", agora)
+    _dizer(con, saida, para, frase, "pendencia %d: arquivo recusado (desligada)" % p["id"])
+    _avisar_desligada(con, p, quem or numero, agora)
+    return True
+
+
 def tratar(con, saida, e, agora: datetime) -> bool:
     """Chamado de `pendencias.tratar`, depois dos toques. True = tratado aqui."""
+    a = arquivo_da_mensagem(e)
+    if a is not None and e.contexto and _citado(con, saida, e, a, agora):
+        return True
     if not ligado(con):
         return False
     from . import pendencias as P
     numero, para = e.pessoa.wa_id or "", e.pessoa.para
-    a = arquivo_da_mensagem(e)
     if a is None:
         # o texto logo depois dos arquivos fecha a rajada e vira o texto do comentario (D3)
         if e.texto and not e.toque:

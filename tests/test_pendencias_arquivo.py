@@ -115,7 +115,9 @@ def avisos(cfg, tipo):
 
 # ── a migracao e a chave ─────────────────────────────────────────────────────
 
-def test_a_chave_nasce_desligada_e_desligada_o_arquivo_segue_o_caminho_de_hoje(cfg, tmp_path):
+def test_a_chave_nasce_desligada_e_desligada_nada_e_baixado(cfg, tmp_path):
+    # #1722: antes este teste afirmava que, desligada, o arquivo deslizado nao deixava linha nenhuma -- e
+    # descia a corrente ate virar logo. Agora fica a linha de rastro da recusa (D1), e nada e baixado.
     c = replace(cfg, erp_segredo="segredo-de-teste", porteiro=True, responde=True)
     with conexao(c) as con:
         con.execute("UPDATE atendimento.ajustes SET valor = 'true'::jsonb WHERE chave = 'pendencias.ligado'")
@@ -126,9 +128,90 @@ def test_a_chave_nasce_desligada_e_desligada_o_arquivo_segue_o_caminho_de_hoje(c
     try:
         s = saida()
         arquivo(c, s, contexto=w)
-        assert arquivos(c) == [] and not getattr(s, "baixadas", [])
+        assert [a["estado"] for a in arquivos(c)] == ["arquivo_recusado"] and not getattr(s, "baixadas", [])
     finally:
         arquivo_volta.PASTA = None
+
+
+# ── #1722: a chave desligada e o arquivo que desliza uma mensagem de chamado ─
+
+@pytest.fixture
+def desligado(cfg, tmp_path):
+    """Pendencias ligadas, volta com arquivo DESLIGADA (o estado de producao de 17/11 a 23/11/2026), e a
+    Fran como da casa (destino ativo): e assim que o PDF dela chegou a logos.receber."""
+    c = replace(cfg, erp_segredo="segredo-de-teste", porteiro=True, responde=True)
+    with conexao(c) as con:
+        for chave, valor in (("pendencias.ligado", "true"), ("pendencias.juntar_minutos", "0")):
+            con.execute("UPDATE atendimento.ajustes SET valor = %s::jsonb WHERE chave = %s", (valor, chave))
+        con.execute("INSERT INTO atendimento.destinos (nome, whatsapp, ativo) VALUES ('Fran', %s, true)", (FRAN,))
+    arquivo_volta.PASTA = tmp_path / "chamados_volta"
+    yield c
+    arquivo_volta.PASTA = None
+
+
+def _pela_corrente(cfg, s, tmp_path, nome="RESCISAO LUCAS.pdf", contexto=None, agora=AGORA):
+    """O arquivo pelo motor INTEIRO, com o campo presente: sem o campo a corrente nem chega a logo."""
+    from backend import campo as C
+    wamid = "wamid.arq.%d" % next(_IDS)
+    e = motor.Entrada(wamid=wamid, tipo="document", contexto=contexto,
+                      pessoa=motor.Pessoa(bsuid="BR.f", wa_id=FRAN_META, nome="Fran"))
+    e.documento = motor.Documento(id="m-" + wamid, mime="application/pdf", nome_arquivo=nome)
+    with conexao(cfg) as con:
+        motor.tratar(con, s, None, e, agora, Envio(), C.Campo(tmp_path / "campo", None))
+    return wamid
+
+
+def _logos(cfg):
+    with conexao(cfg) as con:
+        return con.execute("SELECT * FROM atendimento.logos_de_cliente").fetchall()
+
+
+def test_1722_desligada_o_pdf_que_desliza_a_pergunta_nao_vira_logo(desligado, tmp_path):
+    """O caso da Fran, 23/11/2026 15:06: o PDF deslizando a pergunta do 1541 virou "De qual cliente e a logo?"."""
+    w = pergunta_aberta(desligado)
+    s = saida()
+    _pela_corrente(desligado, s, tmp_path, contexto=w)
+    assert s.enviadas[-1][2] == arquivo_volta.DESLIGADA % "350"
+    assert _logos(desligado) == [] and not getattr(s, "baixadas", [])
+    (a,) = arquivos(desligado)
+    assert a["estado"] == "arquivo_recusado" and a["arquivo"]["motivo"] == "desligada" and a["arquivo"]["avisado"]
+    (av,) = avisos(desligado, "arquivo_sem_antivirus")
+    assert av.startswith("está desligada, e Fran tentou mandar um arquivo no chamado 350,") and "ligar-arquivo" in av
+    # a volta do minuto nao repete a frase (a linha ja nasce avisada)
+    with conexao(desligado) as con:
+        assert arquivo_volta.mandar(con, saida(), AGORA) == 0
+
+
+def test_1722_segundo_arquivo_no_dia_ouve_a_frase_sem_segundo_aviso(desligado, tmp_path):
+    w = pergunta_aberta(desligado)
+    s = saida()
+    _pela_corrente(desligado, s, tmp_path, contexto=w)
+    _pela_corrente(desligado, s, tmp_path, "outro.pdf", contexto=w, agora=AGORA + timedelta(hours=1))
+    assert [x[2] for x in s.enviadas].count(arquivo_volta.DESLIGADA % "350") == 2
+    assert len(avisos(desligado, "arquivo_sem_antivirus")) == 1
+    _pela_corrente(desligado, s, tmp_path, "amanha.pdf", contexto=w, agora=AGORA + timedelta(days=1))
+    assert len(avisos(desligado, "arquivo_sem_antivirus")) == 2        # outro dia, outro aviso
+
+
+def test_1722_reenvio_da_meta_nao_repete_a_frase(desligado):
+    w = pergunta_aberta(desligado)
+    s = saida()
+    e = motor.Entrada(wamid="wamid.repetido", tipo="document", contexto=w,
+                      pessoa=motor.Pessoa(bsuid="BR.f", wa_id=FRAN_META, nome="Fran"))
+    e.documento = motor.Documento(id="m-rep", mime="application/pdf", nome_arquivo="r.pdf")
+    with conexao(desligado) as con:
+        assert arquivo_volta.tratar(con, s, e, AGORA) is True
+        assert arquivo_volta.tratar(con, s, e, AGORA) is True
+    assert len(s.enviadas) == 1 and len(arquivos(desligado)) == 1
+
+
+def test_1722_desligada_o_pdf_sem_deslizar_vira_logo_como_hoje(desligado, tmp_path):
+    """E a prova de que o teste acima chega mesmo a logo: sem citar, o mesmo PDF vira logo."""
+    pergunta_aberta(desligado)
+    s = saida()
+    _pela_corrente(desligado, s, tmp_path)
+    assert len(_logos(desligado)) == 1 and arquivos(desligado) == []
+    assert avisos(desligado, "arquivo_sem_antivirus") == []
 
 
 # ── (a) a Fran: deslizou, o ERP aceitou, um comentario, "Anotado" ───────────
