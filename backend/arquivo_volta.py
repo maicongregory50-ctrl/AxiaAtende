@@ -201,12 +201,23 @@ def entrar(con, saida, para: str, numero: str, p, a: dict, agora: datetime, mid:
 
 def _avisar_desligada(con, p, quem: str, agora: datetime) -> None:
     """D3: o aviso ao dono quando a chave desligada recusou um arquivo -- no maximo um por dia (o dia de
-    Brasilia), pelo tipo e pelo modelo que ja existem (`arquivo_sem_antivirus`)."""
-    from .vigia import FUSO, _avisar, _hora
+    Brasilia), pelo tipo que ja existe (`arquivo_sem_antivirus`).
+
+    Nasce GUARDADO e sem reabertura (dono, 23/11/2026, #1722: "e melhor que so rode dentro da janela de
+    24 horas mesmo... quando acumula, deixa acumular"): o porteiro do #1188 solta como texto quando o
+    dono escreve, e o guardado sem reabertura nao vira "nao visto" (a mesma espera calada do #1271).
+    Nao paga modelo nem reabertura na Meta. Com o porteiro desligado (o rollback do #1188), os guardados
+    saem por modelo, como todos."""
+    from .vigia import FUSO, _ajuste as _ajuste_vigia, _hora
     hoje = agora.astimezone(FUSO).date().isoformat()
     if _ajuste(con, "pendencias.arquivo_desligada_aviso_em", None) == hoje:
         return
-    _avisar(con, "arquivo_sem_antivirus", [AVISO_DESLIGADA % (quem, p["referencia"], _hora(agora))])
+    dono = con.execute("SELECT nome, whatsapp FROM atendimento.destinos WHERE id = %s",
+                       (_ajuste_vigia(con, "avisado_no_nao"),)).fetchone()
+    if dono:
+        con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre, guardado_em)
+                       VALUES ('arquivo_sem_antivirus', %s, %s, %s, %s)""",
+                    (dono["nome"], dono["whatsapp"], AVISO_DESLIGADA % (quem, p["referencia"], _hora(agora)), agora))
     con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES ('pendencias.arquivo_desligada_aviso_em', %s)
                    ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor""", (Jsonb(hoje),))
 

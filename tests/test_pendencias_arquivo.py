@@ -193,6 +193,34 @@ def test_1722_segundo_arquivo_no_dia_ouve_a_frase_sem_segundo_aviso(desligado, t
     assert len(avisos(desligado, "arquivo_sem_antivirus")) == 2        # outro dia, outro aviso
 
 
+def test_1722_o_aviso_da_desligada_so_sai_na_janela_e_acumula_calado(desligado, tmp_path):
+    """Dono, 23/11/2026: "e melhor que so rode dentro da janela de 24 horas mesmo... quando acumula,
+    deixa acumular". O aviso nasce guardado, sem reabertura: fora da janela nada e pago na Meta, oito
+    dias depois continua guardado (nao vira "nao visto"), e sai como texto quando o dono escreve."""
+    from tests.test_1188_porteiro import falou, volta
+    w = pergunta_aberta(desligado)
+    _pela_corrente(desligado, saida(), tmp_path, contexto=w)
+    _pela_corrente(desligado, saida(), tmp_path, "amanha.pdf", contexto=w, agora=AGORA + timedelta(days=1))
+    with conexao(desligado) as con:
+        linhas = con.execute("""SELECT * FROM atendimento.avisos WHERE tipo = 'arquivo_sem_antivirus'
+                                 ORDER BY id""").fetchall()
+    assert len(linhas) == 2 and all(a["guardado_em"] and a["reabertura_id"] is None for a in linhas)
+    dono = linhas[0]["para_whatsapp"]
+    porteiro = replace(desligado, porteiro=True)
+    s = saida()
+    volta(porteiro, s, AGORA + timedelta(days=8))
+    assert s.modelos == [] and s.enviadas == []                       # janela fechada: nada pago, nada sai
+    with conexao(desligado) as con:
+        assert con.execute("""SELECT count(*) AS n FROM atendimento.avisos WHERE tipo = 'arquivo_sem_antivirus'
+                               AND nao_visto_em IS NULL AND enviado_em IS NULL""").fetchone()["n"] == 2
+    meta = dono[:4] + dono[5:] if len(dono) == 13 else dono
+    falou(porteiro, AGORA + timedelta(days=9), numero=meta)
+    s = saida()
+    volta(porteiro, s, AGORA + timedelta(days=9, minutes=1))
+    assert s.modelos == [] and len(s.enviadas) == 2                   # os dois acumulados, como texto
+    assert all("ligar-arquivo" in x[2] for x in s.enviadas)
+
+
 def test_1722_reenvio_da_meta_nao_repete_a_frase(desligado):
     w = pergunta_aberta(desligado)
     s = saida()

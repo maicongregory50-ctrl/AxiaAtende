@@ -102,7 +102,9 @@ antivírus antes de guardar.
   voltou"* quando voltar). **"Arquivo recusado por ameaça: ..."**: o antivírus acusou um arquivo mandado
   por alguém da equipe; vale conferir o celular da pessoa. **"Volta com arquivo: está desligada, e
   fulano tentou mandar um arquivo no chamado N..."** (#1722): a chave está desligada e alguém tentou
-  devolver um arquivo; a linha traz o comando para ligar. No máximo um aviso por dia.
+  devolver um arquivo; a linha traz o comando para ligar. No máximo um aviso por dia, e **só chega
+  quando você escreve à empresa** (dentro da janela de 24 h): sem você escrever, os avisos ficam
+  guardados, um por dia, e saem juntos no seu próximo "oi". Não paga modelo na Meta.
 - **Sem o "Bom dia" de volta.** Se você escreve "Bom dia" e havia mensagem esperando, chegam só as
   mensagens, sem o menu da casa.
 
@@ -170,8 +172,10 @@ o usuário → WhatsApp). Sem ele, nada sai, e tudo continua só na caixa do sis
   `ligar`; o `ver` mostra as duas chaves). Desligada (#1722): o arquivo que **desliza** uma mensagem de
   chamado recebe *"Não estou recebendo arquivo por aqui agora. Anexe no chamado N, no sistema."*, nada é
   baixado, fica uma linha "recusado" (motivo `desligada`) na tela Envios, e sai ao dono **um aviso por
-  dia** pelo modelo `aviso_arquivo_sem_antivirus` ("Volta com arquivo: está desligada, e ... tentou
-  mandar ...", controlado pelo ajuste `pendencias.arquivo_desligada_aviso_em`); o arquivo **sem
+  dia**, com a frase do tipo `arquivo_sem_antivirus` ("Volta com arquivo: está desligada, e ... tentou
+  mandar ...", controlado pelo ajuste `pendencias.arquivo_desligada_aviso_em`). Esse aviso nasce
+  **guardado, sem reabertura**: sai como texto quando o dono escreve e nunca vira "não visto" (a
+  espera calada do #1271); com o porteiro desligado, sairia por modelo como todos. O arquivo **sem
   deslizar** segue os caminhos de antes (a logo, o campo); o que já estava no caminho termina. Arquivo
   que desliza uma mensagem de **aprovação** recebe a frase de sempre do aviso de aprovação, ligada ou
   não. A linha de recusa conta no teto de 20 por dia. Os tetos:
