@@ -247,6 +247,36 @@ def test_resposta_a_informativo_e_descartada_com_uma_linha_so(ligado):
     assert {m["estado"] for m in mensagens(ligado, "entrou")} == {"descartada"}
 
 
+def test_1722_resposta_a_pergunta_ja_respondida_entra_do_mesmo_jeito(ligado):
+    """#1722 (D2): a Fran, 1541, 23/11/2026. A espera ja tinha fechado (uma resposta anterior) e a resposta
+    que deslizava a PERGUNTA virava "so aviso" e era descartada. Agora entra, e vai ao ERP."""
+    _, w = _enviada(ligado, [linha(101, "pergunta")])
+    s = saida()
+    chega(ligado, s, texto="veio o PDF.", contexto=w)
+    assert pendencia(ligado)["espera"] is None
+    chega(ligado, s, texto="No caso da rescisão não terá guia de FGTS.", contexto=w)
+    assert [x[2] for x in s.enviadas] == ["Anotado no chamado 350. ✓"] * 2
+    assert [m["estado"] for m in mensagens(ligado, "entrou")] == ["a_entregar", "a_entregar"]
+    e = ErpFalso()
+    volta(ligado, e)
+    assert [r[2] for r in e.respostas] == ["veio o PDF.", "No caso da rescisão não terá guia de FGTS."]
+
+
+def test_1722_resposta_a_entrega_sem_espera_continua_so_aviso(ligado):
+    """#1722: so a PERGUNTA mudou. A entrega ja validada, citada de novo, continua "so aviso", uma vez."""
+    receber(ligado, [linha(101, "entrega", "No ar.")])
+    falou(ligado, AGORA - timedelta(hours=1))
+    mandar(ligado)
+    w = mensagens(ligado, "saiu")[0]["wamid"]
+    with conexao(ligado) as con:
+        con.execute("UPDATE atendimento.pendencias SET espera = NULL")
+    s = saida()
+    chega(ligado, s, texto="obrigada", contexto=w)
+    chega(ligado, s, texto="valeu", contexto=w)
+    assert [x[2] for x in s.enviadas] == [pendencias.SO_AVISO]
+    assert {m["estado"] for m in mensagens(ligado, "entrou")} == {"descartada"}
+
+
 def test_ficou_bom_e_nao_ficou_bom(ligado):
     receber(ligado, [linha(101, "entrega", "No ar.")])
     falou(ligado, AGORA - timedelta(hours=1))

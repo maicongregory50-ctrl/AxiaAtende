@@ -371,11 +371,23 @@ def tratar(con, saida, e, agora: datetime):
     if not alvo:
         return False
     esperando = [p for p in alvo if p["espera"]]
+    # #1722 (D2): sem espera aberta, o texto que cita uma PERGUNTA de chamado entra do mesmo jeito. A
+    # espera e do chamado, nao da mensagem: uma resposta anterior (ate a uma mensagem antiga) a fecha, e a
+    # resposta a pergunta de verdade era descartada como "so aviso" (a Fran, 1541, 23/11/2026).
+    # Citou informativo ou entrega: como antes.
+    perguntas = [] if esperando else [p for p in alvo if p["tipo"] == "chamado" and con.execute(
+        """SELECT 1 FROM atendimento.pendencias_mensagens WHERE wamid = %s AND sentido = 'saiu'
+              AND pendencia_id = %s AND classe = 'pergunta'""", (e.contexto, p["id"])).fetchone()]
     if len(esperando) == 1:
         _anotar_resposta(con, saida, e.pessoa.para, esperando[0], e.texto, agora)
     elif esperando:
         mid = _entrou(con, esperando[0]["id"], "resposta", e.texto, estado="escolher")
         _lista_de_escolha(con, saida, e.pessoa.para, numero, mid)
+    elif perguntas:
+        # duas perguntas na mesma mensagem (a juncao), nenhuma aberta: a lista de escolha so mostra o que
+        # espera, e ficaria vazia -- vai ao chamado mais recente
+        p = max(perguntas, key=lambda x: (x["ultima_em"] or agora, x["id"]))
+        _anotar_resposta(con, saida, e.pessoa.para, p, e.texto, agora)
     else:
         p = alvo[0]
         _entrou(con, p["id"], "resposta", e.texto, estado="descartada")
