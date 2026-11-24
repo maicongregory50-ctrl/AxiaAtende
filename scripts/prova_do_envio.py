@@ -61,6 +61,8 @@ def main():
     a.add_argument("--imagem", action="append", default=[], help="#1754: a versao maior (repetivel)")
     a.add_argument("--responsavel", help="#1754: Nome:55DDD9XXXXXXXX, quem recebe a ficha de interesse")
     args = a.parse_args()
+    # #1754: a saida redirecionada a arquivo vem em cp1252, e o assunto pode ter "A−" (o sinal de menos)
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     cfg = config.carregar()
     print("ambiente:", cfg.ambiente if hasattr(cfg, "ambiente") else "?")
     with conexao(cfg) as con:
