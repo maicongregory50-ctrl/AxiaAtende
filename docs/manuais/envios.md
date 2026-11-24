@@ -61,6 +61,7 @@ Você, no computador, nos dias seguintes a um envio aprovado.
 | **Quero receber** | tocou o botão: recebeu as imagens e o aceite ficou gravado |
 | **Não quero** | tocou o botão: saiu da lista para sempre, e o responsável dele recebeu um aviso no WhatsApp para um contato direto |
 | **Tocou em falar** (só na comunicação direta) | tocou "Falar com meu atendimento" e foi levado ao WhatsApp do responsável. Se ele mandou mensagem, isso acontece no WhatsApp do responsável: esta tela não vê |
+| **Quis saber mais** (#1754, o boletim com *Quero saber mais*) e o cartão **Quis saber mais** | tocou *Quero saber mais*, ou escreveu em até 7 dias, e conversou com a OlivIA. Ao lado, as **culturas** em que indicou interesse; **"sem indicação"** quer dizer que entrou na conversa e não indicou nenhuma, não que não tem interesse. O resto está no manual `olivia.md`, item 8 |
 | **Não entregues** | a Meta recusou, em geral porque o número não é WhatsApp; o cadastro do cliente precisa de correção no ERP |
 | **Sem responsável** | o canal comercial do cadastro do cliente no ERP está vazio: ele **não recebe** até alguém preencher. A linha mostra o vendedor do último pedido como sugestão |
 | **responsável sem WhatsApp** (#1197) | o cliente tem representante no ERP, mas o representante não tem o contato de **Relacionamento** com celular — é de lá que sai o WhatsApp dele. Ele **não recebe** até alguém informar. Para achar todos de uma vez: no ERP, Stakeholders → **Sem responsável** |

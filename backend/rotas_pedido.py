@@ -14,7 +14,7 @@ import hmac
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -73,6 +73,9 @@ class Pedido(BaseModel):
     aprovado_em: datetime
     lote_tamanho: int = 20
     passa_do_teto: bool = False            # #1175: a peca a mais, que o dono manda alem do teto do mes
+    # #1754 (D10): os rotulos das culturas do boletim ("aveia preta", "nabo forrageiro"). Opcional: sem ele a
+    # OlivIA nao anota interesse e so passa o representante. E a lista FECHADA de anotar_interesse.
+    culturas: list[Annotated[str, Field(min_length=1, max_length=40)]] = Field(default_factory=list, max_length=12)
     clientes: list[Cliente] = Field(min_length=1)
 
 

@@ -319,6 +319,9 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 vaga_ligada = olivia_mod.conduz_vaga(con)
                 venda_ligada = olivia_mod.conduz_venda(con)   # #1589: a conversa de quem quer comprar
                 qualifica_ligada = olivia_mod.qualifica(con)  # #1660: o piloto (so vale com a venda)
+                from . import interesse   # #1754: a OlivIA atende a carteira no boletim
+                carteira = {"chave": "ligada" if interesse.ligado(con) else "desligada",
+                            "parceria_aprovada": interesse.parceria()[0], "atende": interesse.atende(con)}
                 from . import cooperante   # #1664: a resposta padrao a quem responde a um aviso de contrato
                 cooperante_ligada = cooperante.ligado(con)
         except Exception as erro:  # noqa: BLE001
@@ -335,6 +338,8 @@ def criar_app(cfg: config.Config | None = None, saida=None, ia=None, envio=None,
                 "olivia_venda": "ligada" if venda_ligada else "desligada",
                 # #1660: ela qualifica o produtor rural do piloto (ajuste `olivia.qualifica_produtor`, com a venda)
                 "olivia_qualifica": "ligada" if qualifica_ligada else "desligada",
+                # #1754: ajuste `olivia.atende_carteira`; so atende com o texto da parceria aprovado pelo dono
+                "olivia_carteira": carteira,
                 # #1664: a resposta padrao ao cooperante (ajuste `cooperante.resposta_padrao`, scripts/cooperante.py)
                 "cooperante_resposta": "ligada" if cooperante_ligada else "desligada",
                 "pendentes": r["pendentes"], "ultimo_aviso": r["ultimo"].isoformat() if r["ultimo"] else None,

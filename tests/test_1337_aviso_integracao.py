@@ -72,6 +72,7 @@ def test_a_volta_da_060_desfaz_e_a_ida_refaz(ligado):
     raiz = Path(migracoes.__file__).parent / "migracoes"
     with conexao(ligado) as con:
         # #1434: a 063 esta por cima da 060; desfaz-se na ordem inversa e refaz-se na direta.
+        con.execute((raiz / "076_boletim_quero_saber_mais_VOLTA.sql").read_text(encoding="utf-8"))   # #1754: a 076 reescreve os mesmos CHECKs
         con.execute((raiz / "071_termo_reprovacao_VOLTA.sql").read_text(encoding="utf-8"))   # #1542: a 071 reescreve os mesmos CHECKs
         con.execute((raiz / "068_arquivo_volta_VOLTA.sql").read_text(encoding="utf-8"))   # #1528: a 068 reescreve os mesmos CHECKs
         con.execute((raiz / "067_olivia_conduz_vaga_VOLTA.sql").read_text(encoding="utf-8"))   # #1525: a 067 reescreve os mesmos CHECKs

@@ -14,6 +14,7 @@ O ENVIO AO CLIENTE NUNCA ESPERA O ERP: a volta roda numa thread propria do proce
 from datetime import datetime, timedelta, timezone
 
 from . import erp
+from .interesse import resposta_ao_erp
 from .banco import conexao
 
 DIAS = 60
@@ -25,22 +26,39 @@ def montar(con, agora: datetime | None = None) -> list[dict]:
     agora = agora or datetime.now(timezone.utc)
     linhas = con.execute(
         """SELECT d.id, d.erp_codigo, d.papel, d.situacao, d.convite_em, d.entregue_em, d.lido_em,
-                  d.resposta, d.resposta_em, d.resposta_texto, e.campanha, e.tipo, e.peca
+                  d.resposta, d.resposta_em, d.resposta_texto, e.campanha, e.tipo, e.peca,
+                  i.culturas, i.ficha_em, i.escreveu, i.conversa_aberta
              FROM atendimento.envio_destinatarios d
              JOIN atendimento.envios e ON e.id = d.envio_id
+             -- #1754: o interesse de quem quis saber mais (todas as conversas da carteira daquele envio)
+             LEFT JOIN LATERAL (
+                  SELECT array(SELECT DISTINCT x FROM atendimento.interesses i2, unnest(i2.culturas) AS x
+                                WHERE i2.destinatario_id = d.id ORDER BY x) AS culturas,
+                         max(ii.enviada_em) AS ficha_em,
+                         (array_agg(ii.texto ORDER BY ii.id DESC) FILTER (WHERE ii.texto <> ''))[1] AS escreveu,
+                         bool_or(c.situacao = 'em_curso') AS conversa_aberta
+                    FROM atendimento.interesses ii JOIN atendimento.conversas c ON c.id = ii.conversa_id
+                   WHERE ii.destinatario_id = d.id) i ON d.resposta = 'saber'
             WHERE (d.convite_em IS NOT NULL OR d.situacao = 'falhou')
               AND coalesce(d.convite_em, e.aprovado_em) >= %s
             ORDER BY d.id""", (agora - timedelta(days=DIAS),)).fetchall()
     def iso(v):
         return v.isoformat() if v else None
+
+    def resposta(l):
+        """#1754 (D9): a resposta `saber` sai traduzida para uma que o ERP conhece (interesse.resposta_ao_erp)."""
+        if l["resposta"] != "saber":
+            return l["resposta"], (l["resposta_texto"] or None) and l["resposta_texto"][:500]
+        return resposta_ao_erp(dict(l), agora)
+    linhas = [dict(l, _r=resposta(l)) for l in linhas]
     # #1142: o `papel` diz a QUEM do cadastro foi o envio (comprador ou tecnico). O ERP ja o aceita
     # (EventoEnvio.papel, #1141) e o grava em rel_contatos.envio_papel; nulo enquanto o pedido do
     # marketing nao o manda, e o ERP devolve o nulo em vez de inventar.
     return [{"destinatario_id": l["id"], "erp_codigo": l["erp_codigo"], "papel": l["papel"],
              "campanha": l["campanha"] or None,
              "tipo": l["tipo"], "peca": l["peca"], "situacao": l["situacao"], "convite_em": iso(l["convite_em"]),
-             "entregue_em": iso(l["entregue_em"]), "lido_em": iso(l["lido_em"]), "resposta": l["resposta"],
-             "resposta_em": iso(l["resposta_em"]), "resposta_texto": (l["resposta_texto"] or None) and l["resposta_texto"][:500]}
+             "entregue_em": iso(l["entregue_em"]), "lido_em": iso(l["lido_em"]), "resposta": l["_r"][0],
+             "resposta_em": iso(l["resposta_em"]), "resposta_texto": l["_r"][1]}
             for l in linhas]
 
 

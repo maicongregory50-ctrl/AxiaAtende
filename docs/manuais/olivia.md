@@ -1,12 +1,14 @@
 # A OlivIA que conversa com quem é de fora — manual de uso
 
 **Chamado:** #1520 · **Spec:** `C:\AxiaAtende\docs\specs\2026-11-14-a-olivia-anonima-fala.md`
+· **O cliente da carteira no boletim:** #1754, `C:\AxiaAtende\docs\specs\2026-11-24-olivia-atende-a-carteira-no-boletim.md`
 · **Código:** `C:\AxiaAtende\backend\olivia.py`
 
 ## 1. Para que serve
 
 Quem escreve ao WhatsApp da Renascer (49 3664 0121) e **não é da casa nem cliente da carteira** fala com
-a OlivIA. Ela entende o que a pessoa quer, responde **na língua dela** (português ou espanhol), reconhece
+a OlivIA. O cliente da carteira fala com ela **só na conversa do boletim** (#1754, item 8 do caminho
+comum): quando toca *Quero saber mais* ou responde em até 7 dias. Ela entende o que a pessoa quer, responde **na língua dela** (português ou espanhol), reconhece
 o que ela mandou (um currículo em PDF ou em **foto**, um comprovante) e a leva ao lugar certo: o botão do
 setor, a vaga, a Fran. Ela fala da empresa **só o que está na base da empresa**
 (`C:\AxiaAtende\docs\olivia\base-da-empresa.md`); o que não estiver lá, ela encaminha.
@@ -20,6 +22,9 @@ autenticado são os próximos degraus, em chamados próprios.
 - **O dono** escreve e corrige a base da empresa, e recebe o resumo do vigia nos dias em que há o que ver.
 - **A Fran** recebe os currículos, agora também em foto (manual `trabalhe-conosco.md`).
 - **Quem olha a Recepção** vê onde ela falou e quais conversas ficaram sem saída.
+- **O cliente da carteira** (o contato comprador ou o técnico), nos 7 dias seguintes a um boletim com o
+  botão *Quero saber mais* (#1754).
+- **O representante** que cuida do cliente, que recebe no WhatsApp a ficha de interesse.
 
 ## 3. O caminho comum
 
@@ -95,7 +100,29 @@ autenticado são os próximos degraus, em chamados próprios.
         próximas etapas são desenhadas.
    - **Quem recebe** a ficha e o cartão é o destino da folha *Comercial › Produtor rural › SC* (ou *RS*) na
      tela **Destinos**. Trocar o destino ali troca quem recebe a ficha.
-7. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
+8. **O cliente da carteira no boletim** (#1754), com a chave `olivia.atende_carteira` ligada.
+   - **Para que serve.** Fazer do boletim uma conversa: quem recebe e quer saber mais é atendido na hora,
+     pelo nome, recebe o material completo, e quem cuida dele fica sabendo quem se interessou e por quê.
+   - **O caminho comum.**
+     1. O cliente toca *Quero saber mais* no boletim (ou escreve em resposta, em até 7 dias).
+     2. Quem tocou recebe, do sistema e sem fala dela, o cumprimento pelo nome, as imagens do material
+        completo e o **texto da parceria**, como o dono o aprovou
+        (`C:\AxiaAtende\docs\olivia\parceria-da-carteira.md`). Quem escreveu é recebido por ela, que
+        oferece o material.
+     3. Ele conversa com a OlivIA. Se disser em que culturas tem interesse, ela anota, **só das culturas do
+        boletim** (a lista vem no pedido do Marketing).
+     4. **Quem cuida do cliente recebe a ficha** no WhatsApp, do número da empresa: *"Interesse no boletim"*,
+        com o cliente, quem falou (comprador ou técnico), as culturas, o que ele escreveu e o link para
+        conversar. É o responsável **da linha do envio**, o mesmo que já recebe o resumo do lote.
+     5. O interesse aparece no **Relacionamento** do cliente, no ERP: *"Quis saber mais. Interesse: …"*.
+   - **O que ela sabe dele:** o primeiro nome, o nome do cadastro, se é o comprador ou o técnico, quem cuida
+     dele e as culturas do boletim. Não sabe faturamento, pedidos nem histórico.
+   - **O que ela faz:** manda o material completo, anota o interesse, passa o contato de quem cuida dele
+     (quem pede uma pessoa recebe na hora), oferece as opções do cliente (boleto, carga, qualidade, falar
+     com a empresa) e encerra.
+   - Ela se apresenta pelo nome e não diz por conta própria que é uma inteligência artificial; **se
+     perguntarem, não nega**.
+9. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
    e a data entre colchetes (a OlivIA não as repete à pessoa). A OlivIA relê o arquivo sozinha quando
    ele muda: **não precisa reiniciar nada**. O inventário das fontes, com o que entrou e por quê, está em
    `C:\AxiaAtende\docs\olivia\FONTES.md`.
@@ -121,6 +148,12 @@ autenticado são os próximos degraus, em chamados próprios.
 | **Frase recusada: aviso sem ficha** | ela tentou dizer que o consultor foi avisado ou está recebendo o resumo sem a ficha ter saído; saiu no lugar a apresentação simples, e contou no resumo |
 | No resumo, **"leads do produtor: N completos, N incompletos, N sem envio"** | as fichas do dia (#1660); o resumo também chega quando alguma não saiu |
 | Na conversa de compra, **o cartão de quem atende sem o botão "Sim" antes** | ela tinha certeza da categoria (produtor, revenda, corretor) e do estado. **Os botões** em vez do cartão: ficou em dúvida, ou a chave está desligada |
+| Na tela **Envios**, a resposta **"quis saber mais"** | o cliente tocou *Quero saber mais*, ou escreveu em até 7 dias de um boletim com o botão (#1754). Com interesse anotado, as culturas aparecem ao lado |
+| **"quis saber mais · sem indicação"** | entrou na conversa e não indicou cultura. **Não é "sem interesse"**: é sem indicação |
+| No seu WhatsApp, **"Interesse no boletim (conversa com a OlivIA)"** | a ficha de um cliente seu. Fora das 24 h de você ter escrito ao número da empresa, ela vem numa linha só (*"Resumo da OlivIA: Interesse no boletim: …"*), com o telefone escrito |
+| No Relacionamento do ERP, **"Quis saber mais"** sem culturas | o cliente entrou na conversa e não indicou nenhuma. Enquanto a conversa corre, a linha mostra **tocou**; o texto com o interesse chega quando a ficha sai, a conversa fecha ou passam 24 h do toque |
+| No resumo do vigia, **"carteira: N conversas, N com interesse, N fichas com erro"** | as conversas do boletim no dia (#1754). **Ficha com erro**: quem cuida do cliente não recebeu, e a OlivIA não disse ao cliente que ele foi avisado |
+| No `/saude`, **"olivia_carteira"** | `chave` (ligada ou desligada), `parceria_aprovada` e `atende`: ela só atende a carteira com as duas |
 | **Frase recusada: promessa** | numa conversa de vaga, ela tentou dizer que anotou ou encaminhou antes de a ficha ou o currículo estar gravado; saiu no lugar a frase do que ainda falta, e contou no resumo |
 | No resumo, **"N fichas incompletas"** | fichas que foram à Fran pela metade porque a pessoa parou de responder |
 | No `/saude`, em `audio`: **"de_fora": true** e **"pendentes_de_fora"** | o áudio de quem é de fora está ligado, e quantos esperam a transcrição |
@@ -128,8 +161,9 @@ autenticado são os próximos degraus, em chamados próprios.
 
 ## 5. O que NÃO faz
 
-- **Não fala com quem é da casa nem com cliente da carteira** nem com o consultor do piloto: esses têm os
-  caminhos deles, que vêm antes dela. Na conversa de vaga, ela vem **antes** do fluxo fixo só com a chave
+- **Não fala com quem é da casa** nem com o consultor do piloto, e **não atende o cliente da carteira
+  fora dos 7 dias de um boletim com *Quero saber mais***: aí vale o contato do representante, como antes
+  (#1189). Esses têm os caminhos deles, que vêm antes dela. Na conversa de vaga, ela vem **antes** do fluxo fixo só com a chave
   `olivia.conduz_vaga` ligada; desligada, a conversa de vaga é a dos textos fixos.
 - **Não sabe nada de cliente, pedido, boleto, nota ou carga**, e não finge saber: encaminha pelo botão.
   Não tem nenhuma ferramenta que toque dado de cliente. Sempre tem cinco: ver as vagas, ler o arquivo
@@ -144,6 +178,9 @@ autenticado são os próximos degraus, em chamados próprios.
   quem quer comprar e não avisa o representante. No piloto, não classifica o produtor, não agenda nada, não
   avisa outro representante além do destino da folha, e quem manda a ficha é o código, não a fala dela. A
   ficha é apagada com 12 meses.
+- **Com o cliente da carteira** (#1754), não fala de preço, quantidade nem prazo, não reserva estoque, não
+  conhece o histórico do cliente e não substitui o representante. Quem grava o interesse e manda a ficha é
+  o código, não a fala dela; a ficha sai **uma vez por conversa**.
 - **Não faz pré-triagem de currículo em foto**: a Fran olha.
 - **Não responde figurinha nem localização**, e o **áudio só com a chave `audio.de_fora` ligada**; fora
   disso, a linha curta de sempre. **Não responde em áudio.**
@@ -208,3 +245,21 @@ recusa** com a venda desligada. `mostrar` diz a chave, os estados do piloto e qu
 Conferir em `http://127.0.0.1:8008/saude`: `"olivia_qualifica": "ligada"`. **Quem recebe a ficha precisa
 escrever ao número da empresa** de vez em quando: dentro das 24 h a ficha chega completa, com o link; fora
 delas, numa linha só.
+
+**O cliente da carteira no boletim** (#1754) tem chave própria, `olivia.atende_carteira`, que nasce
+desligada e **só o dono liga**, quando o boletim com *Quero saber mais* for sair. **Antes de ligar:** o
+modelo `boletim_quero_saber_mais` aprovado na Meta e o texto da parceria com **Situação: APROVADO** em
+`C:\AxiaAtende\docs\olivia\parceria-da-carteira.md`. Em janela elevada, em produção:
+
+```
+cd C:\AxiaAtende
+$env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
+.\.venv\Scripts\python.exe scripts\olivia.py ligar-carteira
+```
+
+`desligar-carteira` volta na hora, sem restart: o toque em *Quero saber mais* passa a responder com a linha
+do representante (como o *Falar com meu atendimento*), e o texto volta ao portão do cliente. Conversas já
+abertas com ela terminam pelo caminho de sempre. **`ligar-carteira` recusa** enquanto o texto da parceria não
+estiver APROVADO; e mesmo com a chave ligada, sem o texto aprovado ela não atende. `mostrar` diz a chave e a
+situação do texto. Conferir em `http://127.0.0.1:8008/saude`: `"olivia_carteira"`. Só vale com
+`OLIVIA_FALA=true`.

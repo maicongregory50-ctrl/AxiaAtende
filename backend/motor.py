@@ -824,6 +824,12 @@ def tratar(con, saida: Saida, ia, e: Entrada, agora: datetime, envio=None, campo
     # #1189: o CLIENTE da carteira que escreve vai ao representante e ao menu dele, nunca ao fluxo
     # geral. Depois do canal de campo e dos clientes do dia (que sao da equipe) e antes de tudo o que
     # abre conversa.
+    # #1754 (D1b): ANTES do portao, o texto de quem recebeu um boletim com "Quero saber mais" nos ultimos 7
+    # dias vai a OlivIA no modo carteira -- so com a chave `olivia.atende_carteira` ligada e o texto da parceria
+    # aprovado. Fora disso (False), o portao de sempre.
+    if (olivia is not None and hasattr(olivia, "atende_carteira")
+            and olivia.atende_carteira(con, saida, ia, e, agora, envio)):
+        return
     if portao_do_cliente(con, saida, ia, e, agora, envio):
         return
     # #1520: a OLIVIA QUE FALA, com a chave ligada. Depois do portao do cliente (#1189) e de tudo o que e

@@ -48,7 +48,7 @@ function situacaoDe(l) {
   const [rot, cls] = SITUACAO[l.situacao] || [l.situacao, '']
   return [l.situacao, rot, cls]
 }
-const RESPOSTA = { quero: 'Quero receber', nao_quero: 'Não quero', falar: 'tocou em falar', texto: 'escreveu' }
+const RESPOSTA = { quero: 'Quero receber', nao_quero: 'Não quero', falar: 'tocou em falar', texto: 'escreveu', saber: 'quis saber mais' }
 const COLUNAS = [
   ['cliente', 'Cliente', (l) => (l.nome || '').toLowerCase()],
   ['cidade', 'Cidade', (l) => `${l.uf || ''} ${(l.cidade || '').toLowerCase()}`],
@@ -140,6 +140,7 @@ export default function Envios() {
           <select value={resposta} onChange={(e) => setResposta(e.target.value)}>
             <option value="">Toda resposta</option><option value="quero">Quero receber</option>
             <option value="nao_quero">Não quero</option><option value="texto">Escreveu</option><option value="falar">Tocou em falar</option>
+            <option value="saber">Quis saber mais</option>
           </select>
           {lista.nota && <span className="leve">Nota do número: <b>{NOTA[lista.nota.nota]}</b></span>}
           {lista.segurado && (lista.segurado.ligado
@@ -163,6 +164,7 @@ export default function Envios() {
             <div className="cartao"><span>Lidos</span><b>{c.lidos}</b></div>
             {d.envio.tipo === 'material' && <div className="cartao"><span>Quero receber</span><b>{c.quero}</b></div>}
             {d.envio.tipo === 'material' && <div className="cartao"><span>Não quero</span><b>{c.nao_quero}</b></div>}
+            {c.saber > 0 && <div className="cartao"><span>Quis saber mais</span><b>{c.saber}</b></div>}
             <div className="cartao alerta"><span>Não entregues</span><b>{c.nao_entregues}</b></div>
             <div className="cartao alerta"><span>Sem responsável</span><b>{c.sem_responsavel}</b></div>
             <div className="cartao"><span>Na fila</span><b>{c.aguardando}</b></div>
@@ -187,6 +189,11 @@ export default function Envios() {
                     {l.resposta === 'nao_quero' && <span className="selo r">Não quero · {hora(l.resposta_em)}
                       {l.aviso_recusa_em ? ' · responsável avisado' : ''}</span>}
                     {l.resposta === 'falar' && <span className="selo v">tocou em falar · {hora(l.resposta_em)}</span>}
+                    {l.resposta === 'saber' && <><span className="selo v">quis saber mais · {hora(l.resposta_em)}</span>
+                      {l.culturas && l.culturas.length > 0
+                        ? <> interesse: {l.culturas.join(', ')}</>
+                        : <span className="leve" title="Entrou na conversa e não indicou cultura: não é falta de interesse"> sem indicação</span>}
+                      {l.resposta_texto && <> “{l.resposta_texto}”</>}</>}
                     {l.resposta === 'texto' && <><span className="selo v">escreveu · {hora(l.resposta_em)}</span> “{l.resposta_texto}”</>}
                     {!l.resposta && (l.sem_convite
                       ? <span className="selo v" title="Já tinha aceitado e escreveu nas últimas 24 h: foi sem o convite pago">sem convite (janela aberta)</span>

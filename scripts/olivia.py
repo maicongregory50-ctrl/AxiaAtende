@@ -8,6 +8,8 @@ Em producao, janela elevada:
 
 #1589: `ligar-venda|desligar-venda`, a conversa de quem quer comprar (070). #1660: `ligar-qualifica|
 desligar-qualifica`, o piloto da qualificacao do produtor rural (072); recusa ligar com a venda desligada.
+#1754: `ligar-carteira|desligar-carteira`, a OlivIA atende o cliente da carteira no boletim (077). So o DONO
+liga, e `ligar-carteira` RECUSA enquanto docs/olivia/parceria-da-carteira.md nao disser APROVADO.
 
 `ligar-vaga` RECUSA ligar enquanto algum texto de cadastro da ficha ainda tiver a marca [TEXTO DO DONO]:
 o texto provisorio da 067 nao sai para candidato nenhum.
@@ -17,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend import config, olivia  # noqa: E402
+from backend import config, interesse, olivia  # noqa: E402
 from backend.banco import conexao  # noqa: E402
 
 MARCA = "[TEXTO DO DONO]"
@@ -32,9 +34,9 @@ def provisorios(con) -> list[str]:
 def main() -> int:
     acao = (sys.argv[1:] or ["mostrar"])[0]
     if acao not in ("mostrar", "ligar-vaga", "desligar-vaga", "ligar-venda", "desligar-venda",
-                    "ligar-qualifica", "desligar-qualifica"):
+                    "ligar-qualifica", "desligar-qualifica", "ligar-carteira", "desligar-carteira"):
         print("uso: olivia.py mostrar|ligar-vaga|desligar-vaga|ligar-venda|desligar-venda|"
-              "ligar-qualifica|desligar-qualifica")
+              "ligar-qualifica|desligar-qualifica|ligar-carteira|desligar-carteira")
         return 2
     cfg = config.carregar()
     with conexao(cfg) as con:
@@ -70,8 +72,21 @@ def main() -> int:
                 print("RECUSADO: o ajuste %s nao existe neste banco (a migracao 072 nao foi aplicada?)"
                       % olivia.AJUSTE_QUALIFICA)
                 return 1
+        if acao in ("ligar-carteira", "desligar-carteira"):
+            # #1754 (D11): a chave nasce na 077. Ligar exige o texto da parceria aprovado pelo dono.
+            if acao == "ligar-carteira" and not interesse.parceria()[0]:
+                print("RECUSADO: o texto da parceria (%s) ainda nao esta APROVADO" % interesse.PARCERIA)
+                return 1
+            n = con.execute("""UPDATE atendimento.ajustes SET valor = %s::jsonb, atualizado_em = now()
+                                WHERE chave = %s""", ("true" if acao == "ligar-carteira" else "false",
+                                                      interesse.AJUSTE)).rowcount
+            if n != 1:
+                print("RECUSADO: o ajuste %s nao existe neste banco (a migracao 077 nao foi aplicada?)"
+                      % interesse.AJUSTE)
+                return 1
         ligada = olivia.conduz_vaga(con)
         venda = olivia.conduz_venda(con)
+        carteira = interesse.ligado(con)
         qualifica = olivia.qualifica(con)
         estados = olivia._estados_do_piloto(con)
         destinos = {r["chave"]: r["nome"] for r in con.execute(
@@ -91,6 +106,8 @@ def main() -> int:
         "LIGADA" if qualifica else "desligada", ", ".join(estados) or "nenhum"))
     for chave, nome in sorted(destinos.items()):
         print("  %s -> ficha e cartao para: %s" % (chave, nome or "SEM DESTINO"))
+    print("a carteira no boletim (#1754): %s; texto da parceria: %s" % (
+        "LIGADA" if carteira else "desligada", "APROVADO" if interesse.parceria()[0] else "rascunho"))
     return 0
 
 

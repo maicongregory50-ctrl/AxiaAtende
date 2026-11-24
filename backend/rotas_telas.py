@@ -385,12 +385,16 @@ def rotas(cfg, usuario) -> APIRouter:
             e = con.execute("SELECT * FROM atendimento.envios WHERE id = %s", (envio_id,)).fetchone()
             if not e:
                 raise HTTPException(status_code=404, detail="envio não encontrado")
-            ds = con.execute("""SELECT * FROM atendimento.envio_destinatarios WHERE envio_id = %s
-                                 ORDER BY posicao""", (envio_id,)).fetchall()
+            # #1754: as culturas que quem quis saber mais indicou (todas as conversas da carteira dele)
+            ds = con.execute("""SELECT d.*, array(SELECT DISTINCT x FROM atendimento.interesses i, unnest(i.culturas) AS x
+                                                   WHERE i.destinatario_id = d.id ORDER BY x) AS culturas
+                                  FROM atendimento.envio_destinatarios d WHERE d.envio_id = %s
+                                 ORDER BY d.posicao""", (envio_id,)).fetchall()
         conv = [d for d in ds if d["convite_em"]]
         cartoes = {"convidados": len(conv), "entregues": sum(1 for d in conv if d["entregue_em"]),
                    "lidos": sum(1 for d in conv if d["lido_em"]),
                    "quero": sum(1 for d in ds if d["resposta"] == "quero"),
+                   "saber": sum(1 for d in ds if d["resposta"] == "saber"),   # #1754
                    "nao_quero": sum(1 for d in ds if d["resposta"] == "nao_quero"),
                    "nao_entregues": sum(1 for d in ds if d["situacao"] in ("falhou", "nao_e_whatsapp")),
                    "sem_responsavel": sum(1 for d in ds if d["situacao"] == "sem_responsavel"),
@@ -411,6 +415,7 @@ def rotas(cfg, usuario) -> APIRouter:
                            "entregue_em": d["entregue_em"].isoformat() if d["entregue_em"] else None,
                            "lido_em": d["lido_em"].isoformat() if d["lido_em"] else None,
                            "resposta": d["resposta"], "resposta_texto": d["resposta_texto"],
+                           "culturas": list(d["culturas"] or []),   # #1754
                            "resposta_em": d["resposta_em"].isoformat() if d["resposta_em"] else None,
                            "imagens": "%d de %d" % (d["imagens_enviadas"], d["imagens_total"]) if d["imagens_total"] else "",
                            "aviso_recusa_em": d["aviso_recusa_em"].isoformat() if d["aviso_recusa_em"] else None,

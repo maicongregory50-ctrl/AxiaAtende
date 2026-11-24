@@ -110,6 +110,12 @@ def falar(con, segredo: str, codigo: str, agora: datetime) -> str | None:
     return d["responsavel_whatsapp"]
 
 
+def motor_enviou(con, conversa_id, resumo: str) -> bool:
+    """Ja saiu, nesta conversa, uma mensagem com este resumo."""
+    return con.execute("SELECT 1 FROM atendimento.enviadas WHERE conversa_id = %s AND resumo = %s LIMIT 1",
+                       (conversa_id, resumo)).fetchone() is not None
+
+
 def com_nove(numero: str) -> str:
     """O celular brasileiro como a lista do ERP o guarda: 55 + DDD + 9 + oito digitos."""
     n = "".join(c for c in (numero or "") if c.isdigit())
@@ -164,6 +170,17 @@ def parametros(m, fontes: dict) -> list[str]:
 
 # ── o pedido (lado das TELAS) ───────────────────────────────────────────────
 
+def culturas_do_pedido(culturas) -> list[str]:
+    """#1754 (D10): os rotulos das culturas do boletim, uma linha cada, sem repetir (minusculas comparadas)."""
+    fica, vistos = [], set()
+    for c in culturas or []:
+        rotulo = " ".join(str(c or "").split())[:40]
+        if rotulo and rotulo.lower() not in vistos:
+            vistos.add(rotulo.lower())
+            fica.append(rotulo)
+    return fica[:12]
+
+
 def receber_pedido(con, pedido: dict) -> int:
     """Grava o pedido e a fila de destinatarios, ja classificada. Devolve o id do envio.
     Pedido repetido (mesma `pedido_ref`) devolve o envio que ja existe e nao muda nada."""
@@ -178,11 +195,12 @@ def receber_pedido(con, pedido: dict) -> int:
         raise PedidoInvalido("o modelo %r não existe ou não serve para envio %s" % (pedido["modelo"], tipo))
     envio = con.execute(
         """INSERT INTO atendimento.envios (pedido_ref, tipo, campanha, peca, assunto, modelo, capa, imagens,
-                                           aprovado_por, aprovado_em, lote_tamanho, passa_do_teto)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s) RETURNING id""",
+                                           aprovado_por, aprovado_em, lote_tamanho, passa_do_teto, culturas)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s) RETURNING id""",
         (pedido["pedido_ref"], tipo, pedido["campanha"], pedido["peca"], pedido.get("assunto", ""), m["nome"],
          pedido["capa"], json.dumps(pedido.get("imagens") or []), pedido["aprovado_por"], pedido["aprovado_em"],
-         min(int(pedido.get("lote_tamanho", 20)), 20), pedido.get("passa_do_teto") is True)).fetchone()["id"]
+         min(int(pedido.get("lote_tamanho", 20)), 20), pedido.get("passa_do_teto") is True,
+         culturas_do_pedido(pedido.get("culturas")))).fetchone()["id"]
 
     ordenados = sorted(pedido["clientes"], key=lambda c: -float(c.get("faturamento") or 0))
     for pos, c in enumerate(ordenados, start=1):
@@ -445,6 +463,8 @@ class Envio:
         botoes = (["envio:%d:quero" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "quero_nao_quero"
                   else ["envio:%d:nao_quero" % e["id"]] if m["botao"] == "parar_e_falar"
                   else ["envio:%d:nao_quero" % e["id"], "envio:%d:falar" % e["id"]] if m["botao"] == "parar_e_chamar"
+                  # #1754 (D2): "Quero saber mais" e "Nao quero receber", na ordem do modelo (modelos_meta)
+                  else ["envio:%d:saber" % e["id"], "envio:%d:nao_quero" % e["id"]] if m["botao"] == "saber_e_parar"
                   else None)
         url = (codigo_falar(self._segredo, d["id"], copia=para_nome == d["responsavel_nome"])
                if m["botao"] in ("falar_responsavel", "parar_e_falar") else None)
@@ -541,6 +561,9 @@ class Envio:
         if acao == "falar":
             self._falar_pelo_toque(con, saida, d, numero, agora)
             return
+        if acao == "saber":
+            self._saber_pelo_toque(con, saida, entrada, d, numero, agora)
+            return
         tipo = "aceite" if acao == "quero" else "recusa" if acao == "nao_quero" else None
         if not tipo:
             return
@@ -569,6 +592,28 @@ class Envio:
     #: abre. O toque chega aqui, fica anotado como `falar` (o primeiro) e a resposta e a linha do
     #: representante, a mesma que o portao da carteira manda a quem escreve.
     SEM_REPRESENTANTE = "Obrigado! Pode escrever aqui o que você precisa."
+
+    #: #1754 (D3): o segundo toque em "Quero saber mais", com a conversa ja aberta: o primeiro bloco nao se repete.
+    DE_NOVO = "Estou por aqui. Pode escrever o que você precisa."
+
+    def _saber_pelo_toque(self, con, saida, entrada, d, numero, agora):
+        """#1754: o toque em "Quero saber mais". Chave desligada (ou o texto da parceria sem aprovacao): a linha
+        do representante, como o "falar" (D11). Ligada: a resposta `saber`, a conversa da carteira conduzida pela
+        OlivIA e o primeiro bloco, do codigo (D3). O segundo toque nao repete o bloco."""
+        from . import interesse
+        if not interesse.atende(con):
+            self._falar_pelo_toque(con, saida, d, numero, agora)
+            return
+        primeira = d["resposta"] != "saber"
+        interesse.marcar_saber(con, d, agora)
+        conversa, _ = interesse.abrir(con, entrada.pessoa, d, "toque", agora)
+        completo = interesse._destinatario(con, d["id"])
+        if primeira or not motor_enviou(con, conversa["id"], interesse.RESUMO_PARCERIA):
+            interesse.primeiro_bloco(con, saida, entrada.pessoa, completo, conversa, agora)
+            return
+        w = saida.texto(entrada.pessoa.para, self.DE_NOVO)
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, conversa_id, para, tipo, resumo)
+                       VALUES (%s, %s, %s, 'texto', 'carteira: de novo')""", (w, conversa["id"], entrada.pessoa.para))
 
     def _falar_pelo_toque(self, con, saida, d, numero, agora):
         if d["resposta"] in (None, "texto"):
