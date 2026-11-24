@@ -39,6 +39,9 @@ FORMATOS = {"application/pdf": "pdf", "image/svg+xml": "svg", "svg": "svg",
 # #1238 (dono, 03/11/2026, lendo o dia da DJ AGRO): pedir o CODIGO ficou ruim -- quem manda a logo sabe o
 # nome do cliente, nao o numero. A pergunta pede o nome, o cadastro (a agenda do ERP que o Atende ja
 # tem) resolve o codigo, e o codigo continua valendo para quem o souber.
+#: #1722: o arquivo deslizando um aviso (a integracao recusada, a vaga, o lote...). Nada e baixado.
+AVISO_NAO_RECEBE = ("Aviso não recebe arquivo por aqui, e nada foi guardado. Se o arquivo é de um chamado, "
+                    "anexe no chamado, no sistema.")
 RECEBI = ("Recebi a logo{arquivo}. De qual cliente ela é? Me diga o *nome do cliente* (ou o código dele "
           "no ERP, se souber).")
 PERGUNTA_MARCA = ("Anotado, cliente {codigo}. E o *nome da marca*, como ela deve aparecer na arte?")
@@ -136,6 +139,14 @@ def receber(con, saida, e, agora: datetime, pasta) -> bool:
     formato = _formato(d.mime, d.nome_arquivo)
     if formato is None:
         return False   # arquivo que o marketing nao aceita: cai na linha de arquivo, que explica
+    # #1722 (24/11/2026): o arquivo que DESLIZA um aviso nosso responde ao aviso, nao e logo. O dono
+    # mandou a ficha deslizando o aviso da integracao do Bradesco e ouviu "Recebi a logo". (O que desliza
+    # mensagem de chamado nem chega aqui: e de `arquivo_volta`.)
+    if getattr(e, "contexto", None) and con.execute(
+            "SELECT 1 FROM atendimento.avisos WHERE wamid = %s", (e.contexto,)).fetchone():
+        _dizer(con, saida, e.pessoa.para, AVISO_NAO_RECEBE)
+        print("logos: arquivo deslizando aviso, nao e logo (%s): %s" % (e.pessoa.wa_id, d.nome_arquivo), flush=True)
+        return True
 
     # `wamid` e UNICO: o mesmo aviso repetido pela Meta nao cria duas logos
     if con.execute("SELECT 1 FROM atendimento.logos_de_cliente WHERE wamid = %s", (e.wamid,)).fetchone():

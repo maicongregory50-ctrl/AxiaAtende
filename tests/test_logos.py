@@ -187,6 +187,24 @@ def test_pede_menu_escapa_da_pergunta_e_a_logo_fica(ligado):
     assert s.ultima[0] == "botoes"      # o menu da casa, nao a pergunta da logo
 
 
+def test_1722_arquivo_que_desliza_um_aviso_nao_vira_logo(ligado):
+    """24/11/2026: o dono mandou uma ficha em PDF deslizando o aviso da integracao do Bradesco e ouviu
+    "Recebi a logo". O arquivo que desliza um aviso nosso nao e logo, e nada e baixado."""
+    _sou_da_casa(ligado)
+    with conexao(ligado) as con:
+        con.execute("""INSERT INTO atendimento.avisos (tipo, para_nome, para_whatsapp, sobre, enviado_em, wamid)
+                       VALUES ('integracao_recusada', 'Dono', %s, 'Bradesco', %s, 'wamid.aviso')""",
+                    (NUMERO, AGORA - timedelta(days=6)))
+    s = SaidaFalsa()
+    msg = dict(documento("wamid.1", "ficha-FRT-2026-0003.pdf"), context={"id": "wamid.aviso", "from": "554936640121"})
+    passo(ligado, s, msg)
+    assert s.ultima[2] == L.AVISO_NAO_RECEBE
+    assert _logos(ligado) == [] and not getattr(s, "baixadas", [])
+    # sem deslizar, o mesmo PDF continua sendo logo
+    passo(ligado, s, documento("wamid.2", "ficha-FRT-2026-0003.pdf"), agora=AGORA + timedelta(minutes=1))
+    assert len(_logos(ligado)) == 1 and "De qual cliente" in s.ultima[2]
+
+
 def test_o_mesmo_aviso_repetido_nao_cria_duas_logos(ligado):
     """`wamid` UNICO: a Meta repete avisos por ate 7 dias."""
     _sou_da_casa(ligado)

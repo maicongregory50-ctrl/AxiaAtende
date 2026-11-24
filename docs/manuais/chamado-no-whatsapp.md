@@ -72,6 +72,9 @@ antivírus antes de guardar.
   24 horas e tem uma pergunta ou uma entrega esperando. Toque em **Ver** e ela aparece.
 - **"Anotado no chamado N. ✓"**: a sua resposta entrou no chamado. Vale também quando a pergunta já
   tinha sido respondida antes: o texto entra do mesmo jeito (#1722).
+- **"Aviso não recebe arquivo por aqui, e nada foi guardado..."** (#1722): você mandou um arquivo
+  deslizando um **aviso** (a integração recusada, a vaga, o lote...). Ele não vira logo e não é guardado;
+  se é de um chamado, anexe no chamado, no sistema.
 - **"Anotado. Esta mensagem é só um aviso…"**: você deslizou um aviso ou uma entrega, não uma pergunta.
   O texto não entrou; para falar do chamado, use o sistema ou espere a próxima pergunta. Essa linha vem
   uma vez só por chamado.
