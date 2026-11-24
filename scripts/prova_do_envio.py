@@ -11,6 +11,11 @@ O que fica diferente, de proposito:
 - lote de 1, e passa do teto.
 Sai pelo laco de sempre do recepcionista: so de segunda a sexta, das 9h30 as 17h, com a nota verde.
 
+#1754 (a prova do boletim com "Quero saber mais"): `--modelo boletim_quero_saber_mais` troca o modelo,
+`--culturas "Aveia preta,Nabo forrageiro"` da a lista fechada do interesse, `--imagem` (repetivel) da a versao
+maior, e `--responsavel "Nome:55DDD9XXXXXXXX"` troca quem recebe a ficha -- que NAO pode ser o proprio numero
+da prova (a ficha a si mesmo e recusada por desenho). O papel vai `comprador`.
+
 Sem `--gravar`, SO MOSTRA. Em producao, janela elevada:
 
     $env:AXIAATENDE_AMBIENTE = 'producao'; $env:AXIAATENDE_PROCESSO = 'recepcionista'
@@ -51,6 +56,10 @@ def main():
     a.add_argument("--numero")
     a.add_argument("--nome", default="Maicon Gregory")
     a.add_argument("--gravar", action="store_true")
+    a.add_argument("--modelo", help="#1754: outro modelo de direta (ex.: boletim_quero_saber_mais)")
+    a.add_argument("--culturas", default="", help="#1754: as culturas do boletim, separadas por virgula")
+    a.add_argument("--imagem", action="append", default=[], help="#1754: a versao maior (repetivel)")
+    a.add_argument("--responsavel", help="#1754: Nome:55DDD9XXXXXXXX, quem recebe a ficha de interesse")
     args = a.parse_args()
     cfg = config.carregar()
     print("ambiente:", cfg.ambiente if hasattr(cfg, "ambiente") else "?")
@@ -72,12 +81,29 @@ def main():
             sys.exit("envio %s ainda nao mandou a ninguem: nao ha o pacote de um cliente para copiar" % e["id"])
         capa = m["capa"] or e["capa"]
         imagens = m["imagens"] if m["imagens"] is not None else e["imagens"]
+        # #1754: o modelo, a versao maior, as culturas e o responsavel da prova do boletim
+        modelo = args.modelo or e["modelo"]
+        if args.modelo and not con.execute("SELECT 1 FROM atendimento.modelos WHERE nome = %s AND ativo AND uso = %s",
+                                           (args.modelo, e["tipo"])).fetchone():
+            sys.exit("o modelo %r nao existe ou nao serve para envio %s" % (args.modelo, e["tipo"]))
+        if args.imagem:
+            imagens = list(args.imagem)
+        culturas = [c.strip() for c in args.culturas.split(",") if c.strip()]
+        resp_nome, resp_whats = m["responsavel_nome"], m["responsavel_whatsapp"]
+        if args.responsavel:
+            resp_nome, _, resp_whats = args.responsavel.rpartition(":")
+            resp_whats = so_digitos(resp_whats)
+            if not resp_nome or not CELULAR.match(resp_whats):
+                sys.exit("--responsavel e Nome:55DDD9XXXXXXXX")
+        if modelo == "boletim_quero_saber_mais" and resp_whats == numero:
+            sys.exit("o responsavel e o proprio numero da prova: a ficha a si mesmo e recusada. Use --responsavel")
         print("\no pacote do envio %s (%s), copiado do cliente %s (%s):" % (e["id"], e["pedido_ref"],
                                                                              m["erp_codigo"], m["nome"]))
-        print("  modelo:", e["modelo"], "| tipo:", e["tipo"], "| peca:", e["peca"], "| assunto:", e["assunto"])
+        print("  modelo:", modelo, "| tipo:", e["tipo"], "| peca:", e["peca"], "| assunto:", e["assunto"])
+        print("  culturas:", ", ".join(culturas) or "(nenhuma: ela nao anota interesse)")
         for rotulo, c in [("capa", capa)] + [("imagem %d" % i, c) for i, c in enumerate(imagens, 1)]:
             print("  %-9s %s  %s" % (rotulo, c, "ok" if c and Path(c).is_file() else "ARQUIVO NAO ENCONTRADO"))
-        print("  responsavel no texto: %s (canal dono: sem resumo ao representante)" % m["responsavel_nome"])
+        print("  responsavel (recebe a ficha): %s %s (canal dono: sem resumo ao representante)" % (resp_nome, resp_whats))
         print("  para: %s (%s)" % (args.nome, numero))
         agora = datetime.now(FUSO)
         dentro = agora.weekday() in DIAS_DA_JANELA and JANELA_INICIO <= agora.time() < JANELA_FIM
@@ -88,17 +114,18 @@ def main():
         ref = "%s-prova-%s" % (e["pedido_ref"], agora.strftime("%Y%m%d%H%M"))
         novo = con.execute(
             """INSERT INTO atendimento.envios (pedido_ref, tipo, campanha, peca, assunto, modelo, capa, imagens,
-                                               aprovado_por, aprovado_em, lote_tamanho, passa_do_teto)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, now(), 1, true) RETURNING id""",
-            (ref, e["tipo"], "PROVA - " + e["campanha"], e["peca"], e["assunto"], e["modelo"], e["capa"],
-             json.dumps(e["imagens"]), "prova do dono (script)")).fetchone()["id"]
+                                               aprovado_por, aprovado_em, lote_tamanho, passa_do_teto, culturas)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, now(), 1, true, %s) RETURNING id""",
+            (ref, e["tipo"], "PROVA - " + e["campanha"], e["peca"], e["assunto"], modelo, e["capa"],
+             json.dumps(imagens if args.imagem else e["imagens"]), "prova do dono (script)", culturas)).fetchone()["id"]
         con.execute(
             """INSERT INTO atendimento.envio_destinatarios
                    (envio_id, erp_codigo, nome, whatsapp, posicao, responsavel_nome, responsavel_whatsapp,
                     situacao, capa, imagens, aceite_cadastro, papel, responsavel_canal)
-               VALUES (%s, 0, %s, %s, 1, %s, %s, 'aguardando', %s, %s::jsonb, true, NULL, 'dono')""",
-            (novo, args.nome, numero, m["responsavel_nome"], m["responsavel_whatsapp"], m["capa"],
-             json.dumps(m["imagens"]) if m["imagens"] is not None else None))
+               VALUES (%s, 0, %s, %s, 1, %s, %s, 'aguardando', %s, %s::jsonb, true, %s, 'dono')""",
+            (novo, args.nome, numero, resp_nome, resp_whats, m["capa"],
+             json.dumps(imagens) if args.imagem else (json.dumps(m["imagens"]) if m["imagens"] is not None else None),
+             "comprador" if args.modelo else None))
         print("\ngravado: envio %s (%s). Sai na proxima volta do recepcionista (1 min), dentro da janela." % (novo, ref))
 
 
