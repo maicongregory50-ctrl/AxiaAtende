@@ -1,6 +1,6 @@
 # O texto da parceria, para o cliente da carteira (#1754)
 
-**Situação:** RASCUNHO — aguardando o dono (não sai a ninguém enquanto esta linha disser RASCUNHO)
+**Situação:** APROVADO — pelo dono em 24/11/2026, na sessão do #1754 ("texto ok"), sem mudança no rascunho
 **Quem escreve:** o dono. A sessão só copia o texto aprovado, literal.
 
 ## Onde ele aparece
