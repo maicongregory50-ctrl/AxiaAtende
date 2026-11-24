@@ -355,13 +355,15 @@ def test_5b_com_fala_nao_duplica(piloto):
 
 # ── passo 6: a qualificacao nao e conversa travada ──────────────────────────
 
-def test_6_sem_ficha_comecada_as_mesmas_falas_travariam(piloto):
-    """O controle do teste de cima: sem `anotar_lead`, a sexta fala sem toque e marcada "travou"."""
+def test_6_sem_ficha_comecada_as_mesmas_falas_tambem_nao_travam(piloto):
+    """Era o controle do teste de cima (sem `anotar_lead`, a sexta fala sem toque levava a marca). Desde o
+    #1784 a conversa de compra inteira anda por texto: com a venda ligada, a marca nao vem pela contagem.
+    O controle com a venda desligada esta em test_olivia_venda.py (h)."""
     s, ia = SaidaFalsa(), IAFalsa()
     _quatro_respostas(piloto, s, ia, anotar=False)
     ia.conversa = [{"texto": "E o município?"}]
     passo(piloto, s, texto("w6", "sim", numero=DE_FORA), ia, agora=AGORA + timedelta(minutes=6))
-    assert [r for r in resumos(piloto) if r.startswith(O.FALA_TRAVOU)]
+    assert not [r for r in resumos(piloto) if r.startswith(O.FALA_TRAVOU)]
 
 
 # ── passo 7: o entorno ──────────────────────────────────────────────────────

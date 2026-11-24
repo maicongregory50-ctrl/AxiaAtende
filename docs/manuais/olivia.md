@@ -49,7 +49,9 @@ autenticado são os próximos degraus, em chamados próprios.
    currículo à noite recebeu o menu no meio de uma conversa boa). **Na conversa de vaga** (#1543,
    17/11/2026) a contagem de respostas não vale, e um segundo "Sim" ou "Ok" não conta como mensagem
    repetida: ali perguntar e ouvir resposta é a conversa andando. Só *"não é isso"* e a repetição de uma
-   mensagem de mais de três palavras a fazem mudar de abordagem.
+   mensagem de mais de três palavras a fazem mudar de abordagem. **Na conversa de quem quer comprar**
+   (#1784, 24/11/2026), com a chave da venda ligada, vale o mesmo: responder por texto é a conversa
+   andando, e um segundo "Sim" não manda o menu.
    Ela escreve **curto**: no máximo duas frases por mensagem, uma pergunta por vez. Quando a pessoa manda
    o currículo sem dizer a vaga, ela pergunta qual antes de encaminhar, e encaminha o arquivo que já veio.
 6. **A conversa da vaga** (#1525), com a chave `olivia.conduz_vaga` ligada: quem chega pelo anúncio ou

@@ -171,3 +171,40 @@ def test_saude_diz_a_chave_da_venda(venda):
         assert O.conduz_venda(con) is True
         con.execute("UPDATE atendimento.ajustes SET valor = 'false'::jsonb WHERE chave = 'olivia.conduz_venda'")
         assert O.conduz_venda(con) is False
+
+
+# ── (h) #1784: a conversa de compra anda por texto ──────────────────────────
+
+TROCAS = [("Bom dia", "Bom dia! Em que posso ajudar?"),
+          ("Semente comprar", "Certo! Qual semente você procura?"),
+          ("Centeio", "Temos sim. Posso indicar o representante comercial da sua região?"),
+          ("Sim", "Você é produtor rural, revenda ou corretor?"),
+          ("Sim", "Você compra para plantar ou para revender?"),
+          ("Pra plantar", "De que estado você é?"),
+          ("Parana", "De que região do Paraná?")]
+
+
+def _conversar(cfg, s, trocas, de=0):
+    ia = IAFalsa()
+    for i, (dele, dela) in enumerate(trocas, start=de):
+        ia.conversa = [{"texto": dela}]
+        passo(cfg, s, texto("h%d" % i, dele, numero=DE_FORA), ia, agora=AGORA + timedelta(seconds=40 * i))
+    return ia
+
+
+def test_h_sete_respostas_por_texto_e_um_segundo_sim_nao_marcam_travou(venda):
+    s = SaidaFalsa()
+    _conversar(venda, s, TROCAS)
+    assert len([r for r in resumos(venda) if r.startswith(O.FALA)]) == len(TROCAS)
+    assert not [r for r in resumos(venda) if r.startswith(O.FALA_TRAVOU)]
+    assert conversa(venda)["conduzida_por"] == "olivia" and "botoes" not in [x[0] for x in s.enviadas]
+    # o "nao e isso" continua valendo
+    ia = _conversar(venda, s, [("não é isso", "Me conta em uma frase o que você precisa.")], de=len(TROCAS))
+    assert ia.chamadas[-1]["extra"].startswith("A CONVERSA TRAVOU")
+    assert resumos(venda)[-1].startswith(O.FALA_TRAVOU)
+
+
+def test_h_com_a_venda_desligada_a_contagem_continua(sem_venda):
+    s = SaidaFalsa()
+    _conversar(sem_venda, s, [t for t in TROCAS if t[0] != "Sim"] + [("Irati", "Certo."), ("Isso", "Certo!")])
+    assert [r for r in resumos(sem_venda) if r.startswith(O.FALA_TRAVOU)]
