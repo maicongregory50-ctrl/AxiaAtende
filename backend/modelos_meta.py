@@ -39,6 +39,8 @@ BOTAO_CANDIDATO = "Conversar com o candidato"
 BOTAO_VER = "Ver"
 #: #1542: o termo de reprovacao de lote; volta com a carga `termo:ciente:<id>`. E o recebimento do termo.
 BOTAO_CIENTE = "Recebi e estou ciente"
+#: #1754: o boletim com "Quero saber mais" (`envio:<id>:saber`) e a recusa de sempre, as duas resposta rapida.
+BOTAO_SABER = "Quero saber mais"
 #: O endereco publico do recepcionista (Funnel 443). O botao da direta termina em {{1}} = o codigo.
 ENDERECO_FALAR = "https://serverrenascer.taild57672.ts.net/falar/"
 LIMITE_BOTAO = 25
@@ -141,6 +143,10 @@ def componentes(m: dict, cabecalho: str | None = None, documento: str | None = N
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t} for t in BOTOES_TRIAGEM] + [{
             "type": "URL", "text": BOTAO_CANDIDATO, "url": ENDERECO_FALAR + "{{1}}",
             "example": [ENDERECO_FALAR + "v1-0a1b2c3d4e5f6a7b"]}]})
+    elif m["botao"] == "saber_e_parar":
+        # #1754 (D2): "Quero saber mais" e "Nao quero receber", na ordem do envio (envio._mensagem)
+        saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": t}
+                                                     for t in (BOTAO_SABER, BOTOES_CONVITE[1])]})
     elif m["botao"] == "ver":
         saida.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": BOTAO_VER}]})
     elif m["botao"] == "ciente":

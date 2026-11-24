@@ -38,6 +38,16 @@ def test_o_cadastro_vira_a_forma_da_meta(cfg):
     assert [c["type"] for c in aviso] == ["BODY"] and len(aviso[0]["example"]["body_text"][0]) == 3
 
 
+def test_o_boletim_com_quero_saber_mais(cfg):
+    """#1754 (D2): imagem no cabecalho, o primeiro nome, e as duas respostas rapidas, sem link."""
+    m = next(m for m in modelos_meta.cadastro(cfg) if m["nome"] == "boletim_quero_saber_mais")
+    assert (m["categoria"], m["uso"], m["botao"]) == ("MARKETING", "direta", "saber_e_parar")
+    c = modelos_meta.componentes(m, "4::h")
+    assert c[0]["format"] == "IMAGE" and c[1]["example"]["body_text"] == [["João"]]
+    assert c[2]["buttons"] == [{"type": "QUICK_REPLY", "text": "Quero saber mais"},
+                               {"type": "QUICK_REPLY", "text": "Não quero receber"}]
+
+
 def test_corpo_que_comeca_por_variavel_e_recusado_antes_de_ir(cfg):
     m = dict(modelos_meta.cadastro(cfg)[0], texto="{{1}}, oi", cabecalho_imagem=False)
     with pytest.raises(ValueError):
@@ -55,13 +65,13 @@ def test_propor_so_cria_o_que_falta_e_nunca_edita(cfg, tmp_path):
     assert sorted(f["nome"] for f in feitos) == ["abertura_do_canal", "arquivo_ameaca", "arquivo_sem_antivirus", "aviso_auditoria_estoque", "aviso_avaliacao_ruim", "aviso_endereco_fora",
                                                  "aviso_endereco_voltou", "aviso_integracao", "aviso_lote_do_representante", "aviso_painel",
                                                  "aviso_plano_sem_registro",
-                                                 "aviso_sem_atendimento", "curriculo_para_fran",
+                                                 "aviso_sem_atendimento", "boletim_quero_saber_mais", "curriculo_para_fran",
                                                  "epoca_de_plantio", "informativo_ao_comprador", "informativo_curto",
                                                  "informativo_renascer", "olivia_resumo",
                                                  "pecas_da_revenda", "reabrir_avisos", "termo_reprovacao_lote",
                                                  "vaga_visita"]
     criados = [p for p in pedidos if p.method == "POST" and p.url.path.endswith("/message_templates")]
-    assert len(criados) == 22   # #1542: + termo_reprovacao_lote; #1525: + vaga_visita; #1528: + arquivo_sem_antivirus, arquivo_ameaca; #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 a 045: + informativos; #350: + auditoria; #1337: + integracao; #1434: + painel; #1520: + olivia_resumo
+    assert len(criados) == 23   # #1754: + boletim_quero_saber_mais; #1542: + termo_reprovacao_lote; #1525: + vaga_visita; #1528: + arquivo_sem_antivirus, arquivo_ameaca; #1182: + abertura_do_canal; #1188: + reabrir_avisos; 043 a 045: + informativos; #350: + auditoria; #1337: + integracao; #1434: + painel; #1520: + olivia_resumo
     import json
     reabrir = next(json.loads(p.content) for p in criados if json.loads(p.content)["name"] == "reabrir_avisos")
     assert reabrir["category"] == "UTILITY"
