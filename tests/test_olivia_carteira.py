@@ -372,3 +372,11 @@ def test_parceria_le_so_o_aprovado_e_o_texto_entre_as_marcas(tmp_path):
     aprovado, texto_real = interesse.parceria(interesse.Path(__file__).resolve().parent.parent / "docs" / "olivia"
                                               / "parceria-da-carteira.md")
     assert texto_real.startswith("A safra de sementes de cobertura")
+
+
+def test_a_instrucao_responde_a_pergunta_da_ia_e_oferece_o_contato_uma_vez(ligada):
+    """Prova do dono, 24/11/2026: "Falo com uma IA?" ficou sem resposta e o contato saiu sem pedido."""
+    with conexao(ligada) as con:
+        i = O.instrucao_da_carteira(con)
+    assert "Sou a OlivIA, a assistente virtual da Renascer" in i and "Não use ferramenta nenhuma" in i
+    assert "ofereça UMA vez" in i and "SÓ" in i

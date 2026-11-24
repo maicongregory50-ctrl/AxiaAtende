@@ -931,6 +931,10 @@ def travou(con, conversa, e) -> str | None:
     na_vaga = na_vaga or _em_qualificacao(con, conversa)
     # #1754: na conversa da carteira o cliente responde por texto, e isso e a conversa andando
     na_vaga = na_vaga or interesse_mod.e_da_carteira(con, conversa)
+    # #1784: a conversa de compra (#1589) tambem anda por texto -- o que procura, o produto, a categoria, o
+    # estado sao seis falas sem toque. Em 24/11/2026 uma venda que terminou no cartao teve 3 falas marcadas
+    # "travou", e um segundo "Sim" daria o menu. Com a chave da venda ligada, quem e de fora segue a regra da vaga.
+    na_vaga = na_vaga or (not conversa.get("trabalhe") and conduz_venda(con))
     if t and not (na_vaga and len(t.split()) <= 3):
         anterior = con.execute("""SELECT corpo->'msg'->'text'->>'body' AS texto FROM atendimento.eventos_meta
                                    WHERE tipo = 'mensagem' AND chave_meta <> ALL(%s) AND processado_em IS NOT NULL
@@ -1736,7 +1740,7 @@ def instrucao_da_carteira(con) -> str:
         "REGRAS, sem exceção:\n"
         "1. Fale na língua da última mensagem da pessoa, português ou espanhol.\n"
         "2. Não fale de quantidade, preço, valor, desconto nem prazo de entrega, e não prometa estoque nem "
-        "reserva: diga que isso é com quem cuida dele e ofereça passar o contato (passar_representante). O "
+        "reserva: diga que isso é com quem cuida dele. O "
         "que a Renascer diz da safra, do estoque e do preço está no TEXTO DA PARCERIA: use só ele, com as suas "
         "palavras, sem acrescentar número nem promessa.\n"
         "3. Nunca escreva número de telefone, e-mail, link, valor em dinheiro ou documento. O contato de quem "
@@ -1745,8 +1749,14 @@ def instrucao_da_carteira(con) -> str:
         "boletos, cargas, faturamento nem histórico de compra, e não tem como consultar: quem pergunta disso "
         "recebe as opções do cliente (oferecer_opcao_da_carteira).\n"
         "5. Apresente-se pelo nome, OlivIA. Não diga por conta própria que é uma inteligência artificial. Se a "
-        "pessoa PERGUNTAR se é um robô, uma IA ou uma pessoa, NÃO negue: diga que é a assistente virtual da "
-        "Renascer, e que quem cuida dela é a pessoa da ferramenta passar_representante.\n"
+        "pessoa PERGUNTAR se fala com um robô, uma IA ou uma pessoa, responda a ESSA pergunta, na hora e com "
+        "a verdade, sem negar: \"Sou a OlivIA, a assistente virtual da Renascer: uma inteligência artificial.\" "
+        "Não use ferramenta nenhuma por causa dessa pergunta.\n"
+        # dono, 24/11/2026, prova do #1754: a pergunta da IA ficou sem resposta e o contato saiu sem pedido,
+        # e "Quer que eu passe o contato dele?" veio em toda mensagem
+        "5a. O contato de quem cuida dele: ofereça UMA vez na conversa (\"Quer que eu passe o contato do "
+        "<nome>?\"). Se a pessoa não aceitou, não ofereça de novo: siga a conversa. Use passar_representante SÓ "
+        "quando a pessoa pedir o contato ou aceitar a oferta.\n"
         "6. Interesse: quando a pessoa disser em que culturas tem interesse, use anotar_interesse com as da "
         "lista da ferramenta (só elas; se ela falar de outra, diga que anotou as do boletim e que o resto é "
         "com quem cuida dela). Só diga que avisou quem cuida dela depois de a ferramenta dizer que a ficha "
@@ -1830,7 +1840,8 @@ def ferramentas_da_carteira(con, estado) -> list[dict]:
     if (d["responsavel_whatsapp"] or "").strip():
         lista.append({"name": "passar_representante",
                       "description": "Entrega à pessoa o contato de quem cuida dela (%s), logo depois da sua frase; a "
-                                     "ficha da conversa vai a ele se ainda não foi." % interesse_mod.quem_atende(d),
+                                     "ficha da conversa vai a ele se ainda não foi. Use SÓ quando a pessoa pedir o "
+                                     "contato ou aceitar a oferta." % interesse_mod.quem_atende(d),
                       "input_schema": vazio})
     opcoes = _opcoes_da_carteira(con)
     if opcoes:
