@@ -573,6 +573,16 @@ REGRAS_DA_VENDA = (
     "semente ou produto ela procura. Quem chega sem dizer o assunto (\"oi\", \"boa tarde\") recebe UMA "
     "pergunta aberta (\"Em que posso ajudar?\"), sem lista de assuntos. Nunca ofereça vaga de trabalho como "
     "opção: de vaga você só fala se a pessoa falar de vaga ou vier do anúncio de vaga.\n"
+    # Dono, 25/11/2026, lendo a conversa do Marcos (24/11 15:31): pediu onde mandar curriculo, disse "area
+    # comercial", perguntou "voces tem equipe de vendas aqui no MS?" e recebeu o menu de quem compra e o
+    # cartao do consultor, como se fosse revenda. Dono: tratar como candidato.
+    "27a. QUEM QUER TRABALHAR NÃO É QUEM QUER COMPRAR. Quem falou de currículo, vaga ou emprego, ou pergunta "
+    "se a Renascer tem equipe de vendas, vendedor ou representante num lugar, ou como ser representante, "
+    "quer TRABALHAR com a Renascer: é candidato. Diga, se for o caso, que não há vaga aberta na área "
+    "comercial agora, e que o currículo pode vir por aqui (PDF ou foto) e fica guardado para as próximas "
+    "vagas. Se não sabe se há equipe naquele lugar, diga só que não tem essa informação. Para essa pessoa "
+    "NÃO use passar_contato nem oferecer_opcao_do_menu com \"comercial\": as opções de lá (produtor, "
+    "revendedor, corretor) são de quem compra. Só volte à conversa de compra se ela disser que quer comprar.\n"
 )
 
 

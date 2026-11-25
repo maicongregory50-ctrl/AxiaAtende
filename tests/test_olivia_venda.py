@@ -68,6 +68,7 @@ def test_a_a_070_nasce_desligada_e_as_regras_so_entram_com_a_chave(sem_venda):
         assert "Não pergunte a cidade exata, a quantidade nem a área" in i
         assert "nunca mande o cartão sem essa apresentação" in i
         assert "quanto ela precisa" not in i
+        assert "QUEM QUER TRABALHAR NÃO É QUEM QUER COMPRAR" in i   # dono, 25/11/2026 (Marcos)
         assert "O NOME, COM MEDIDA" in i and "Nunca em duas mensagens seguidas" in i   # dono, 25/11/2026 (Ivan)
         assert "só pergunta DEPOIS de a pessoa dizer que é do Paraná" in i   # dono, 19/11/2026
         # dono, 19/11/2026 (Sivan): quem vem do site quer semente; vaga nao e opcao de abertura
