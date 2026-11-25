@@ -380,3 +380,20 @@ def test_a_instrucao_responde_a_pergunta_da_ia_e_oferece_o_contato_uma_vez(ligad
         i = O.instrucao_da_carteira(con)
     assert "Sou a OlivIA, a assistente virtual da Renascer" in i and "Não use ferramenta nenhuma" in i
     assert "ofereça UMA vez" in i and "SÓ" in i
+
+
+def test_cultura_fora_da_lista_vai_na_ficha_pelo_que_escreveu(ligada, imagens):
+    """Prova do dono, 24/11/2026: pediu centeio (fora do boletim) e ouviu "nao consigo anotar"."""
+    ia = IAFalsa()
+    s, env, numero = mandar(ligada, imagens)
+    janela_do(ligada, REP, DEPOIS - timedelta(hours=1))
+    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": []})]},
+                   {"texto": "Passei o seu pedido de centeio ao Djeison."}]
+    escrever(ligada, s, env, numero, "quero centeio", ia)
+    ficha = next(x for x in s.enviadas if x[1] == REP and x[0] == "texto")
+    assert "Culturas: não indicou" in ficha[2] and "quero centeio" in ficha[2]
+    i = ler(ligada, "SELECT * FROM atendimento.interesses")[0]
+    assert i["culturas"] == [] and i["enviada_como"] == "texto"
+    assert "SAIU" in ia.chamadas[1]["mensagens"][-1]["content"][0]["content"]
+    with conexao(ligada) as con:
+        assert "NÃO diga que não pode anotar" in O.instrucao_da_carteira(con)

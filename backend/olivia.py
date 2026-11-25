@@ -1762,8 +1762,11 @@ def instrucao_da_carteira(con) -> str:
         "<nome>?\"). Se a pessoa não aceitou, não ofereça de novo: siga a conversa. Use passar_representante SÓ "
         "quando a pessoa pedir o contato ou aceitar a oferta.\n"
         "6. Interesse: quando a pessoa disser em que culturas tem interesse, use anotar_interesse com as da "
-        "lista da ferramenta (só elas; se ela falar de outra, diga que anotou as do boletim e que o resto é "
-        "com quem cuida dela). Só diga que avisou quem cuida dela depois de a ferramenta dizer que a ficha "
+        "lista da ferramenta. Se ela pedir uma cultura que NÃO está na lista, NÃO diga que não pode anotar: "
+        "use anotar_interesse com a lista vazia, que a ficha leva a quem cuida dela o que ela escreveu, "
+        "literal, e diga que passou o pedido a ele.\n"
+        # dono, 24/11/2026, prova do #1754: pediu centeio (fora do boletim) e ouviu "nao consigo anotar"
+        "6b. Só diga que avisou quem cuida dela depois de a ferramenta dizer que a ficha "
         "SAIU. Sem a ferramenta (o boletim não tem lista), não pergunte culturas: ofereça passar o contato.\n"
         "7. Quem pede para falar com uma pessoa, com o representante ou com o vendedor recebe o contato na "
         "hora: passar_representante, e uma frase curta apresentando quem cuida dela, sem número.\n"
@@ -1835,8 +1838,9 @@ def ferramentas_da_carteira(con, estado) -> list[dict]:
     culturas = list(d["culturas"] or [])
     if culturas:
         lista.append({"name": "anotar_interesse",
-                      "description": "Anota em que culturas do boletim a pessoa tem interesse. Na primeira vez, a "
-                                     "FICHA da conversa vai a quem cuida dela; a resposta diz se saiu.",
+                      "description": "Anota em que culturas do boletim a pessoa tem interesse (lista vazia: ela pediu "
+                                     "outra, que vai na ficha pelo que escreveu). Na primeira vez, a FICHA da "
+                                     "conversa vai a quem cuida dela; a resposta diz se saiu.",
                       "input_schema": {"type": "object",
                                        "properties": {"culturas": {"type": "array",
                                                                    "items": {"type": "string", "enum": culturas}}},
@@ -1879,7 +1883,15 @@ def _executar_da_carteira(con, saida, estado, nome: str, entrada: dict, agora: d
     if nome == "anotar_interesse":
         i = interesse_mod.anotar(con, i, entrada.get("culturas") or [], list(d["culturas"] or []), agora)
         if not i["culturas"]:
-            return "Nenhuma dessas culturas é do boletim. Use só as da lista da ferramenta."
+            # dono, 24/11/2026: o pedido fora da lista vai na ficha, literal (D7); a lista segue fechada
+            if i["enviada_em"] is not None:
+                return ("A ficha desta conversa já tinha ido a %s. Diga que %s fala com a pessoa sobre isso, sem "
+                        "dizer que avisou de novo." % (quem, quem))
+            if interesse_mod.mandar(con, saida, i, d, c, numero, agora, e.texto or ""):
+                return ("A ficha SAIU com o que a pessoa escreveu: %s recebeu agora, no WhatsApp, o pedido dela. "
+                        "Diga numa frase que passou o pedido a %s." % (quem, quem))
+            return ("A ficha NÃO saiu. NÃO diga que avisou %s; se a pessoa quiser falar com alguém, use "
+                    "passar_representante." % quem)
         ditas = ", ".join(i["culturas"])
         if i["enviada_em"] is not None:
             return ("Anotado (%s). A ficha desta conversa já tinha ido a %s: não diga que avisou de novo." % (ditas, quem))
