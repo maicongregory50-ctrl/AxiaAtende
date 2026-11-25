@@ -44,6 +44,30 @@ _TEXTO = re.compile(r"<!-- texto -->\s*(.*?)\s*<!-- /texto -->", re.DOTALL)
 
 # ── a chave e o texto do dono ───────────────────────────────────────────────
 
+LINHA = "olivia.culturas_da_linha"
+FORA_ATE = 120
+
+
+def culturas_da_linha(con) -> list[str]:
+    """D13 (emenda de 25/11): a lista fechada de anotar_interesse, a linha inteira da Renascer (078), conferida
+    pelo dono. As culturas do envio sao so o destaque "do boletim"."""
+    v = motor._ajuste(con, LINHA, None)
+    return [str(x) for x in v if str(x).strip()] if isinstance(v, list) else []
+
+
+def _chave(c: str) -> str:
+    import unicodedata
+    return "".join(x for x in unicodedata.normalize("NFD", (c or "").strip().lower()) if unicodedata.category(x) != "Mn")
+
+
+def marcadas(culturas, do_boletim, fora_da_linha=()) -> str:
+    """D14: cada cultura com a marca "do boletim" ou "fora do boletim"; o pedido fora da linha, literal."""
+    boletim = {_chave(c) for c in do_boletim or []}
+    partes = ["%s (%s)" % (c, "do boletim" if _chave(c) in boletim else "fora do boletim") for c in culturas or []]
+    partes += ["\"%s\" (fora da linha)" % f for f in fora_da_linha or [] if f]
+    return "; ".join(partes)
+
+
 def parceria(caminho: Path | None = None) -> tuple[bool, str]:
     """(aprovado, texto). O texto e o que esta entre as marcas, literal; aprovado so com a situacao
     APROVADO (a palavra RASCUNHO, ou o arquivo ausente, e nao). Relido a cada vez: o dono corrige sem restart."""
@@ -194,16 +218,25 @@ def passar_representante(con, saida, pessoa, d, conversa) -> bool:
 
 # ── o interesse e a ficha (D5, D7) ──────────────────────────────────────────
 
-def anotar(con, interesse, culturas: list[str], validas: list[str], agora: datetime):
-    """Soma as culturas (so as da lista fechada do envio) as que ja estavam. Devolve a linha nova."""
-    por_nome = {v.lower(): v for v in validas}
-    novas = [por_nome[c.strip().lower()] for c in culturas or [] if c and c.strip().lower() in por_nome]
+def anotar(con, interesse, culturas: list[str], validas: list[str], agora: datetime, fora: str = ""):
+    """Soma as culturas (so as da lista fechada: a linha, D13) as que ja estavam, e o pedido fora da linha,
+    literal (D14). Devolve (a linha nova, se algo novo entrou)."""
+    por_nome = {_chave(v): v for v in validas}
     juntas = list(interesse["culturas"] or [])
-    for c in novas:
-        if c not in juntas:
-            juntas.append(c)
-    return con.execute("""UPDATE atendimento.interesses SET culturas = %s, anotado_em = %s
-                           WHERE id = %s RETURNING *""", (juntas, agora, interesse["id"])).fetchone()
+    foras = list(interesse.get("fora_da_linha") or [])
+    novo = False
+    for c in culturas or []:
+        v = por_nome.get(_chave(c))
+        if v and v not in juntas:
+            juntas.append(v)
+            novo = True
+    fora = " ".join((fora or "").split())[:FORA_ATE]
+    if fora and _chave(fora) not in {_chave(f) for f in foras}:
+        foras.append(fora)
+        novo = True
+    linha = con.execute("""UPDATE atendimento.interesses SET culturas = %s, fora_da_linha = %s, anotado_em = %s
+                            WHERE id = %s RETURNING *""", (juntas, foras, agora, interesse["id"])).fetchone()
+    return linha, novo
 
 
 def o_que_escreveu(con, conversa, atual: str = "") -> str:
@@ -216,11 +249,10 @@ def o_que_escreveu(con, conversa, atual: str = "") -> str:
     return ja[:TEXTO_ATE]
 
 
-def _culturas_ditas(interesse) -> str:
-    c = list(interesse["culturas"] or [])
-    if not c:
-        return "não indicou"
-    return c[0] if len(c) == 1 else ", ".join(c[:-1]) + " e " + c[-1]
+def _culturas_ditas(d, interesse) -> str:
+    """D14: as culturas com a marca do boletim, e o pedido fora da linha, literal."""
+    ditas = marcadas(interesse["culturas"], d["culturas"], interesse.get("fora_da_linha"))
+    return ditas or "não indicou"
 
 
 def _quem(d) -> str:
@@ -228,39 +260,43 @@ def _quem(d) -> str:
     return "%s (código %s%s)" % ((d["nome"] or "").strip() or "sem nome", d["erp_codigo"], (", " + local) if local else "")
 
 
-def texto_da_ficha(d, interesse, texto: str, numero: str) -> str:
+def texto_da_ficha(d, interesse, texto: str, numero: str, de_novo: bool = False) -> str:
     papel = PAPEL_DITO.get(interesse["papel"] or "", "contato do cadastro")
-    linhas = ["*Interesse no boletim* (conversa com a OlivIA)",
+    linhas = ["*Interesse no boletim* (conversa com a OlivIA%s)" % (", atualizada" if de_novo else ""),
               "Cliente: %s" % _quem(d),
               "Quem falou: %s" % papel,
-              "Culturas: %s" % _culturas_ditas(interesse),
+              "Culturas: %s" % _culturas_ditas(d, interesse),
               "Escreveu: %s" % (("\"%s\"" % texto) if texto else "nada além do toque em Quero saber mais")]
     n = "".join(c for c in (numero or "") if c.isdigit())
     linhas.append(("Conversar com ele: https://wa.me/%s" % n) if n else "Sem número de WhatsApp na conversa.")
     return "\n".join(linhas)
 
 
-def linha_da_ficha(d, interesse, texto: str, numero: str) -> str:
+def linha_da_ficha(d, interesse, texto: str, numero: str, de_novo: bool = False) -> str:
     """A ficha numa linha so, para a variavel do `olivia_resumo` (fora da janela): sem quebra nem espaco
     repetido (a Meta recusa os dois numa variavel), com o telefone escrito, cortada para caber."""
     from .lead import limpo, telefone
     papel = PAPEL_DITO.get(interesse["papel"] or "", "contato do cadastro")
-    fim = "telefone %s." % telefone(numero)
-    partes = ["Interesse no boletim: %s" % _quem(d), "falou o %s" % papel,
-              "culturas: %s" % _culturas_ditas(interesse),
+    # dono, 25/11/2026: a ficha leva o link do WhatsApp do cliente tambem fora da janela (antes, so o telefone)
+    n = "".join(c for c in (numero or "") if c.isdigit())
+    fim = ("conversar com ele: https://wa.me/%s (telefone %s)." % (n, telefone(numero))) if n else "sem número de WhatsApp."
+    partes = ["Interesse no boletim%s: %s" % (" (atualizado)" if de_novo else "", _quem(d)), "falou o %s" % papel,
+              "culturas: %s" % _culturas_ditas(d, interesse),
               "escreveu: %s" % (texto or "só tocou em Quero saber mais")]
     corpo = limpo("; ".join(partes), LINHA_ATE - len(fim) - 2)
     return limpo(corpo + "; " + fim, LINHA_ATE)
 
 
-def mandar(con, saida, interesse, d, conversa, numero: str, agora: datetime, atual: str = "") -> bool:
-    """A ficha ao responsavel da linha do envio. True: a Meta aceitou. NUNCA levanta."""
+def mandar(con, saida, interesse, d, conversa, numero: str, agora: datetime, atual: str = "",
+           de_novo: bool = False) -> bool:
+    """A ficha ao responsavel da linha do envio. True: a Meta aceitou. NUNCA levanta. `de_novo` (D15: todo
+    interesse declarado gera ficha): a ficha ja foi e entrou cultura nova -- sai outra, marcada atualizada."""
     def falhou(motivo: str) -> bool:
         print("interesse: ficha %d nao saiu: %s" % (interesse["id"], motivo[:200]), flush=True)
         con.execute("UPDATE atendimento.interesses SET erro = %s WHERE id = %s", (motivo[:500], interesse["id"]))
         return False
 
-    if interesse["enviada_em"] is not None:
+    if interesse["enviada_em"] is not None and not de_novo:
         return True
     para = "".join(c for c in (d["responsavel_whatsapp"] or "") if c.isdigit())
     if not para:
@@ -270,12 +306,12 @@ def mandar(con, saida, interesse, d, conversa, numero: str, agora: datetime, atu
     texto = o_que_escreveu(con, conversa, atual)
     try:
         if janela_aberta(con, para, agora):
-            como, w = "texto", saida.texto(para, texto_da_ficha(d, interesse, texto, numero))
+            como, w = "texto", saida.texto(para, texto_da_ficha(d, interesse, texto, numero, de_novo))
         else:
             m = modelo_do_uso(con, USO_DO_MODELO)
             if not m:
                 return falhou("nenhum modelo ativo para %s" % USO_DO_MODELO)
-            como, w = "modelo", saida.modelo(para, m["nome"], m["idioma"], [linha_da_ficha(d, interesse, texto, numero)])
+            como, w = "modelo", saida.modelo(para, m["nome"], m["idioma"], [linha_da_ficha(d, interesse, texto, numero, de_novo)])
     except Exception as falha:   # noqa: BLE001 -- a ficha nunca derruba a conversa
         return falhou("%s: %s" % (type(falha).__name__, falha))
     if not w:
@@ -307,8 +343,10 @@ def resposta_ao_erp(linha: dict, agora: datetime) -> tuple[str, str | None]:
         return "falar", None
     culturas = [c for c in (linha.get("culturas") or []) if c]
     texto = "Quis saber mais."
-    if culturas:
-        texto += " Interesse: %s." % ", ".join(culturas)
+    # D14 (emenda de 25/11): cada cultura com a marca do boletim, e o pedido fora da linha, literal
+    ditas = marcadas(culturas, linha.get("do_boletim"), [f for f in (linha.get("fora_da_linha") or []) if f])
+    if ditas:
+        texto += " Interesse: %s." % ditas
     escreveu = " ".join(((linha.get("escreveu") or "") or (linha.get("resposta_texto") or "")).split())
     if escreveu:
         texto += " Escreveu: \"%s\"" % escreveu

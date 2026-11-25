@@ -10,10 +10,13 @@ Em producao, janela elevada:
 desligar-qualifica`, o piloto da qualificacao do produtor rural (072); recusa ligar com a venda desligada.
 #1754: `ligar-carteira|desligar-carteira`, a OlivIA atende o cliente da carteira no boletim (077). So o DONO
 liga, e `ligar-carteira` RECUSA enquanto docs/olivia/parceria-da-carteira.md nao disser APROVADO.
+Emenda de 25/11 (D13): `linha` mostra a lista de culturas da linha (o que ela anota, 078); `linha "Aveia
+preta;Centeio;..."` troca a lista inteira, separada por ponto e virgula. Sem restart.
 
 `ligar-vaga` RECUSA ligar enquanto algum texto de cadastro da ficha ainda tiver a marca [TEXTO DO DONO]:
 o texto provisorio da 067 nao sai para candidato nenhum.
 """
+import json
 import sys
 from pathlib import Path
 
@@ -31,14 +34,40 @@ def provisorios(con) -> list[str]:
                                             (MARCA,)).fetchall()]
 
 
+def linha(cfg, nova: str | None) -> int:
+    """#1754 (D13): mostra ou troca a lista de culturas da linha, a lista fechada de anotar_interesse."""
+    with conexao(cfg) as con:
+        if nova is not None:
+            itens = []
+            for c in nova.split(";"):
+                c = " ".join(c.split())
+                if c and c.lower() not in [x.lower() for x in itens]:
+                    itens.append(c[:60])
+            if not itens:
+                print("RECUSADO: a lista nova esta vazia")
+                return 1
+            n = con.execute("""UPDATE atendimento.ajustes SET valor = %s::jsonb, atualizado_em = now()
+                                WHERE chave = %s""", (json.dumps(itens, ensure_ascii=False), interesse.LINHA)).rowcount
+            if n != 1:
+                print("RECUSADO: o ajuste %s nao existe neste banco (a migracao 078 nao foi aplicada?)" % interesse.LINHA)
+                return 1
+        atual = interesse.culturas_da_linha(con)
+    print("culturas da linha (%s), %d:" % (interesse.LINHA, len(atual)))
+    for i, c in enumerate(atual, 1):
+        print("  %2d. %s" % (i, c))
+    return 0
+
+
 def main() -> int:
     acao = (sys.argv[1:] or ["mostrar"])[0]
     if acao not in ("mostrar", "ligar-vaga", "desligar-vaga", "ligar-venda", "desligar-venda",
-                    "ligar-qualifica", "desligar-qualifica", "ligar-carteira", "desligar-carteira"):
+                    "ligar-qualifica", "desligar-qualifica", "ligar-carteira", "desligar-carteira", "linha"):
         print("uso: olivia.py mostrar|ligar-vaga|desligar-vaga|ligar-venda|desligar-venda|"
-              "ligar-qualifica|desligar-qualifica|ligar-carteira|desligar-carteira")
+              "ligar-qualifica|desligar-qualifica|ligar-carteira|desligar-carteira|linha [\"A;B;C\"]")
         return 2
     cfg = config.carregar()
+    if acao == "linha":
+        return linha(cfg, sys.argv[2] if len(sys.argv) > 2 else None)
     with conexao(cfg) as con:
         if acao == "ligar-vaga":
             falta = provisorios(con)

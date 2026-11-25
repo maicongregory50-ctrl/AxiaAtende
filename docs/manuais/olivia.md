@@ -111,19 +111,25 @@ autenticado são os próximos degraus, em chamados próprios.
         completo e o **texto da parceria**, como o dono o aprovou
         (`C:\AxiaAtende\docs\olivia\parceria-da-carteira.md`). Quem escreveu é recebido por ela, que
         oferece o material.
-     3. Ele conversa com a OlivIA. Se disser em que culturas tem interesse, ela anota, **só das culturas do
-        boletim** (a lista vem no pedido do Marketing).
+     3. Ele conversa com a OlivIA. Se disser em que culturas tem interesse, ela anota **qualquer cultura da
+        linha da Renascer**, não só as do boletim. O que ele pedir fora da linha (soja, por exemplo) também
+        vai, com as palavras dele. **Ela nunca diz que não pode anotar** (emenda de 25/11/2026). A lista da
+        linha se vê e se troca, sem reiniciar, com
+        `C:\AxiaAtende\.venv\Scripts\python.exe C:\AxiaAtende\scripts\olivia.py linha` (para trocar:
+        `linha "Aveia preta;Centeio;..."`).
      4. **Quem cuida do cliente recebe a ficha** no WhatsApp, do número da empresa: *"Interesse no boletim"*,
         com o cliente, quem falou (comprador ou técnico), as culturas, o que ele escreveu e o link para
-        conversar. É o responsável **da linha do envio**, o mesmo que já recebe o resumo do lote.
+        conversar. Cada cultura vem marcada **(do boletim)** ou **(fora do boletim)**, e o pedido fora da
+        linha vem entre aspas, **(fora da linha)**. Se o cliente indicar mais coisa depois, chega outra
+        ficha, **atualizada**. É o responsável **da linha do envio**, o mesmo que já recebe o resumo do lote.
      5. O interesse aparece no **Relacionamento** do cliente, no ERP: *"Quis saber mais. Interesse: …"*.
    - **O que ela sabe dele:** o primeiro nome, o nome do cadastro, se é o comprador ou o técnico, quem cuida
-     dele e as culturas do boletim. Não sabe faturamento, pedidos nem histórico.
+     dele, as culturas que o boletim destaca e a lista da linha. Não sabe faturamento, pedidos nem histórico.
    - **O que ela faz:** manda o material completo, anota o interesse, passa o contato de quem cuida dele
      (quem pede uma pessoa recebe na hora), oferece as opções do cliente (boleto, carga, qualidade, falar
      com a empresa) e encerra.
    - Ela se apresenta pelo nome e não diz por conta própria que é uma inteligência artificial; **se
-     perguntarem, não nega**.
+     perguntarem, responde na mesma mensagem** que é a OlivIA, assistente virtual da Renascer.
 9. **Corrigir a base:** edite `C:\AxiaAtende\docs\olivia\base-da-empresa.md`. Cada afirmação traz a fonte
    e a data entre colchetes (a OlivIA não as repete à pessoa). A OlivIA relê o arquivo sozinha quando
    ele muda: **não precisa reiniciar nada**. O inventário das fontes, com o que entrou e por quê, está em
@@ -152,6 +158,7 @@ autenticado são os próximos degraus, em chamados próprios.
 | Na conversa de compra, **o cartão de quem atende sem o botão "Sim" antes** | ela tinha certeza da categoria (produtor, revenda, corretor) e do estado. **Os botões** em vez do cartão: ficou em dúvida, ou a chave está desligada |
 | Na tela **Envios**, a resposta **"quis saber mais"** | o cliente tocou *Quero saber mais*, ou escreveu em até 7 dias de um boletim com o botão (#1754). Com interesse anotado, as culturas aparecem ao lado |
 | **"quis saber mais · sem indicação"** | entrou na conversa e não indicou cultura. **Não é "sem interesse"**: é sem indicação |
+| **Frase recusada: disse que nao anota** | na conversa do boletim, ela tentou dizer que não podia anotar. O sistema anotou o que o cliente escreveu, mandou a ficha e disse a ele *"Anotei o seu pedido e passei a …"* |
 | No seu WhatsApp, **"Interesse no boletim (conversa com a OlivIA)"** | a ficha de um cliente seu. Fora das 24 h de você ter escrito ao número da empresa, ela vem numa linha só (*"Resumo da OlivIA: Interesse no boletim: …"*), com o telefone escrito |
 | No Relacionamento do ERP, **"Quis saber mais"** sem culturas | o cliente entrou na conversa e não indicou nenhuma. Enquanto a conversa corre, a linha mostra **tocou**; o texto com o interesse chega quando a ficha sai, a conversa fecha ou passam 24 h do toque |
 | No resumo do vigia, **"carteira: N conversas, N com interesse, N fichas com erro"** | as conversas do boletim no dia (#1754). **Ficha com erro**: quem cuida do cliente não recebeu, e a OlivIA não disse ao cliente que ele foi avisado |

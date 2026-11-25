@@ -221,13 +221,14 @@ def test_a_ia_fora_no_texto_desfaz_a_conversa_e_cai_no_portao(ligada, imagens):
 
 # ── passo 9: o modo carteira ────────────────────────────────────────────────
 
-def test_sem_culturas_no_pedido_anotar_interesse_nao_e_oferecida(ligada, imagens):
+def test_sem_culturas_no_pedido_anotar_interesse_continua_oferecida_com_a_linha(ligada, imagens):
+    """Emenda de 25/11 (D13): a ferramenta e sempre oferecida, com a linha inteira."""
     s, env, numero = mandar(ligada, imagens, culturas=None)
     ia = IAFalsa()
-    ia.conversa = [{"texto": "Oi! Posso te passar o contato de quem cuida de você."}]
+    ia.conversa = [{"texto": "Oi! Em que cultura você tem interesse?"}]
     escrever(ligada, s, env, numero, "tenho interesse", ia)
-    assert "anotar_interesse" not in ia.chamadas[0]["ferramentas"]
-    assert "não anote interesse" in ia.chamadas[0]["extra"]
+    assert "anotar_interesse" in ia.chamadas[0]["ferramentas"]
+    assert "anote qualquer cultura da linha" in ia.chamadas[0]["extra"]
 
 
 def test_ferramenta_fora_da_lista_e_recusada(ligada, imagens):
@@ -278,6 +279,7 @@ def test_ficha_fora_da_janela_vai_pelo_olivia_resumo(ligada, imagens):
     s, _ = _conversa_com_interesse(ligada, imagens, ia, janela_rep=False)
     m = next(x for x in s.modelos if x["para"] == REP and x["nome"] == "olivia_resumo")
     assert "Interesse no boletim" in m["corpo"][0] and "\n" not in m["corpo"][0] and len(m["corpo"][0]) <= 900
+    assert "https://wa.me/55" in m["corpo"][0]   # dono, 25/11: o link tambem fora da janela
     assert ler(ligada, "SELECT enviada_como FROM atendimento.interesses")[0]["enviada_como"] == "modelo"
 
 
@@ -328,14 +330,17 @@ def test_o_erp_recebe_falar_enquanto_corre_e_texto_com_o_interesse_depois(ligada
         e = eventos_erp.montar(con, DEPOIS + timedelta(minutes=1))[0]
     assert (e["resposta"], e["resposta_texto"]) == ("falar", None)
     janela_do(ligada, REP, DEPOIS)
-    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": ["Aveia preta", "Nabo forrageiro"]})]},
+    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": ["Aveia preta", "Centeio"],
+                                                          "fora_da_linha": "soja"})]},
                    {"texto": "Anotado."}]
-    escrever(ligada, s, env, numero, "aveia preta e nabo", ia, agora=DEPOIS + timedelta(minutes=2))
+    escrever(ligada, s, env, numero, "aveia preta, centeio e soja", ia, agora=DEPOIS + timedelta(minutes=2))
     with conexao(ligada) as con:
         e = eventos_erp.montar(con, DEPOIS + timedelta(minutes=3))[0]
     assert e["resposta"] == "texto"
-    assert e["resposta_texto"].startswith("Quis saber mais. Interesse: Aveia preta, Nabo forrageiro.")
-    assert "aveia preta e nabo" in e["resposta_texto"] and len(e["resposta_texto"]) <= 500
+    # emenda de 25/11 (D14): a marca do boletim em cada cultura, e o fora da linha literal
+    assert e["resposta_texto"].startswith("Quis saber mais. Interesse: Aveia preta (do boletim); Centeio (fora do "
+                                          "boletim); \"soja\" (fora da linha).")
+    assert "aveia preta, centeio e soja" in e["resposta_texto"] and len(e["resposta_texto"]) <= 500
     with conexao(ligada) as con:   # nenhum valor novo sai cru
         assert all(x["resposta"] in (None, "quero", "nao_quero", "texto", "falar")
                    for x in eventos_erp.montar(con, DEPOIS + timedelta(minutes=3)))
@@ -382,18 +387,69 @@ def test_a_instrucao_responde_a_pergunta_da_ia_e_oferece_o_contato_uma_vez(ligad
     assert "ofereça UMA vez" in i and "SÓ" in i
 
 
-def test_cultura_fora_da_lista_vai_na_ficha_pelo_que_escreveu(ligada, imagens):
-    """Prova do dono, 24/11/2026: pediu centeio (fora do boletim) e ouviu "nao consigo anotar"."""
+def test_centeio_num_boletim_de_tres_culturas_e_anotado_e_a_ficha_sai(ligada, imagens):
+    """Emenda de 25/11 (D13, D14): a prova de 24/11 -- pediu centeio e ouviu "nao consigo anotar"."""
     ia = IAFalsa()
     s, env, numero = mandar(ligada, imagens)
     janela_do(ligada, REP, DEPOIS - timedelta(hours=1))
-    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": []})]},
-                   {"texto": "Passei o seu pedido de centeio ao Djeison."}]
-    escrever(ligada, s, env, numero, "quero centeio", ia)
+    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": ["Centeio"], "fora_da_linha": ""})]},
+                   {"texto": "Anotei o centeio, e o Djeison já sabe do seu interesse."}]
+    escrever(ligada, s, env, numero, "Ok, quero Centeio", ia)
     ficha = next(x for x in s.enviadas if x[1] == REP and x[0] == "texto")
-    assert "Culturas: não indicou" in ficha[2] and "quero centeio" in ficha[2]
+    assert "Culturas: Centeio (fora do boletim)" in ficha[2] and "Ok, quero Centeio" in ficha[2]
     i = ler(ligada, "SELECT * FROM atendimento.interesses")[0]
-    assert i["culturas"] == [] and i["enviada_como"] == "texto"
+    assert i["culturas"] == ["Centeio"] and i["enviada_como"] == "texto"
     assert "SAIU" in ia.chamadas[1]["mensagens"][-1]["content"][0]["content"]
+
+
+def test_fora_da_linha_vai_literal_e_cultura_nova_manda_a_ficha_de_novo(ligada, imagens):
+    """D14 e D15: o pedido fora da linha vai como ela escreveu; o interesse que vem depois da ficha gera outra."""
+    ia = IAFalsa()
+    s, env, numero = mandar(ligada, imagens)
+    janela_do(ligada, REP, DEPOIS - timedelta(hours=1))
+    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": [], "fora_da_linha": "semente de soja"})]},
+                   {"texto": "Passei o seu pedido ao Djeison."}]
+    escrever(ligada, s, env, numero, "quero semente de soja", ia)
+    fichas = [x for x in s.enviadas if x[1] == REP and x[0] == "texto"]
+    assert len(fichas) == 1 and "\"semente de soja\" (fora da linha)" in fichas[0][2]
+    ia.conversa = [{"ferramentas": [("anotar_interesse", {"culturas": ["Aveia preta"], "fora_da_linha": ""})]},
+                   {"texto": "Anotei a aveia preta também."}]
+    escrever(ligada, s, env, numero, "e aveia preta", ia, agora=DEPOIS + timedelta(minutes=5), wamid="wamid.t2")
+    fichas = [x for x in s.enviadas if x[1] == REP and x[0] == "texto"]
+    assert len(fichas) == 2 and "atualizada" in fichas[1][2] and "Aveia preta (do boletim)" in fichas[1][2]
+
+
+def test_nao_consigo_anotar_e_trocado_pela_anotacao_de_fato(ligada, imagens):
+    """D15: a fala "nao consigo anotar" nao sai; o codigo anota o que a pessoa escreveu e a ficha vai."""
+    ia = IAFalsa()
+    s, env, numero = mandar(ligada, imagens)
+    janela_do(ligada, REP, DEPOIS - timedelta(hours=1))
+    ia.conversa = [{"texto": "O centeio não está no boletim, então não consigo anotá-lo por aqui."}]
+    escrever(ligada, s, env, numero, "quero centeio", ia)
+    assert s.ultima[1] == numero and s.ultima[2] == O.ANOTEI_NA_TRAVA % "Djeison"
+    assert O.RECUSADA_NAO_ANOTA in resumos(ligada)
+    ficha = next(x for x in s.enviadas if x[1] == REP and x[0] == "texto")
+    assert "\"quero centeio\" (fora da linha)" in ficha[2]
+
+
+def test_a_instrucao_da_emenda(ligada):
+    """D13, D15 e D16 na instrucao: a linha inteira, nunca "nao posso anotar", a IA na mesma mensagem."""
     with conexao(ligada) as con:
-        assert "NÃO diga que não pode anotar" in O.instrucao_da_carteira(con)
+        i = O.instrucao_da_carteira(con)
+        assert "Centeio" in interesse.culturas_da_linha(con)
+    assert "linha inteira" in i and "NUNCA diga que não pode" in i
+    assert "PRIMEIRA frase desta mesma mensagem" in i
+    assert "lista vazia" not in i
+
+
+def test_passei_o_seu_pedido_sem_ficha_vira_a_anotacao_de_fato(ligada, imagens):
+    """Prova de 25/11: "Passei o seu pedido ao Djeison" saiu sem ferramenta nenhuma, e nenhuma ficha foi."""
+    ia = IAFalsa()
+    s, env, numero = mandar(ligada, imagens)
+    janela_do(ligada, REP, DEPOIS - timedelta(hours=1))
+    ia.conversa = [{"texto": "Maicon, passei o seu pedido ao Djeison, e estoque é com ele confirmar."}]
+    escrever(ligada, s, env, numero, "Eu quero Centeio, tem disponível?", ia)
+    ficha = next(x for x in s.enviadas if x[1] == REP and x[0] == "texto")
+    assert "Eu quero Centeio, tem disponível?" in ficha[2]
+    assert s.ultima[1] == numero and s.ultima[2] == O.ANOTEI_NA_TRAVA % "Djeison"
+    assert O.RECUSADA_AVISO in resumos(ligada)

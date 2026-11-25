@@ -146,6 +146,10 @@ AVISADO = ("esta recebendo", "ja esta recebendo", "ja recebeu", "recebendo agora
            "avisei o", "avisei ele", "ja passei o", "passei o resumo", "enviei o resumo", "mandei o resumo",
            "repassei", "ja vai saber", "vai saber do que", "ja sabe do que", "vai te chamar", "vai te ligar",
            "vai entrar em contato", "entra em contato com voce", "ele te chama")
+# #1754, prova de 25/11: "Passei o seu pedido ao Djeison" sem a ficha ter saido. So na carteira: a venda
+# (#1589) segue com a lista de cima.
+AVISADO_CARTEIRA = AVISADO + ("passei o seu pedido", "passei seu pedido", "passei o pedido", "passei ao",
+                              "passei para o", "passei pro", "encaminhei", "ja sabe do seu")
 APRESENTACAO = "%sa sua região quem atende é o nosso consultor %s. Segue o contato dele."
 
 
@@ -1017,7 +1021,8 @@ def atender(con, saida, ia, e, agora: datetime, envio=None, de_vaga: bool = Fals
             certo, _ = motor.casar_opcao(con, None, no, e.texto)
             if certo is not None:
                 return False   # "Sc" no "em qual estado?": o casamento exato de hoje, sem IA
-    estado = {"falou": False, "acabou": False, "conversa": None, "e": e, "de_vaga": de_vaga, "carteira": carteira}
+    estado = {"falou": False, "acabou": False, "conversa": None, "e": e, "de_vaga": de_vaga, "carteira": carteira,
+              "agora": agora}
     try:
         with con.transaction():   # ponto de retorno: se nada sair, a conversa que ela abriu e desfeita
             if not _atender(con, saida, ia, e, agora, estado):
@@ -1713,6 +1718,12 @@ def resumo_do_dia(n: int, bem: int, sem: list, n_recusadas: int, recusadas: list
 
 FRASE_DA_CARTEIRA = "Me conte em uma linha o que você precisa."
 SEM_FICHA_DA_CARTEIRA = "Quem cuida de você aqui na Sementes Renascer é %s."
+# emenda de 25/11 (D15): ela nunca diz que nao pode anotar. A fala que diz isso e trocada pela anotacao de fato
+# (o que a pessoa escreveu vai literal, como pedido fora da linha) e por esta frase, se a ficha saiu.
+NAO_ANOTA = re.compile(r"\bnao (?:consigo|posso|tenho como|da para|da pra|e possivel|vou conseguir|consegui)"
+                       r"(?: (?:o|a|os|as|isso|esse|essa|seu|sua))? (?:anot|registr)")
+ANOTEI_NA_TRAVA = "Anotei o seu pedido e passei a %s, que cuida de você."
+RECUSADA_NAO_ANOTA = "olivia: recusada: disse que nao anota"
 
 
 def carteira(con, saida, ia, e, agora: datetime, envio=None) -> bool:
@@ -1763,21 +1774,23 @@ def instrucao_da_carteira(con) -> str:
         "boletos, cargas, faturamento nem histórico de compra, e não tem como consultar: quem pergunta disso "
         "recebe as opções do cliente (oferecer_opcao_da_carteira).\n"
         "5. Apresente-se pelo nome, OlivIA. Não diga por conta própria que é uma inteligência artificial. Se a "
-        "pessoa PERGUNTAR se fala com um robô, uma IA ou uma pessoa, responda a ESSA pergunta, na hora e com "
-        "a verdade, sem negar: \"Sou a OlivIA, a assistente virtual da Renascer: uma inteligência artificial.\" "
-        "Não use ferramenta nenhuma por causa dessa pergunta.\n"
+        "pessoa PERGUNTAR se fala com um robô, uma IA ou uma pessoa, a PRIMEIRA frase desta mesma mensagem "
+        "responde a ESSA pergunta, com a verdade, sem negar e sem desviar: \"Sou a OlivIA, a assistente "
+        "virtual da Renascer: uma inteligência artificial.\" Depois, se for o caso, siga o assunto. Não use "
+        "ferramenta nenhuma por causa dessa pergunta.\n"
+        # emenda de 25/11 (D16): em 24/11 ela respondeu a pergunta da IA com o contato do representante
+
         # dono, 24/11/2026, prova do #1754: a pergunta da IA ficou sem resposta e o contato saiu sem pedido,
         # e "Quer que eu passe o contato dele?" veio em toda mensagem
         "5a. O contato de quem cuida dele: ofereça UMA vez na conversa (\"Quer que eu passe o contato do "
         "<nome>?\"). Se a pessoa não aceitou, não ofereça de novo: siga a conversa. Use passar_representante SÓ "
         "quando a pessoa pedir o contato ou aceitar a oferta.\n"
-        "6. Interesse: quando a pessoa disser em que culturas tem interesse, use anotar_interesse com as da "
-        "lista da ferramenta. Se ela pedir uma cultura que NÃO está na lista, NÃO diga que não pode anotar: "
-        "use anotar_interesse com a lista vazia, que a ficha leva a quem cuida dela o que ela escreveu, "
-        "literal, e diga que passou o pedido a ele.\n"
-        # dono, 24/11/2026, prova do #1754: pediu centeio (fora do boletim) e ouviu "nao consigo anotar"
-        "6b. Só diga que avisou quem cuida dela depois de a ferramenta dizer que a ficha "
-        "SAIU. Sem a ferramenta (o boletim não tem lista), não pergunte culturas: ofereça passar o contato.\n"
+        "6. Interesse: TODO interesse que a pessoa disser é anotado, com anotar_interesse. A lista da "
+        "ferramenta é a linha inteira da Renascer, não só o boletim: o centeio, por exemplo, está nela. O "
+        "que ela pedir e não estiver na lista vai em fora_da_linha, com as palavras dela. NUNCA diga que não "
+        "pode, não consegue ou não tem como anotar.\n"
+        # emenda de 25/11 (D13, D15): "nao consigo anotar o centeio" na prova de 24/11
+        "6b. Só diga que avisou quem cuida dela depois de a ferramenta dizer que a ficha SAIU.\n"
         "7. Quem pede para falar com uma pessoa, com o representante ou com o vendedor recebe o contato na "
         "hora: passar_representante, e uma frase curta apresentando quem cuida dela, sem número.\n"
         "8. O material completo (as imagens do boletim): se a pessoa pedir, ou se entrou escrevendo e ainda "
@@ -1820,7 +1833,8 @@ def fatos_da_carteira(con, conversa, d) -> str:
         "TEXTO DA PARCERIA (o que a Renascer diz; você não acrescenta nada):\n%s" % (
             primeiro_nome_de(atual["nome"]), " ".join((atual["nome"] or "").split())[:120] or "—",
             interesse_mod.PAPEL_DITO.get(atual["papel"] or "", "contato"), interesse_mod.quem_atende(atual),
-            ", ".join(culturas) if culturas else "nenhuma lista neste boletim (não anote interesse)",
+            (", ".join(culturas) + " (o destaque; anote qualquer cultura da linha)") if culturas
+            else "o boletim não destaca culturas (anote qualquer cultura da linha)",
             material, ficha, entrada, interesse_mod.parceria()[1] or "—"))
 
 
@@ -1845,16 +1859,18 @@ def ferramentas_da_carteira(con, estado) -> list[dict]:
         lista.append({"name": "mandar_material",
                       "description": "Manda à pessoa as imagens do material completo do boletim que ela ainda não "
                                      "recebeu.", "input_schema": vazio})
-    culturas = list(d["culturas"] or [])
-    if culturas:
-        lista.append({"name": "anotar_interesse",
-                      "description": "Anota em que culturas do boletim a pessoa tem interesse (lista vazia: ela pediu "
-                                     "outra, que vai na ficha pelo que escreveu). Na primeira vez, a FICHA da "
-                                     "conversa vai a quem cuida dela; a resposta diz se saiu.",
-                      "input_schema": {"type": "object",
-                                       "properties": {"culturas": {"type": "array",
-                                                                   "items": {"type": "string", "enum": culturas}}},
-                                       "required": ["culturas"], "additionalProperties": False}, "strict": True})
+    # emenda de 25/11 (D13): sempre oferecida; a lista fechada e a linha inteira, o boletim so o destaque
+    linha = interesse_mod.culturas_da_linha(con) or list(d["culturas"] or [])
+    culturas = {"type": "array", "items": ({"type": "string", "enum": linha} if linha else {"type": "string"})}
+    lista.append({"name": "anotar_interesse",
+                  "description": "Anota o interesse da pessoa: as culturas da linha da Renascer em `culturas`, e o que "
+                                 "ela pediu fora da lista em `fora_da_linha`, com as palavras dela (vazio se nada). "
+                                 "A FICHA vai a quem cuida dela, e de novo quando entra coisa nova; a resposta diz "
+                                 "se saiu.",
+                  "input_schema": {"type": "object",
+                                   "properties": {"culturas": culturas, "fora_da_linha": {"type": "string"}},
+                                   "required": ["culturas", "fora_da_linha"], "additionalProperties": False},
+                  "strict": True})
     if (d["responsavel_whatsapp"] or "").strip():
         lista.append({"name": "passar_representante",
                       "description": "Entrega à pessoa o contato de quem cuida dela (%s), logo depois da sua frase; a "
@@ -1891,21 +1907,17 @@ def _executar_da_carteira(con, saida, estado, nome: str, entrada: dict, agora: d
         return _oferecer_da_carteira(con, saida, estado, str(entrada.get("chave") or ""))
     i = interesse_mod.da_conversa(con, c["id"])
     if nome == "anotar_interesse":
-        i = interesse_mod.anotar(con, i, entrada.get("culturas") or [], list(d["culturas"] or []), agora)
-        if not i["culturas"]:
-            # dono, 24/11/2026: o pedido fora da lista vai na ficha, literal (D7); a lista segue fechada
-            if i["enviada_em"] is not None:
-                return ("A ficha desta conversa já tinha ido a %s. Diga que %s fala com a pessoa sobre isso, sem "
-                        "dizer que avisou de novo." % (quem, quem))
-            if interesse_mod.mandar(con, saida, i, d, c, numero, agora, e.texto or ""):
-                return ("A ficha SAIU com o que a pessoa escreveu: %s recebeu agora, no WhatsApp, o pedido dela. "
-                        "Diga numa frase que passou o pedido a %s." % (quem, quem))
-            return ("A ficha NÃO saiu. NÃO diga que avisou %s; se a pessoa quiser falar com alguém, use "
-                    "passar_representante." % quem)
-        ditas = ", ".join(i["culturas"])
-        if i["enviada_em"] is not None:
-            return ("Anotado (%s). A ficha desta conversa já tinha ido a %s: não diga que avisou de novo." % (ditas, quem))
-        if interesse_mod.mandar(con, saida, i, d, c, numero, agora, e.texto or ""):
+        linha = interesse_mod.culturas_da_linha(con) or list(d["culturas"] or [])
+        i, novo = interesse_mod.anotar(con, i, entrada.get("culturas") or [], linha, agora,
+                                       str(entrada.get("fora_da_linha") or ""))
+        ditas = interesse_mod.marcadas(i["culturas"], d["culturas"], i["fora_da_linha"])
+        if not ditas:
+            return ("Nada foi anotado: ponha as culturas da lista em `culturas` e o resto, com as palavras da "
+                    "pessoa, em `fora_da_linha`.")
+        if i["enviada_em"] is not None and not novo:
+            return ("Já estava anotado (%s), e a ficha já tinha ido a %s: não diga que avisou de novo." % (ditas, quem))
+        # D15: todo interesse declarado gera ficha; a que ja foi sai de novo, atualizada
+        if interesse_mod.mandar(con, saida, i, d, c, numero, agora, e.texto or "", de_novo=i["enviada_em"] is not None):
             return ("Anotado (%s), e a ficha SAIU: %s recebeu agora, no WhatsApp, o que a pessoa disse. Diga numa "
                     "frase que anotou e que %s já sabe do interesse dela." % (ditas, quem, quem))
         return ("Anotado (%s), mas a ficha NÃO saiu. Diga que anotou, SEM dizer que avisou %s; se a pessoa quiser "
@@ -1948,19 +1960,43 @@ def _oferecer_da_carteira(con, saida, estado, chave: str) -> str:
     return ("Os botões de \"%s\" foram mandados." % no["rotulo"]) if w else "Os botões não puderam ser mandados agora."
 
 
+def _anotar_na_trava(con, saida, estado, texto: str, resumo: str = RECUSADA_NAO_ANOTA) -> None:
+    """D15: ela disse que nao pode anotar, ou disse que passou o pedido sem a ficha ter saido (prova de 25/11:
+    "Passei o seu pedido ao Djeison" sem ferramenta nenhuma). O codigo anota de fato -- o que a pessoa escreveu,
+    literal, se nada estava anotado --, manda a ficha (de novo, atualizada, se ja tinha ido) e fala a frase de
+    anotado; sem ficha, so quem cuida dela."""
+    e, c = estado["e"], estado["conversa"]
+    print("olivia: carteira, %s na conversa %d: %s" % (resumo, c["id"], " ".join(texto.split())[:300]), flush=True)
+    d = interesse_mod._destinatario(con, estado["carteira"]["id"])
+    quem = interesse_mod.quem_atende(d)
+    i = interesse_mod.da_conversa(con, c["id"])
+    saiu = False
+    if i is not None and (e.texto or "").strip():
+        vazio = not (i["culturas"] or i["fora_da_linha"])
+        i, novo = interesse_mod.anotar(con, i, [], [], estado["agora"], e.texto if vazio or resumo == RECUSADA_NAO_ANOTA
+                                       else "")
+        if novo or i["enviada_em"] is None:
+            saiu = interesse_mod.mandar(con, saida, i, d, c, c["wa_id"] or e.pessoa.wa_id or "",
+                                        estado["agora"], e.texto or "", de_novo=i["enviada_em"] is not None)
+        else:
+            saiu = True
+    frase = (ANOTEI_NA_TRAVA if saiu else SEM_FICHA_DA_CARTEIRA) % quem
+    w = saida.texto(e.pessoa.para, frase)
+    _registrar(con, c["id"], e.pessoa.para, "texto", resumo, w)
+    estado["falou"] = estado["falou"] or bool(w)
+
+
 def _falar_na_carteira(con, saida, estado, texto: str, ok: bool, motivo: str, travada: bool) -> None:
     """A fala no modo carteira: o filtro de saida de sempre (com a frase de reserva dela), e a trava da ficha
     (D7): "avisei quem cuida de voce" sem a ficha ter saido vira a apresentacao simples de quem atende."""
     p, c = estado["e"].pessoa, estado["conversa"]
-    if ok and any(x in _sem_acento(texto) for x in AVISADO):
+    if ok and NAO_ANOTA.search(_sem_acento(texto)):
+        _anotar_na_trava(con, saida, estado, texto)
+        return
+    if ok and any(x in _sem_acento(texto) for x in AVISADO_CARTEIRA):
         i = interesse_mod.da_conversa(con, c["id"])
         if i is None or i["enviada_em"] is None:
-            print("olivia: carteira, aviso sem ficha na conversa %d: %s" % (c["id"], " ".join(texto.split())[:300]),
-                  flush=True)
-            w = saida.texto(p.para, SEM_FICHA_DA_CARTEIRA % interesse_mod.quem_atende(
-                interesse_mod._destinatario(con, estado["carteira"]["id"])))
-            _registrar(con, c["id"], p.para, "texto", RECUSADA_AVISO, w)
-            estado["falou"] = estado["falou"] or bool(w)
+            _anotar_na_trava(con, saida, estado, texto, RECUSADA_AVISO)
             return
     if not ok:
         print("olivia: carteira, frase recusada na conversa %d (%s): %s" % (c["id"], motivo, " ".join(texto.split())[:300]),

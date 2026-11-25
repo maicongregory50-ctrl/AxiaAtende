@@ -27,13 +27,15 @@ def montar(con, agora: datetime | None = None) -> list[dict]:
     linhas = con.execute(
         """SELECT d.id, d.erp_codigo, d.papel, d.situacao, d.convite_em, d.entregue_em, d.lido_em,
                   d.resposta, d.resposta_em, d.resposta_texto, e.campanha, e.tipo, e.peca,
-                  i.culturas, i.ficha_em, i.escreveu, i.conversa_aberta
+                  i.culturas, i.fora_da_linha, e.culturas AS do_boletim, i.ficha_em, i.escreveu, i.conversa_aberta
              FROM atendimento.envio_destinatarios d
              JOIN atendimento.envios e ON e.id = d.envio_id
              -- #1754: o interesse de quem quis saber mais (todas as conversas da carteira daquele envio)
              LEFT JOIN LATERAL (
                   SELECT array(SELECT DISTINCT x FROM atendimento.interesses i2, unnest(i2.culturas) AS x
                                 WHERE i2.destinatario_id = d.id ORDER BY x) AS culturas,
+                         array(SELECT DISTINCT x FROM atendimento.interesses i3, unnest(i3.fora_da_linha) AS x
+                                WHERE i3.destinatario_id = d.id ORDER BY x) AS fora_da_linha,
                          max(ii.enviada_em) AS ficha_em,
                          (array_agg(ii.texto ORDER BY ii.id DESC) FILTER (WHERE ii.texto <> ''))[1] AS escreveu,
                          bool_or(c.situacao = 'em_curso') AS conversa_aberta
