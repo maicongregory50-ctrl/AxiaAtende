@@ -1822,7 +1822,10 @@ def fatos_da_carteira(con, conversa, d) -> str:
     if i is None or i["enviada_em"] is None:
         ficha = "ainda não foi a quem cuida dele"
     else:
-        ficha = "já foi a quem cuida dele" + ((" (culturas: %s)" % ", ".join(i["culturas"])) if i["culturas"] else "")
+        # prova de 25/11: a ficha saiu sem cultura e ela disse ao cliente que "nao registrou de fato"
+        ditas = interesse_mod.marcadas(i["culturas"], atual["culturas"], i["fora_da_linha"])
+        ficha = ("JÁ FOI a quem cuida dele, com o que a pessoa escreveu" + ((" (anotado: %s)" % ditas) if ditas else "")
+                 + "; o pedido dela está registrado e entregue")
     entrada = ("tocou \"Quero saber mais\": a saudação, o material e o texto da parceria JÁ foram mandados "
                "pelo sistema; não os repita" if i is not None and i["entrada"] == "toque"
                else "escreveu em resposta ao boletim")
