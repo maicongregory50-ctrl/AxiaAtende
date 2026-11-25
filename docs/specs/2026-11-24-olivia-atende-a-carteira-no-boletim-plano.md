@@ -121,7 +121,33 @@ passo 15, antes de a chave ligar. Manual legal: não se aplica.
     `axiaatende-backend`. — verificação: `/saude` mostra a chave desligada; log sem erro; um toque
     "falar" de envio antigo responde como antes.
 
-17. **Prova real**, com o modelo aprovado na Meta. Um envio de teste só para o WhatsApp do dono, com
+**Emenda de 25/11/2026 — a lista é a linha inteira (spec, D13 a D16).** Entram antes de refazer a
+prova do passo 17, com o código do #1754 já no ar e a chave desligada:
+
+- **16a. A linha da casa.** Migração nova (próximo número lido da pasta, com `_VOLTA`): o ajuste
+  `olivia.culturas_da_linha`, com as culturas de `docs/olivia/base-da-empresa.md`. **[SÓ O DONO]**
+  confere a lista antes de aplicar; o verbo de ver e trocar a lista entra em `scripts\olivia.py`.
+  — verificação: o ajuste em produção com a lista que ele conferiu; centeio dentro.
+- **16b. A ferramenta.** `backend/olivia.py` (`ferramentas_da_carteira`) e `backend/interesse.py`
+  (`anotar`): o enum de `anotar_interesse` passa a ser a linha inteira, e a ferramenta é sempre
+  oferecida no modo carteira; as culturas do envio viram só o destaque. Um campo de texto curto leva
+  o que o cliente pediu fora da linha, literal.
+  — verificação: testes: boletim com três culturas, cliente pede centeio → anotado e ficha enviada;
+  cliente pede algo fora da linha → ficha com "fora da linha: <o que escreveu>"; pedido sem
+  `culturas` → a ferramenta continua oferecida.
+- **16c. A ficha e o ERP.** `interesse.py`: cada cultura sai marcada "do boletim" ou "fora do
+  boletim", na ficha e no texto que vai ao Relacionamento.
+  — verificação: teste da ficha e de `eventos_erp.montar` com as duas marcas.
+- **16d. As duas falas.** A instrução do modo carteira troca a regra 6 (não existe mais "não consigo
+  anotar") e a regra da IA (perguntada, responde na mesma mensagem que é a OlivIA, assistente
+  virtual); a trava de fala ganha "não consigo anotar" e as parecidas.
+  — verificação: testes da trava; a regra nova presente na instrução.
+- **16e.** Bateria, manual (`olivia.md`: "anota qualquer cultura da linha"), commit citando #1754,
+  restart dos dois serviços com a chave desligada.
+
+17. **Prova real**, com o modelo aprovado na Meta. **Refeita depois da emenda**, repetindo o caso que
+    falhou: pedir centeio com um boletim de três culturas (a ficha tem de sair) e perguntar "Falo com
+    uma IA?" (a resposta tem de vir na mesma mensagem). Um envio de teste só para o WhatsApp do dono, com
     um responsável que **não** seja o próprio número dele (a ficha a si mesmo é recusada por desenho),
     e a chave ligada durante a prova. **[SÓ O DONO]**: toca "Quero saber mais"; confere a saudação, as
     imagens e o texto; pergunta preço (ela manda ao representante); pergunta se é um robô (ela não

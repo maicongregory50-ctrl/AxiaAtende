@@ -125,8 +125,8 @@ Caminho A (dono, 24/11/2026): o degrau inteiro numa etapa, atrás de chave próp
   faturamento, faixa, histórico de compra, cidade, telefone nem nada do ERP. O dado vem da linha do
   envio; ela não tem ferramenta de busca.
 - **D5. O que ela faz**, com lista de ferramentas própria deste modo (as de vaga, venda e lead não
-  são oferecidas): mandar a versão maior; anotar o interesse, numa **lista fechada** com as culturas
-  do boletim; passar o contato do representante do cliente; oferecer as opções da `raiz_carteira`
+  são oferecidas): mandar a versão maior; anotar o interesse, numa **lista fechada** com a linha
+  inteira da Renascer (emenda de 25/11, D13); passar o contato do representante do cliente; oferecer as opções da `raiz_carteira`
   (boleto, carga, qualidade, falar com a empresa); encerrar.
 - **D6. O que ela não faz.** Não fala de quantidade, preço nem prazo: diz que isso é com o
   representante. Não promete estoque: o texto da parceria fala de esforço, com limite. O filtro de
@@ -140,18 +140,44 @@ Caminho A (dono, 24/11/2026): o degrau inteiro numa etapa, atrás de chave próp
 - **D9. O registro no ERP.** O interesse viaja por `eventos_erp` e aparece no Relacionamento do
   cliente como a resposta dele ao boletim ("Quis saber mais. Interesse: aveia preta, nabo
   forrageiro"). Sem mudança no ERP: na saída, o valor novo é traduzido para um que ele já aceita.
-- **D10. A lista de culturas vem no pedido.** `POST /pedido/envio` ganha um campo opcional com os
-  rótulos das culturas do boletim. Sem ele, a ferramenta de anotar interesse não é oferecida, e ela
-  só passa o representante.
+- **D10. As culturas do boletim vêm no pedido, como destaque.** `POST /pedido/envio` tem um campo
+  opcional com os rótulos das culturas daquele boletim. **Emendada em 25/11 (D13):** esse campo deixou
+  de ser a lista do que ela pode anotar; diz só o que o boletim destacou.
 - **D11. A chave.** `olivia.atende_carteira`, ajuste no banco, nasce `false`, liga e desliga por
   `scripts\olivia.py` sem restart e aparece no `/saude`. Desligada: o toque "saber" responde com a
   linha do representante (como o "falar" de hoje) e o texto cai no portão.
 - **D12. O vigia.** `fechar_dia` passa a contar as conversas da carteira, os interesses e as fichas
   com erro, no resumo que o dono já recebe.
 
+### Emenda de 25/11/2026 (dono, depois da prova de 24/11)
+
+Na prova, o envio de teste trouxe três culturas (aveia preta, azevém, nabo forrageiro). O dono
+escreveu "Ok, quero Centeio" e ouviu *"o centeio não está entre as culturas do boletim, então não
+consigo anotá-lo por aqui"*. Nenhuma ficha saiu (resumo do dia: "carteira: 3 conversas, 0 com
+interesse"). A saída que existia para esse caso (anotar com a lista vazia, e a ficha leva o que o
+cliente escreveu) não foi usada por ela. E à pergunta "Falo com uma IA?" ela respondeu com o contato
+do representante; só respondeu de fato na conversa seguinte.
+
+Decisão do dono: *"Lista de cultura de atendimento precisa sempre ser todas, o boletim pode até
+limitar por nosso interesse, mas não podemos dizer a um cliente que não podemos anotar o interesse
+dele se não for nas culturas do boletim."*
+
+- **D13. A lista de atendimento é a linha inteira.** A lista fechada de `anotar_interesse` passa a
+  ser a das culturas que a Renascer vende, guardada num ajuste do AxiaAtende
+  (`olivia.culturas_da_linha`), nascida das culturas de `docs/olivia/base-da-empresa.md` e conferida
+  pelo dono. Não depende do que o pedido do envio traz. A ferramenta é sempre oferecida no modo
+  carteira.
+- **D14. A ficha diz o que era do boletim.** Cada cultura anotada sai marcada como "do boletim" ou
+  "fora do boletim". O que o cliente pedir e não for da linha vai à ficha como ele escreveu, marcado
+  "fora da linha". O texto que vai ao Relacionamento do ERP lista as culturas do mesmo jeito.
+- **D15. Ela nunca diz que não pode anotar.** Todo interesse declarado gera ficha. A frase "não
+  consigo anotar" (e as parecidas) entra na trava de fala, trocada pela anotação de fato.
+- **D16. Perguntada se é IA, responde na mesma mensagem.** D8 dizia "não nega"; desviar da pergunta
+  não cumpre a intenção. Ela diz que é a OlivIA, assistente virtual da Renascer, e segue.
+
 ## Escopo desta etapa
 
-**DENTRO:** D1 a D12; a migração com `_VOLTA`; o arquivo do texto da parceria (rascunho da sessão,
+**DENTRO:** D1 a D16; a migração com `_VOLTA`; o arquivo do texto da parceria (rascunho da sessão,
 aprovação do dono); os testes; o manual; a política de IA e o inventário de agentes (AxiaSecurity).
 
 **FORA:**
