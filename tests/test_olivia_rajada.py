@@ -138,3 +138,43 @@ def test_so_link_e_so_link():
             self.texto = t
     assert O._so_link(E("https://a.com/x")) and O._so_link(E(" www.a.com/x \nhttps://b.com "))
     assert not O._so_link(E("segue a ordem https://a.com/x")) and not O._so_link(E("bom dia")) and not O._so_link(E(None))
+
+
+# ── a propaganda de quem ja tem o contato (dono, 26/11/2026) ────────────────
+
+PROPAGANDA = ("Bom dia, tudo bem? Sua colheitadeira precisa estar 100% pronta para o campo! Que tal fazer aquela "
+              "revisão preventiva com urgência para evitar surpresas? A LOJA DE PEÇAS distribui direto das maiores "
+              "fabricantes do país com preço de atacado e entrega rápida para você não perder tempo! Vantagens de "
+              "hoje: peças de alta qualidade, frete grátis e atendimento especializado. Envie a lista de peças.")
+
+
+def ja_tem_o_contato(cfg):
+    with conexao(cfg) as con:
+        con.execute("""INSERT INTO atendimento.enviadas (wamid, para, tipo, resumo)
+                       VALUES ('wamid.antigo', %s, 'texto', 'link: fornecedores.ainda')""", (DE_FORA,))
+
+
+def test_propaganda_de_quem_ja_tem_o_contato_nao_e_respondida(ligada):
+    assert len(PROPAGANDA) >= O.PROPAGANDA_DE
+    ja_tem_o_contato(ligada)
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Não devia sair."}]
+    chegar(ligada, texto("p1", PROPAGANDA, numero=DE_FORA))
+    rodar(ligada, s, ia)
+    assert not s.enviadas and not getattr(ia, "chamadas", []) and pendentes(ligada) == 0
+    assert not ler(ligada, "SELECT 1 FROM atendimento.conversas")
+
+
+def test_a_primeira_propaganda_e_a_mensagem_curta_de_quem_ja_tem_o_contato_seguem_ao_modelo(ligada):
+    s, ia = SaidaFalsa(), IAFalsa()
+    ia.conversa = [{"texto": "Ofertas são com o setor de Fornecedores."}]
+    chegar(ligada, texto("p1", PROPAGANDA, numero=DE_FORA))
+    rodar(ligada, s, ia)
+    assert len(ia.chamadas) == 1                      # a primeira vez, como sempre
+    with conexao(ligada) as con:                      # a conversa fecha, e ele ja tem o contato
+        con.execute("UPDATE atendimento.conversas SET situacao = 'com_link'")
+    ja_tem_o_contato(ligada)
+    ia.conversa = [{"texto": "Quem cuida de pagamento é o Financeiro."}]
+    chegar(ligada, texto("p2", "boa tarde, queria falar de um pagamento", numero=DE_FORA))
+    rodar(ligada, s, ia)
+    assert len(ia.chamadas) == 2                      # mensagem curta: pode ser gente

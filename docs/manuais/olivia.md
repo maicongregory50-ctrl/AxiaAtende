@@ -203,6 +203,9 @@ autenticado são os próximos degraus, em chamados próprios.
   disso, a linha curta de sempre. **Não responde em áudio.**
 - **Não abre link, não repassa a ninguém a mensagem que veio com link** (uma ordem de serviço, um
   rastreio) e **não conversa com quem só manda link**: essa pessoa não aparece na Recepção nem no resumo.
+- **Não responde à propaganda de quem já recebeu o contato de Fornecedores** (26/11/2026): a mensagem longa
+  e pronta (300 caracteres ou mais) de um número que já teve esse contato fica sem resposta. A primeira
+  vez é respondida como sempre, e a mensagem curta desse número também.
 - **Não lê o catálogo do ERP** nem números de produto (dose, janela, massa): esses ficam fora da base até
   o #857 reconciliar a base técnica.
 

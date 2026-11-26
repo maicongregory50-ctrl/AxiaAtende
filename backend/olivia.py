@@ -1061,6 +1061,22 @@ def _link_solto(con, saida, e, agora: datetime) -> bool:
     return True
 
 
+PROPAGANDA_DE = 300   # caracteres: o disparo em massa e uma mensagem longa e pronta
+
+
+def _propaganda_de_quem_ja_tem_o_contato(con, e) -> bool:
+    """Dono, 26/11/2026 (a loja de pecas, cinco disparos desde 14/10, cada um respondido): quem JA recebeu o
+    contato de Fornecedores e abre conversa de novo com uma mensagem longa e pronta nao recebe resposta. A
+    primeira vez segue como sempre, e a mensagem curta de quem ja tem o contato tambem (pode ser gente)."""
+    if len((e.texto or "").strip()) < PROPAGANDA_DE:
+        return False
+    from .envio import com_nove
+    p = e.pessoa
+    numeros = list({x for x in (p.wa_id, p.bsuid, p.para, com_nove(p.wa_id or "")) if x})
+    return con.execute("""SELECT 1 FROM atendimento.enviadas WHERE para = ANY(%s) AND resumo LIKE 'link: fornecedores%%'
+                           LIMIT 1""", (numeros,)).fetchone() is not None
+
+
 def _parada_dela(con, pessoa, agora: datetime) -> bool:
     return con.execute("""SELECT 1 FROM atendimento.conversas
                            WHERE bsuid = %s AND situacao = 'parou_no_meio' AND conduzida_por = 'olivia'
@@ -1127,6 +1143,10 @@ def atender(con, saida, ia, e, agora: datetime, envio=None, de_vaga: bool = Fals
     if (carteira is None and not de_vaga and aberta is None and _so_link(e)
             and not _parada_dela(con, e.pessoa, agora)):
         return _link_solto(con, saida, e, agora)
+    if (carteira is None and not de_vaga and aberta is None and not _parada_dela(con, e.pessoa, agora)
+            and _propaganda_de_quem_ja_tem_o_contato(con, e)):
+        print("olivia: propaganda de quem ja tem o contato de Fornecedores (%s): silencio" % e.wamid, flush=True)
+        return True
     _esperar_a_rajada(con, e, agora)
     if _tem_mais_nova(con, e):
         print("olivia: %s cede a vez a mensagem mais nova da mesma pessoa" % e.wamid, flush=True)
