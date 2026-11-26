@@ -635,7 +635,10 @@ def test_curriculo_sem_vaga_ela_pergunta_e_encaminha_o_arquivo_de_antes(ligada):
     ia.conversa = [{"ferramentas": [("encaminhar_curriculo", {"vaga_id": 2})]}, {"texto": "Ok."}]
     passo(ligada, s, texto("w3", "e para a de auxiliar tambem"), ia=ia, nome="Gabriel Fante")
     assert len(candidaturas(ligada)) == 1
-    assert "não mandou PDF nem foto" in ia.chamadas[-1]["mensagens"][-1]["content"][0]["content"]
+    # 26/11/2026 (conversa 383): com o curriculo ja encaminhado ela ouvia "peca o curriculo" e dizia ao
+    # candidato que a foto nao tinha chegado. Agora a ferramenta diz que ja foi, e que nao e para pedir de novo
+    dito = ia.chamadas[-1]["mensagens"][-1]["content"][0]["content"]
+    assert "JÁ foi encaminhado" in dito and "NÃO peça o currículo de novo" in dito
 
 
 def test_a_instrucao_pede_mensagens_curtas(ligada):

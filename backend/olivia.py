@@ -1492,6 +1492,16 @@ def _executar(con, saida, ia, estado, nome: str, entrada: dict, agora: datetime)
         e = anterior or e
         tipo = _tem_arquivo(e)
         if tipo is None:
+            # 26/11/2026 (conversa 383): o curriculo em foto foi a Fran as 09:58; a mensagem seguinte era texto,
+            # o modelo chamou a ferramenta de novo, ouviu "peca o curriculo" e disse ao candidato que a foto nao
+            # tinha chegado. Ele mandou de novo, e ela se desculpou. Com candidatura gravada, a resposta e outra.
+            # pela pessoa, e nao pela conversa: a que recebeu o curriculo fecha, e a mensagem seguinte abre outra
+            if con.execute("""SELECT 1 FROM atendimento.candidaturas
+                               WHERE (bsuid = %s OR wa_id = %s) AND recebida_em > %s LIMIT 1""",
+                           (e.pessoa.bsuid, e.pessoa.wa_id or "", agora - HISTORICO)).fetchone():
+                return ("O currículo desta pessoa JÁ foi encaminhado à equipe nas últimas 24 h: não há arquivo novo "
+                        "a encaminhar. NÃO peça o currículo de novo e não diga que ele não chegou. Responda ao que "
+                        "ela disse agora.")
             return ("A pessoa não mandou PDF nem foto nas últimas 24 h que ainda não tenha sido encaminhado. "
                     "Peça o currículo em PDF ou em foto.")
         vaga_id = entrada.get("vaga_id")
