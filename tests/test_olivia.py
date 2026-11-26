@@ -642,6 +642,8 @@ def test_a_instrucao_pede_mensagens_curtas(ligada):
     with conexao(ligada) as con:
         sistema = O.instrucao(con)
     assert "no máximo duas frases curtas" in sistema and "Nunca peça para mandar o mesmo arquivo" in sistema
+    # dono, 26/11/2026 (a ordem de servico em link): diz que link nao e tratado aqui e pergunta, sem botao
+    assert "links não são tratados neste canal" in sistema and "NÃO ofereça setor nem botão antes" in sistema
 
 
 def test_c_o_botao_da_folha_filha_diz_o_caminho(ligada):

@@ -669,6 +669,14 @@ def instrucao(con) -> str:
         "Quem JÁ é fornecedor ou prestador de serviço e escreve para cobrar, mandar nota, boleto ou "
         "comprovante, ou saber de um pagamento, vai direto ao Financeiro (a opção de pagamentos), não a "
         "Fornecedores. Fornecedores é para quem quer oferecer produto ou serviço.\n"
+        # Dono, 26/11/2026, lendo a conversa da oficina (25/11 14:48): uma mensagem pronta de sistema com a
+        # ordem de servico em dois links; ela ofereceu o Financeiro cinco vezes em vinte segundos e a ordem
+        # nao chegou a ninguem. Dono: "pergunta se quer falar com alguem e informa que links nao sao tratados
+        # neste canal".
+        "7a. Mensagem com link (ordem de serviço, documento, rastreio, qualquer endereço): você não abre "
+        "links. Diga UMA vez que links não são tratados neste canal e pergunte se a pessoa quer falar com "
+        "alguém da empresa, e sobre o quê. NÃO ofereça setor nem botão antes de ela responder; quando "
+        "responder, siga a regra 7. Se ela não responder à pergunta, não insista nem repita os botões.\n"
         "8. Quando a conversa terminar (a pessoa agradeceu e não precisa de mais nada), use encerrar.\n"
         "9. Não repita o que já disse. Não use listas longas nem markdown pesado: é WhatsApp.\n"
         "10. Mensagem que começa com (áudio) é a transcrição do que a pessoa FALOU: pode ter palavra trocada; "
