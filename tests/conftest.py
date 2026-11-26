@@ -18,4 +18,8 @@ def cfg(tmp_path):
     c = carregar("teste", logs=tmp_path / "logs")
     _zerar(c)
     migracoes.aplicar(c)
+    # #1929: a espera da rajada da OlivIA fica em 0 nos testes (varios poem a chegada na hora do `agora`, e
+    # esperariam). Quem testa a espera apaga este ajuste e fica com o padrao do codigo (test_olivia_rajada.py).
+    with conexao(c) as con:
+        con.execute("INSERT INTO atendimento.ajustes (chave, valor) VALUES ('olivia.espera_rajada_s', '0'::jsonb)")
     return c

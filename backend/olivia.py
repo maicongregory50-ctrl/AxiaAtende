@@ -988,6 +988,99 @@ def _ja_travou(con, conversa_id) -> bool:
                        (conversa_id, FALA_TRAVOU + "%")).fetchone() is not None
 
 
+# ── a rajada, o botao repetido e o link solto (#1929) ───────────────────────
+
+AJUSTE_ESPERA = "olivia.espera_rajada_s"
+ESPERA_RAJADA = 5   # segundos; o ajuste ausente vale isto, e 0 desliga a espera
+LINK_SOLTO = "olivia: link solto"
+TEXTO_LINK_SOLTO = ("Links não são tratados neste canal. Se quiser falar com a Sementes Renascer, escreva em "
+                    "uma linha o que você precisa.")
+_URL = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
+
+
+def espera_da_rajada(con) -> float:
+    try:
+        return max(float(motor._ajuste(con, AJUSTE_ESPERA, ESPERA_RAJADA)), 0.0)
+    except (TypeError, ValueError):
+        return float(ESPERA_RAJADA)
+
+
+def _e_texto_digitado(e) -> bool:
+    return bool(e.texto) and not e.toque and e.documento is None and e.midia is None \
+        and not (e.wamid or "").endswith(":transcrito")
+
+
+def _esperar_a_rajada(con, e, agora: datetime) -> None:
+    """Em 24 e 25/11/2026 tres conversas tiveram uma resposta por mensagem ("Olá!" e "Boa tarde" no mesmo
+    segundo, duas respostas; seis mensagens em 20 s, seis voltas). O texto digitado espera alguns segundos da
+    CHEGADA antes de ser respondido. Hora de chegada no futuro ou muito atras (o `agora` fixo dos testes, o
+    reenvio da Meta): nao espera."""
+    if not _e_texto_digitado(e) or e.chegou_em is None:
+        return
+    espera = espera_da_rajada(con)
+    passou = (agora - e.chegou_em).total_seconds()
+    if 0 <= passou < espera:
+        raise motor.Adiar(espera - passou)
+
+
+def _tem_mais_nova(con, e) -> bool:
+    """A pessoa ja mandou OUTRO texto depois deste, ainda na fila: este cede a vez, e a resposta ao mais novo
+    le os dois (`historico` junta as mensagens seguidas dela num turno so)."""
+    if not _e_texto_digitado(e):
+        return False
+    return con.execute("""SELECT 1 FROM atendimento.eventos_meta n
+                           WHERE n.tipo = 'mensagem' AND n.processado_em IS NULL AND n.chave_meta <> ALL(%s)
+                             AND n.corpo->'msg'->>'type' = 'text'
+                             AND (n.bsuid = %s OR n.corpo->'msg'->>'from' = %s)
+                             AND n.id > (SELECT coalesce(max(a.id), 0) FROM atendimento.eventos_meta a
+                                          WHERE a.chave_meta = ANY(%s))
+                           LIMIT 1""",
+                       (_chaves_da_atual(e.wamid), e.pessoa.bsuid, e.pessoa.wa_id or "",
+                        _chaves_da_atual(e.wamid))).fetchone() is not None
+
+
+def _so_link(e) -> bool:
+    t = e.texto or ""
+    return bool(_URL.search(t)) and not _URL.sub("", t).strip(" \n\t.,;:!?-")
+
+
+def _link_solto(con, saida, e, agora: datetime) -> bool:
+    """Em 26/11/2026, 05:07 e 05:40, dois links de golpe ganharam duas respostas do modelo. A mensagem que e SO
+    link, de quem nao esta em conversa, recebe uma linha fixa uma vez em 24 h, sem modelo; as seguintes,
+    silencio. Sempre True: o caminho de hoje (o menu) tambem nao responde a ela."""
+    p = e.pessoa
+    ja = con.execute("""SELECT 1 FROM atendimento.enviadas WHERE para = ANY(%s) AND resumo = %s AND enviada_em > %s
+                         LIMIT 1""", ([x for x in (p.wa_id, p.bsuid, p.para) if x], LINK_SOLTO,
+                                      agora - HISTORICO)).fetchone()
+    if ja:
+        print("olivia: link solto de novo (%s): silencio" % e.wamid, flush=True)
+        return True
+    w = saida.texto(p.para, TEXTO_LINK_SOLTO)
+    _registrar(con, None, p.para, "texto", LINK_SOLTO, w)
+    print("olivia: link solto (%s): a linha fixa, sem modelo" % e.wamid, flush=True)
+    return True
+
+
+def _parada_dela(con, pessoa, agora: datetime) -> bool:
+    return con.execute("""SELECT 1 FROM atendimento.conversas
+                           WHERE bsuid = %s AND situacao = 'parou_no_meio' AND conduzida_por = 'olivia'
+                             AND ultimo_toque_em > %s LIMIT 1""", (pessoa.bsuid, agora - RETOMA_ATE)).fetchone() is not None
+
+
+def _oferta_sem_toque(con, conversa, chave: str, pessoa) -> bool:
+    """A ULTIMA oferta de opcao desta conversa foi esta mesma, e a pessoa nao tocou em botao nenhum depois
+    (25/11/2026: "Posso te passar para Financeiro?" saiu cinco vezes em vinte segundos)."""
+    u = con.execute("""SELECT resumo, enviada_em FROM atendimento.enviadas
+                        WHERE conversa_id = %s AND resumo LIKE %s ORDER BY id DESC LIMIT 1""",
+                    (conversa["id"], FERRAMENTA + " oferecer_opcao_do_menu:%")).fetchone()
+    if not u or u["resumo"] != "%s oferecer_opcao_do_menu: %s" % (FERRAMENTA, chave):
+        return False
+    return con.execute("""SELECT 1 FROM atendimento.eventos_meta
+                           WHERE tipo = 'mensagem' AND corpo->'msg'->>'type' IN ('interactive', 'button')
+                             AND (bsuid = %s OR corpo->'msg'->>'from' = %s) AND recebido_em > %s LIMIT 1""",
+                       (pessoa.bsuid, pessoa.wa_id or "", u["enviada_em"])).fetchone() is None
+
+
 # ── o atendimento ───────────────────────────────────────────────────────────
 
 class _Desfazer(Exception):
@@ -1029,6 +1122,15 @@ def atender(con, saida, ia, e, agora: datetime, envio=None, de_vaga: bool = Fals
             certo, _ = motor.casar_opcao(con, None, no, e.texto)
             if certo is not None:
                 return False   # "Sc" no "em qual estado?": o casamento exato de hoje, sem IA
+    # #1929: o link solto de quem nao esta em conversa nao vai ao modelo; o texto digitado espera a rajada
+    # (levanta `motor.Adiar`, antes de qualquer envio ou gravacao); e o que tem outro mais novo na fila cede a vez
+    if (carteira is None and not de_vaga and aberta is None and _so_link(e)
+            and not _parada_dela(con, e.pessoa, agora)):
+        return _link_solto(con, saida, e, agora)
+    _esperar_a_rajada(con, e, agora)
+    if _tem_mais_nova(con, e):
+        print("olivia: %s cede a vez a mensagem mais nova da mesma pessoa" % e.wamid, flush=True)
+        return True
     estado = {"falou": False, "acabou": False, "conversa": None, "e": e, "de_vaga": de_vaga, "carteira": carteira,
               "agora": agora}
     try:
@@ -1265,6 +1367,12 @@ def _oferecer(con, saida, estado, chave: str, agora: datetime) -> str:
     validas = set(opcoes)
     if no is None or chave not in validas or no["acao"] == "encerrar":
         return "Essa opção não existe no menu. Use uma chave da lista OPÇÕES DO MENU."
+    if _oferta_sem_toque(con, c, chave, p):
+        # #1929: os mesmos botoes nao saem de novo. Se ela ja falou nesta vez, a vez acaba aqui (uma mensagem so)
+        estado["acabou"] = estado.get("acabou") or estado["falou"]
+        return ("Os botões de \"%s\" JÁ estão na tela da pessoa, sem toque: não foram mandados de novo. Não "
+                "repita a oferta. Se você ainda não respondeu nesta vez, diga em UMA frase curta que é só tocar "
+                "em Sim nos botões acima, ou responda ao que ela disse, se mudou de assunto." % no["rotulo"])
     if motor._filhos(con, no["id"]):
         # um no com opcoes: a pergunta dele com os botoes, e a conversa passa a estar nele
         w = motor.perguntar(con, saida, p, no)

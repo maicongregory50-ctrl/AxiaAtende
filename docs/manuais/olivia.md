@@ -52,6 +52,14 @@ autenticado são os próximos degraus, em chamados próprios.
    mensagem de mais de três palavras a fazem mudar de abordagem. **Na conversa de quem quer comprar**
    (#1784, 24/11/2026), com a chave da venda ligada, vale o mesmo: responder por texto é a conversa
    andando, e um segundo "Sim" não manda o menu.
+   **Ela espera a pessoa terminar de escrever** (#1929, 26/11/2026): a resposta a um texto digitado sai uns
+   5 segundos depois da mensagem, e quem manda várias em seguida ("Olá!", "Boa tarde", "queria saber…")
+   recebe **uma** resposta, à última, que leu todas. Toque em botão, foto, PDF e áudio não esperam.
+   **Ela não repete o botão**: a opção que já está na tela, sem toque, não sai de novo; ela diz que é só
+   tocar em Sim, ou responde ao que a pessoa disse.
+   **Mensagem com link**: ela não abre links. No meio de uma conversa, diz que links não são tratados neste
+   canal e pergunta se a pessoa quer falar com alguém. A mensagem que é **só um link**, de quem não está em
+   conversa, recebe uma linha fixa uma vez em 24 horas e, nas seguintes, nada.
    Ela escreve **curto**: no máximo duas frases por mensagem, uma pergunta por vez. Quando a pessoa manda
    o currículo sem dizer a vaga, ela pergunta qual antes de encaminhar, e encaminha o arquivo que já veio.
 6. **A conversa da vaga** (#1525), com a chave `olivia.conduz_vaga` ligada: quem chega pelo anúncio ou
@@ -193,6 +201,8 @@ autenticado são os próximos degraus, em chamados próprios.
 - **Não faz pré-triagem de currículo em foto**: a Fran olha.
 - **Não responde figurinha nem localização**, e o **áudio só com a chave `audio.de_fora` ligada**; fora
   disso, a linha curta de sempre. **Não responde em áudio.**
+- **Não abre link, não repassa a ninguém a mensagem que veio com link** (uma ordem de serviço, um
+  rastreio) e **não conversa com quem só manda link**: essa pessoa não aparece na Recepção nem no resumo.
 - **Não lê o catálogo do ERP** nem números de produto (dose, janela, massa): esses ficam fora da base até
   o #857 reconciliar a base técnica.
 
@@ -213,6 +223,11 @@ Restart-Service axiaatende-recepcionista
 Desligada, tudo volta ao menu de hoje, na hora, e nada se perde. A foto como currículo e a base continuam,
 porque não dependem dela. Para religar, `OLIVIA_FALA=true` e o mesmo restart. Conferir em
 `http://127.0.0.1:8008/saude`: `"olivia": "ligada"` ou `"desligada"`.
+
+**A espera da rajada** (#1929) é um número de segundos, que muda **sem restart** (janela elevada, em
+produção, com as duas variáveis de ambiente do bloco abaixo): `scripts\olivia.py espera-rajada` mostra,
+`espera-rajada 0` desliga a espera (ela volta a responder em 1 segundo, uma resposta por mensagem) e
+`espera-rajada 5` é o padrão.
 
 **O áudio de fora** tem chave própria, que liga e desliga **sem restart** (janela elevada, em produção):
 

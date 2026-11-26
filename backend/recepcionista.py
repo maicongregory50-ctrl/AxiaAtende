@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import json
 import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -32,6 +33,9 @@ from . import envio as envio_mod
 from .banco import conexao
 
 LOTE = 20
+#: #1929: os eventos adiados pela espera da rajada: id -> o `time.monotonic()` em que voltam a fila. Mora na
+#: memoria do processo de proposito: um restart so faz o evento ser lido na hora, como era antes.
+_ADIADOS: dict[int, float] = {}
 
 
 def assinatura_confere(segredo: str, corpo: bytes, cabecalho: str | None) -> bool:
@@ -108,12 +112,18 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
         olivia = Olivia()
     for _ in range(LOTE):
         with conexao(cfg) as con:
+            # #1929: o evento adiado (a rajada) fica de fora ate a espera dele vencer, pelo relogio do processo
+            relogio = time.monotonic()
+            for i in [i for i, ate in _ADIADOS.items() if ate <= relogio]:
+                del _ADIADOS[i]
             ev = con.execute("""SELECT * FROM atendimento.eventos_meta WHERE processado_em IS NULL
-                                 ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED""").fetchone()
+                                    AND id <> ALL(%s)
+                                 ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED""", (list(_ADIADOS),)).fetchone()
             if not ev:
                 return feitos
             momento = agora or datetime.now(timezone.utc)
             erro = ""
+            adiar = None
             try:
                 with con.transaction():
                     if ev["tipo"] == "status":
@@ -123,13 +133,19 @@ def processar_pendentes(cfg: config.Config, saida, ia=None, envio=None, agora: d
                     elif ev["tipo"] == "mensagem":
                         corpo = ev["corpo"]
                         entrada = motor.ler_mensagem({"contacts": corpo["contacts"]}, corpo["msg"])
+                        entrada.chegou_em = ev["recebido_em"]   # #1929: de onde a espera da rajada conta
                         if cfg.responde_so_para and envio_mod.com_nove(entrada.pessoa.wa_id) not in {
                                 envio_mod.com_nove(n) for n in cfg.responde_so_para}:
                             erro = "escuta (ensaio)"   # o Opa responde a quem nao esta no ensaio
                         else:
                             motor.tratar(con, saida, ia, entrada, momento, envio, campo, olivia=olivia)
+            except motor.Adiar as espera:   # #1929: nada foi mandado nem gravado; o evento volta depois
+                adiar = espera
             except Exception as falha:  # noqa: BLE001 -- um evento ruim nao trava a fila
                 erro = "%s: %s" % (type(falha).__name__, str(falha)[:300])
+            if adiar is not None:
+                _ADIADOS[ev["id"]] = time.monotonic() + max(adiar.segundos, 0.1)
+                continue
             con.execute("UPDATE atendimento.eventos_meta SET processado_em = %s, erro = %s WHERE id = %s",
                         (momento, erro, ev["id"]))
             feitos += 1

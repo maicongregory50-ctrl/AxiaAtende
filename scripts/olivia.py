@@ -61,13 +61,28 @@ def linha(cfg, nova: str | None) -> int:
 def main() -> int:
     acao = (sys.argv[1:] or ["mostrar"])[0]
     if acao not in ("mostrar", "ligar-vaga", "desligar-vaga", "ligar-venda", "desligar-venda",
-                    "ligar-qualifica", "desligar-qualifica", "ligar-carteira", "desligar-carteira", "linha"):
+                    "ligar-qualifica", "desligar-qualifica", "ligar-carteira", "desligar-carteira", "linha",
+                    "espera-rajada"):
         print("uso: olivia.py mostrar|ligar-vaga|desligar-vaga|ligar-venda|desligar-venda|"
-              "ligar-qualifica|desligar-qualifica|ligar-carteira|desligar-carteira|linha [\"A;B;C\"]")
+              "ligar-qualifica|desligar-qualifica|ligar-carteira|desligar-carteira|linha [\"A;B;C\"]|"
+              "espera-rajada [segundos]")
         return 2
     cfg = config.carregar()
     if acao == "linha":
         return linha(cfg, sys.argv[2] if len(sys.argv) > 2 else None)
+    if acao == "espera-rajada":
+        # #1929: quantos segundos o texto digitado espera antes da resposta da OlivIA (a rajada). 0 desliga.
+        # O ajuste nao tem migracao: ausente vale o padrao do codigo. Sem restart.
+        with conexao(cfg) as con:
+            if len(sys.argv) > 2:
+                if not sys.argv[2].isdigit() or int(sys.argv[2]) > 30:
+                    print("RECUSADO: segundos inteiros, de 0 a 30")
+                    return 1
+                con.execute("""INSERT INTO atendimento.ajustes (chave, valor) VALUES (%s, %s::jsonb)
+                               ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor, atualizado_em = now()""",
+                            (olivia.AJUSTE_ESPERA, sys.argv[2]))
+            print("%s = %g s (0 = sem espera)" % (olivia.AJUSTE_ESPERA, olivia.espera_da_rajada(con)))
+        return 0
     with conexao(cfg) as con:
         if acao == "ligar-vaga":
             falta = provisorios(con)

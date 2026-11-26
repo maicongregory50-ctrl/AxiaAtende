@@ -97,6 +97,17 @@ class Entrada:
     enviado_em: datetime | None = None   # #1099: a hora em que a pessoa MANDOU (`msg.timestamp`)
     tipo: str = ""                # o `type` da Meta: text, interactive, button, image, reaction, sticker...
     audio: Audio | None = None    # #1238: o audio (so o de interno e transcrito)
+    chegou_em: datetime | None = None    # #1929: a hora em que o aviso chegou AQUI (`eventos_meta.recebido_em`)
+
+
+class Adiar(Exception):
+    """#1929: esta mensagem espera `segundos` antes de ser respondida (a rajada: quem escreve "Olá!" e "Boa
+    tarde" em seguida recebe UMA resposta). Quem levanta nao mandou nem gravou nada; `processar_pendentes`
+    desfaz o que houver, deixa o evento sem `processado_em` e volta a ele depois da espera."""
+
+    def __init__(self, segundos: float):
+        super().__init__("adiada por %.1f s" % segundos)
+        self.segundos = segundos
 
 
 # ── leitura do aviso ────────────────────────────────────────────────────────
